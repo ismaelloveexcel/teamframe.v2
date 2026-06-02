@@ -12,6 +12,7 @@ export interface ControlState {
   selectedEmployeeId: string | null;
   resolvedActions: string[];
   positionEdits: PositionEdit[];
+  onboardingCompleted: string[];
 }
 
 export interface OrgNode {
@@ -32,7 +33,7 @@ export interface Signal {
 export interface Action {
   id: string;
   positionId: string;
-  type: "assign_employee" | "fix_compliance" | "complete_offboarding" | "review_capacity" | "update_descriptions" | "performance_review";
+  type: "assign_employee" | "fix_compliance" | "complete_offboarding" | "review_capacity" | "update_descriptions" | "update_job_desc" | "assign_document" | "complete_onboarding";
   label: string;
   dueIn: string;
   relatedSignalId: string | null;
@@ -74,12 +75,12 @@ export interface UIState {
 }
 
 export const SCENARIOS: Record<string, Partial<ControlState>> = {
-  DEFAULT_VIEW: { selectedPositionId: "1-001", selectedEmployeeId: "e-001" },
-  VACANT_POSITION_FOCUS: { selectedPositionId: "3-002", selectedEmployeeId: null },
-  ON_LEAVE_EMPLOYEE_FOCUS: { selectedPositionId: "2-002", selectedEmployeeId: "e-006" },
-  OFFBOARDING_EMPLOYEE_FOCUS: { selectedPositionId: "2-004", selectedEmployeeId: "e-008" },
-  MISSING_COMPLIANCE_FOCUS: { selectedPositionId: "2-001", selectedEmployeeId: "e-005" },
-  FULL_ORGANIZATION_VIEW: { selectedPositionId: "1-001", selectedEmployeeId: null },
+  DEFAULT_VIEW: { selectedPositionId: "1-001", selectedEmployeeId: "e-001", onboardingCompleted: [] },
+  VACANT_POSITION_FOCUS: { selectedPositionId: "3-002", selectedEmployeeId: null, onboardingCompleted: [] },
+  ON_LEAVE_EMPLOYEE_FOCUS: { selectedPositionId: "2-002", selectedEmployeeId: "e-006", onboardingCompleted: [] },
+  OFFBOARDING_EMPLOYEE_FOCUS: { selectedPositionId: "2-004", selectedEmployeeId: "e-008", onboardingCompleted: [] },
+  MISSING_COMPLIANCE_FOCUS: { selectedPositionId: "2-001", selectedEmployeeId: "e-005", onboardingCompleted: [] },
+  FULL_ORGANIZATION_VIEW: { selectedPositionId: "1-001", selectedEmployeeId: null, onboardingCompleted: [] },
 };
 
 function applyPositionEdits(seed: SeedData, edits: PositionEdit[]): SeedData {
@@ -261,14 +262,38 @@ function computeActions(signals: Signal[], resolvedActions: string[]): Action[] 
     });
   }
 
-  const perfId = "act-performance-review";
-  if (!resolvedActions.includes(perfId)) {
+  const jobDescId = "act-update-jobdesc";
+  if (!resolvedActions.includes(jobDescId)) {
     actions.push({
-      id: perfId,
+      id: jobDescId,
       positionId: "1-001",
-      type: "performance_review",
-      label: "Performance Reviews",
-      dueIn: "Due in 2 weeks",
+      type: "update_job_desc",
+      label: "Update Job Description",
+      dueIn: "Due in 3 days",
+      relatedSignalId: null,
+    });
+  }
+
+  const docId = "act-assign-doc";
+  if (!resolvedActions.includes(docId)) {
+    actions.push({
+      id: docId,
+      positionId: "2-001",
+      type: "assign_document",
+      label: "Assign Document",
+      dueIn: "Due in 5 days",
+      relatedSignalId: null,
+    });
+  }
+
+  const onboardId = "act-complete-onboarding";
+  if (!resolvedActions.includes(onboardId)) {
+    actions.push({
+      id: onboardId,
+      positionId: "3-001",
+      type: "complete_onboarding",
+      label: "Complete Onboarding",
+      dueIn: "Due in 1 week",
       relatedSignalId: null,
     });
   }
@@ -360,6 +385,7 @@ export function computeUIState(seed: SeedData, controlState: ControlState): UISt
     ...scenario,
     resolvedActions: controlState.resolvedActions,
     positionEdits: controlState.positionEdits ?? [],
+    onboardingCompleted: controlState.onboardingCompleted ?? [],
   };
 
   const selectedPosition = seedWithEdits.positions.find((p) => p.id === mergedControl.selectedPositionId) ?? null;

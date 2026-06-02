@@ -1,0 +1,276 @@
+Good — this is exactly the kind of refinement that prevents your system from drifting into “feature soup” and keeps it aligned with the simulation engine.
+
+Below is a **clean, execution-ready Replit Agent prompt** incorporating your constraints and corrections.
+
+---
+
+# 🚀 REPLIT AGENT PROMPT — TEAMFRAME V2 (FEATURE REFINEMENT PATCH)
+
+You are working on an existing **React (Vite + TypeScript) frontend-only application**:
+
+# TeamFrame V2 — People Risk Intelligence Simulation Engine
+
+The system is already functional. You are now applying a **strict refinement patch**, not a redesign.
+
+---
+
+# 1. NON-NEGOTIABLE SYSTEM RULE
+
+The system remains:
+
+```txt id="p9kq1x"
+Seed Data → computeUIState() → UI Snapshot → React Render
+```
+
+NO backend. NO API calls. NO new architecture changes.
+
+---
+
+# 2. FEATURE SCOPE ADJUSTMENTS (CRITICAL)
+
+You MUST apply the following changes exactly.
+
+---
+
+# 3. REMOVE FEATURE (IMPORTANT)
+
+## ❌ Remove entirely:
+
+### Performance Review Module
+
+* Delete all performance review UI or logic
+* Remove from navigation if present
+* Do NOT replace with anything
+
+Reason:
+
+* Not aligned with current simulation stage
+* Too early for system scope
+
+---
+
+# 4. REPORTING MODULE (NEW REQUIREMENT)
+
+## Add: Finance Report View (READ-ONLY)
+
+This is NOT a payroll system.
+
+It is a **static export-style report** for Finance only.
+
+---
+
+## 4.1 Report Content
+
+Must display a list of employees with:
+
+* Full Name
+* Position
+* Department
+* Salary
+* Bank Name
+* Bank Account Number (masked partially, e.g. ****1234)
+* Employment Status
+
+---
+
+## 4.2 RULES
+
+* READ-ONLY only
+* No editing allowed
+* No workflow or payroll logic
+* No calculations beyond display formatting
+* Must be derived from existing employee data only
+
+---
+
+## 4.3 UI LOCATION
+
+Add under:
+
+> Reports → Finance Report
+
+---
+
+# 5. ACTIONS MODULE (CRITICAL UPGRADE)
+
+## CURRENT STATE:
+
+* actions only have "Resolve"
+
+---
+
+## NEW REQUIREMENT:
+
+Each action MUST support:
+
+### Action Types:
+
+| Action Type              | Behavior                 |
+| ------------------------ | ------------------------ |
+| Resolve                  | marks complete           |
+| Update Job Description   | opens upload input       |
+| Assign Document          | opens file upload        |
+| Complete Onboarding Step | updates onboarding state |
+
+---
+
+## 5.1 ACTION UI BEHAVIOR
+
+Each action must:
+
+* show a primary action button
+* show contextual secondary input when needed
+
+Example:
+
+### "Update Job Description"
+
+Click → expands:
+
+* file upload input
+* submit button
+
+Then:
+
+* updates state
+* removes or updates action in UI
+
+---
+
+## 5.2 RULE
+
+Actions are no longer passive.
+
+They are **interactive state transitions inside the simulation engine**.
+
+---
+
+# 6. EMPLOYEE PROFILE ACCESS (CRITICAL FIX)
+
+## CURRENT ISSUE:
+
+Employees are not independently accessible.
+
+---
+
+## NEW REQUIREMENT:
+
+Each employee MUST have:
+
+### Dedicated Employee Profile View
+
+Accessible from:
+
+* Org Tree node click
+* Risk Map click
+* Employee list (new section)
+
+---
+
+## 6.1 EMPLOYEE PROFILE MUST SHOW:
+
+* Personal details
+* Position info
+* Reporting line
+* Compliance status
+* Onboarding status
+* Active risks affecting them
+* Actions assigned to them
+
+---
+
+## 6.2 RULE
+
+Employee profile is NOT separate state.
+
+It is derived from:
+
+```txt
+selectedEmployee → computeUIState snapshot
+```
+
+---
+
+# 7. EMPLOYEE NAVIGATION REQUIREMENT
+
+You MUST add:
+
+### Employee Directory Panel
+
+* searchable list of all employees
+* click → opens employee profile view
+* shows status indicator (active / leave / offboarding)
+
+---
+
+# 8. SYSTEM ARCHITECTURE RULE (UNCHANGED)
+
+You MUST NOT break existing engine:
+
+* computeUIState remains single source of truth
+* no duplicated business logic in UI
+* no derived state in components
+* no mutation of seed data outside allowed setters
+
+---
+
+# 9. UI CONSISTENCY RULE
+
+All views MUST stay consistent:
+
+If user switches:
+
+* Org Node
+* Risk Map Card
+* Employee Directory
+
+→ ALL must resolve to same computeUIState snapshot
+
+No divergence allowed.
+
+---
+
+# 10. FILE STRUCTURE (UNCHANGED CORE)
+
+You may extend but not restructure radically:
+
+```
+src/
+  data/
+  state/
+  logic/
+  components/
+```
+
+---
+
+# 11. FINAL ACCEPTANCE CRITERIA
+
+System is correct ONLY if:
+
+* Performance Review module is fully removed
+* Finance Report exists and is read-only
+* Actions support interactive transitions (not just resolve)
+* Employee profiles are independently accessible
+* Employee directory exists and is searchable
+* All views resolve through computeUIState
+* No new backend or external dependencies introduced
+* No duplication of business logic in UI layer
+
+---
+
+# END GOAL
+
+The system remains:
+
+## 🧠 Deterministic People Risk Simulation Engine
+
+but now includes:
+
+* Finance reporting layer (read-only export view)
+* Action execution layer (interactive transitions)
+* Full employee-level navigation layer
+
+---
+
+If you want next step, I can help you define the **Action State Machine model**, which is the missing piece that will make your “actions as transitions” system fully deterministic and scalable.

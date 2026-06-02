@@ -18,6 +18,10 @@ export interface Employee {
   startDate: string;
   avatarInitials: string;
   avatarColor: string;
+  salary: number;
+  bankName: string;
+  bankAccount: string;
+  onboardingStatus: "complete" | "in_progress" | "not_started";
 }
 
 export interface ComplianceItem {
@@ -69,84 +73,112 @@ export const SEED: SeedData = {
       email: "alex.thompson@company.com", phone: "(415) 555-0100",
       location: "San Francisco, CA", startDate: "Jan 1, 2018",
       avatarInitials: "AT", avatarColor: "#6366f1",
+      salary: 180000, bankName: "Chase", bankAccount: "1234567890",
+      onboardingStatus: "complete",
     },
     {
       id: "e-002", name: "Emma Davis", positionId: "1-002", status: "active",
       email: "emma.davis@company.com", phone: "(415) 555-0101",
       location: "San Francisco, CA", startDate: "Mar 15, 2019",
       avatarInitials: "ED", avatarColor: "#8b5cf6",
+      salary: 160000, bankName: "Chase", bankAccount: "2345678901",
+      onboardingStatus: "complete",
     },
     {
       id: "e-003", name: "Michael Chen", positionId: "1-003", status: "active",
       email: "michael.chen@company.com", phone: "(415) 555-0102",
       location: "San Francisco, CA", startDate: "Feb 1, 2019",
       avatarInitials: "MC", avatarColor: "#f59e0b",
+      salary: 175000, bankName: "Bank of America", bankAccount: "3456789012",
+      onboardingStatus: "complete",
     },
     {
       id: "e-004", name: "Lisa Martinez", positionId: "1-004", status: "active",
       email: "lisa.martinez@company.com", phone: "(415) 555-0103",
       location: "Austin, TX", startDate: "Jul 10, 2019",
       avatarInitials: "LM", avatarColor: "#10b981",
+      salary: 165000, bankName: "Wells Fargo", bankAccount: "4567890123",
+      onboardingStatus: "complete",
     },
     {
       id: "e-005", name: "James Wilson", positionId: "2-001", status: "active",
       email: "james.wilson@company.com", phone: "(415) 555-0123",
       location: "San Francisco, CA", startDate: "Jan 15, 2020",
       avatarInitials: "JW", avatarColor: "#3b82f6",
+      salary: 155000, bankName: "Chase", bankAccount: "5678901234",
+      onboardingStatus: "complete",
     },
     {
       id: "e-006", name: "Rachel Green", positionId: "2-002", status: "on_leave",
       email: "rachel.green@company.com", phone: "(415) 555-0104",
       location: "New York, NY", startDate: "Apr 22, 2020",
       avatarInitials: "RG", avatarColor: "#ec4899",
+      salary: 145000, bankName: "Citibank", bankAccount: "6789012345",
+      onboardingStatus: "complete",
     },
     {
       id: "e-007", name: "Priya Patel", positionId: "2-003", status: "active",
       email: "priya.patel@company.com", phone: "(415) 555-0105",
       location: "San Francisco, CA", startDate: "Jun 1, 2020",
       avatarInitials: "PP", avatarColor: "#06b6d4",
+      salary: 150000, bankName: "Chase", bankAccount: "7890123456",
+      onboardingStatus: "complete",
     },
     {
       id: "e-008", name: "Daniel Kim", positionId: "2-004", status: "offboarding",
       email: "daniel.kim@company.com", phone: "(415) 555-0106",
       location: "Chicago, IL", startDate: "Sep 15, 2020",
       avatarInitials: "DK", avatarColor: "#f97316",
+      salary: 140000, bankName: "Bank of America", bankAccount: "8901234567",
+      onboardingStatus: "complete",
     },
     {
       id: "e-009", name: "Robert Brown", positionId: "2-005", status: "active",
       email: "robert.brown@company.com", phone: "(415) 555-0107",
       location: "Dallas, TX", startDate: "Nov 3, 2020",
       avatarInitials: "RB", avatarColor: "#84cc16",
+      salary: 135000, bankName: "Wells Fargo", bankAccount: "9012345678",
+      onboardingStatus: "complete",
     },
     {
       id: "e-010", name: "Sarah Lee", positionId: "3-001", status: "active",
       email: "sarah.lee@company.com", phone: "(415) 555-0108",
       location: "San Francisco, CA", startDate: "Jan 10, 2021",
       avatarInitials: "SL", avatarColor: "#a78bfa",
+      salary: 125000, bankName: "Chase", bankAccount: "0123456789",
+      onboardingStatus: "in_progress",
     },
     {
       id: "e-011", name: "Tom Nguyen", positionId: "3-011", status: "active",
       email: "tom.nguyen@company.com", phone: "(415) 555-0109",
       location: "New York, NY", startDate: "Mar 5, 2021",
       avatarInitials: "TN", avatarColor: "#fb923c",
+      salary: 110000, bankName: "Citibank", bankAccount: "1123456789",
+      onboardingStatus: "complete",
     },
     {
       id: "e-012", name: "Amy Chen", positionId: "3-005", status: "active",
       email: "amy.chen@company.com", phone: "(415) 555-0110",
       location: "San Francisco, CA", startDate: "May 17, 2021",
       avatarInitials: "AC", avatarColor: "#34d399",
+      salary: 120000, bankName: "Chase", bankAccount: "2123456789",
+      onboardingStatus: "not_started",
     },
     {
       id: "e-013", name: "Mark Davis", positionId: "3-008", status: "active",
       email: "mark.davis@company.com", phone: "(415) 555-0111",
       location: "Chicago, IL", startDate: "Jul 22, 2021",
       avatarInitials: "MD", avatarColor: "#60a5fa",
+      salary: 105000, bankName: "Bank of America", bankAccount: "3123456789",
+      onboardingStatus: "complete",
     },
     {
       id: "e-014", name: "Nina Foster", positionId: "3-015", status: "active",
       email: "nina.foster@company.com", phone: "(415) 555-0112",
       location: "Dallas, TX", startDate: "Aug 30, 2021",
       avatarInitials: "NF", avatarColor: "#f472b6",
+      salary: 100000, bankName: "Wells Fargo", bankAccount: "4123456789",
+      onboardingStatus: "complete",
     },
   ],
   compliance: [
