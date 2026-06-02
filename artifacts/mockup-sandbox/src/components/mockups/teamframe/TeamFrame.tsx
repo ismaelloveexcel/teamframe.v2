@@ -1,11 +1,12 @@
 import { useState, useMemo } from "react";
-import { SEED } from "../../../teamframe/data/seed";
+import { SEED, Position } from "../../../teamframe/data/seed";
 import {
   ControlState,
   UIState,
   OrgNode,
   Signal,
   Action,
+  PositionEdit,
   SCENARIOS,
   computeUIState,
 } from "../../../teamframe/engine/compute";
@@ -239,14 +240,96 @@ function OrgTreeView({
   );
 }
 
+function PositionForm({
+  position,
+  onSave,
+  onCancel,
+}: {
+  position: Position;
+  onSave: (edit: PositionEdit) => void;
+  onCancel: () => void;
+}) {
+  const [title, setTitle] = useState(position.title);
+  const [department, setDepartment] = useState(position.department);
+
+  return (
+    <div style={{
+      padding: "14px 20px",
+      borderBottom: "1px solid rgba(255,255,255,0.07)",
+    }}>
+      <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
+        Edit Position
+      </div>
+      <div style={{ marginBottom: 12 }}>
+        <label style={{ display: "block", fontSize: 10, color: "#64748b", marginBottom: 4, fontWeight: 600 }}>
+          Title
+        </label>
+        <input
+          value={title}
+          onChange={(e) => setTitle(e.target.value)}
+          style={{
+            width: "100%", padding: "8px 10px", fontSize: 12, color: "#e2e8f0",
+            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 6, outline: "none",
+          }}
+        />
+      </div>
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display: "block", fontSize: 10, color: "#64748b", marginBottom: 4, fontWeight: 600 }}>
+          Department
+        </label>
+        <input
+          value={department}
+          onChange={(e) => setDepartment(e.target.value)}
+          style={{
+            width: "100%", padding: "8px 10px", fontSize: 12, color: "#e2e8f0",
+            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
+            borderRadius: 6, outline: "none",
+          }}
+        />
+      </div>
+      <div style={{ display: "flex", gap: 8 }}>
+        <button
+          onClick={() => onSave({ id: position.id, title, department })}
+          style={{
+            flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 600,
+            background: "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff",
+            border: "none", borderRadius: 6, cursor: "pointer",
+          }}
+        >
+          Save Changes
+        </button>
+        <button
+          onClick={onCancel}
+          style={{
+            flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 600,
+            background: "rgba(255,255,255,0.06)", color: "#94a3b8",
+            border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, cursor: "pointer",
+          }}
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  );
+}
+
 function RightPanel({
   uiState,
   onResolveAction,
   onClose,
+  onEditPosition,
+  isEditing,
+  onSaveEdit,
+  onCancelEdit,
 }: {
   uiState: UIState;
   onResolveAction: (id: string) => void;
   onClose: () => void;
+  onEditPosition: () => void;
+  isEditing: boolean;
+  onSaveEdit: (edit: PositionEdit) => void;
+  onCancelEdit: () => void;
 }) {
   const emp = uiState.selectedEmployee;
   const pos = uiState.selectedPosition;
@@ -310,11 +393,31 @@ function RightPanel({
             )}
           </div>
         </div>
-        <button onClick={onClose} style={{
-          background: "none", border: "none", color: "#64748b",
-          cursor: "pointer", fontSize: 18, padding: "0 4px", lineHeight: 1,
-        }}>×</button>
+        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <button
+            onClick={onEditPosition}
+            style={{
+              fontSize: 10, color: "#818cf8", background: "rgba(99,102,241,0.1)",
+              border: "1px solid rgba(99,102,241,0.3)", borderRadius: 4,
+              padding: "4px 10px", cursor: "pointer", fontWeight: 600,
+            }}
+          >
+            Edit
+          </button>
+          <button onClick={onClose} style={{
+            background: "none", border: "none", color: "#64748b",
+            cursor: "pointer", fontSize: 18, padding: "0 4px", lineHeight: 1,
+          }}>×</button>
+        </div>
       </div>
+
+      {isEditing && pos && (
+        <PositionForm
+          position={pos}
+          onSave={onSaveEdit}
+          onCancel={onCancelEdit}
+        />
+      )}
 
       <div style={{ flex: 1, overflowY: "auto", padding: "0 0 16px" }}>
         {emp && (
@@ -492,8 +595,10 @@ export function TeamFrame() {
     selectedPositionId: "1-001",
     selectedEmployeeId: "e-001",
     resolvedActions: [],
+    positionEdits: [],
   });
   const [showJson, setShowJson] = useState(false);
+  const [editingPosition, setEditingPosition] = useState<string | null>(null);
 
   const uiState = useMemo(() => computeUIState(SEED, controlState), [controlState]);
 
@@ -513,6 +618,22 @@ export function TeamFrame() {
     setControlState((prev) => ({
       ...prev,
       resolvedActions: [...prev.resolvedActions, actionId],
+    }));
+  };
+  const updatePosition = (edit: PositionEdit) => {
+    setControlState((prev) => {
+      const existing = prev.positionEdits.find((e) => e.id === edit.id);
+      const nextEdits = existing
+        ? prev.positionEdits.map((e) => (e.id === edit.id ? edit : e))
+        : [...prev.positionEdits, edit];
+      return { ...prev, positionEdits: nextEdits };
+    });
+  };
+  const updateEmployee = (empId: string, positionId: string) => {
+    setControlState((prev) => ({
+      ...prev,
+      selectedEmployeeId: empId,
+      selectedPositionId: positionId,
     }));
   };
 
@@ -558,7 +679,6 @@ export function TeamFrame() {
                   width: "100%", padding: "9px 16px", textAlign: "left",
                   background: isActive ? "rgba(99,102,241,0.15)" : "none",
                   borderLeft: `2px solid ${isActive ? "#6366f1" : "transparent"}`,
-                  border: "none", borderLeft: `2px solid ${isActive ? "#6366f1" : "transparent"}`,
                   color: isActive ? "#818cf8" : "#64748b",
                   cursor: "pointer", fontSize: 12, fontWeight: isActive ? 600 : 400,
                   transition: "all 0.1s ease",
@@ -910,6 +1030,10 @@ export function TeamFrame() {
               uiState={uiState}
               onResolveAction={resolveAction}
               onClose={() => setControlState((prev) => ({ ...prev, selectedPositionId: "1-001" }))}
+              onEditPosition={() => setEditingPosition(uiState.selectedPosition?.id ?? null)}
+              isEditing={editingPosition === uiState.selectedPosition?.id}
+              onSaveEdit={updatePosition}
+              onCancelEdit={() => setEditingPosition(null)}
             />
           </div>
         </div>

@@ -1,10 +1,17 @@
 import { SeedData, Position, Employee, ComplianceItem } from "../data/seed";
 
+export interface PositionEdit {
+  id: string;
+  title: string;
+  department: string;
+}
+
 export interface ControlState {
   scenarioId: string;
   selectedPositionId: string;
   selectedEmployeeId: string | null;
   resolvedActions: string[];
+  positionEdits: PositionEdit[];
 }
 
 export interface OrgNode {
@@ -61,6 +68,17 @@ export const SCENARIOS: Record<string, Partial<ControlState>> = {
   MISSING_COMPLIANCE_FOCUS: { selectedPositionId: "2-001", selectedEmployeeId: "e-005" },
   FULL_ORGANIZATION_VIEW: { selectedPositionId: "1-001", selectedEmployeeId: null },
 };
+
+function applyPositionEdits(seed: SeedData, edits: PositionEdit[]): SeedData {
+  return {
+    ...seed,
+    positions: seed.positions.map((p) => {
+      const edit = edits.find((e) => e.id === p.id);
+      if (!edit) return p;
+      return { ...p, title: edit.title, department: edit.department };
+    }),
+  };
+}
 
 function buildOrgTree(
   seed: SeedData,
@@ -246,22 +264,28 @@ function computeActions(signals: Signal[], resolvedActions: string[]): Action[] 
 }
 
 export function computeUIState(seed: SeedData, controlState: ControlState): UIState {
+  const seedWithEdits = applyPositionEdits(seed, controlState.positionEdits ?? []);
   const scenario = SCENARIOS[controlState.scenarioId] ?? {};
-  const mergedControl: ControlState = { ...controlState, ...scenario, resolvedActions: controlState.resolvedActions };
+  const mergedControl: ControlState = {
+    ...controlState,
+    ...scenario,
+    resolvedActions: controlState.resolvedActions,
+    positionEdits: controlState.positionEdits ?? [],
+  };
 
-  const selectedPosition = seed.positions.find((p) => p.id === mergedControl.selectedPositionId) ?? null;
+  const selectedPosition = seedWithEdits.positions.find((p) => p.id === mergedControl.selectedPositionId) ?? null;
   const selectedEmployee = mergedControl.selectedEmployeeId
     ? (seed.employees.find((e) => e.id === mergedControl.selectedEmployeeId) ?? null)
     : selectedPosition
     ? (seed.employees.find((e) => e.positionId === selectedPosition.id) ?? null)
     : null;
 
-  const signals = computeSignals(seed, mergedControl.resolvedActions);
-  const orgTree = buildOrgTree(seed, signals, null);
+  const signals = computeSignals(seedWithEdits, mergedControl.resolvedActions);
+  const orgTree = buildOrgTree(seedWithEdits, signals, null);
   const actions = computeActions(signals, mergedControl.resolvedActions);
 
   const directReportPositions = selectedPosition
-    ? seed.positions
+    ? seedWithEdits.positions
         .filter((p) => p.reportsToId === selectedPosition.id)
         .sort((a, b) => a.order - b.order)
         .map((p) => ({
@@ -270,11 +294,11 @@ export function computeUIState(seed: SeedData, controlState: ControlState): UISt
         }))
     : [];
 
-  const complianceView = seed.compliance.filter(
+  const complianceView = seedWithEdits.compliance.filter(
     (c) => !selectedPosition || c.positionId === selectedPosition.id
   );
 
-  const totalPositions = seed.positions.length;
+  const totalPositions = seedWithEdits.positions.length;
   const filled = seed.employees.filter((e) => e.status !== "offboarding");
   const filledPositions = filled.length;
   const vacantPositions = totalPositions - seed.employees.length;
