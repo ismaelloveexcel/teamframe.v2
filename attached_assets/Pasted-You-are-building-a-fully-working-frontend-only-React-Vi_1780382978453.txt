@@ -1,0 +1,300 @@
+You are building a fully working frontend-only React (Vite + TypeScript) application.
+
+🧠 TEAMFRAME V2 — Deterministic UI Simulation Engine
+
+This is NOT a dashboard.
+
+It is a deterministic UI state machine simulation system.
+
+No backend. No APIs. No external state.
+
+1. CORE PRINCIPLE (ABSOLUTE RULE)
+
+The system MUST follow:
+
+Seed Data + Scenario → computeUIState() → UI Snapshot → React Render
+
+React is ONLY a rendering layer.
+
+2. TECH STACK (STRICT)
+React (Vite)
+TypeScript
+Hooks only (useState, useMemo)
+No Redux / Zustand / external state libraries
+No backend / API calls
+Minimal dependencies
+3. ARCHITECTURE (NON-NEGOTIABLE)
+3.1 Immutable Data Layer
+
+Stored in:
+
+src/data/
+
+Must include:
+
+positions[]
+employees[]
+compliance[]
+
+Rules:
+
+NEVER mutated directly
+NEVER derived inside components
+Loaded once at boot
+3.2 Scenario Layer (UI Input Only)
+
+Scenario shape:
+
+scenario = {
+  id: string,
+  selectedPositionId: string,
+  selectedEmployeeId: string | null
+}
+
+Rules:
+
+ONLY controls UI focus
+NO business logic
+NO derived fields
+NO mutation of datasets
+3.3 Compute Engine (SINGLE SOURCE OF TRUTH)
+
+You MUST implement:
+
+computeUIState(positions, employees, compliance, scenario)
+
+This is the ONLY business logic layer.
+
+3.4 UI State Output
+UIState = {
+  selectedPosition,
+  selectedEmployee,
+  orgTree,
+  signals,
+  actions,
+  complianceView
+}
+
+Rules:
+
+fully derived
+never stored in React state
+recomputed on scenario change
+4. CRITICAL COMPUTE ENGINE PIPELINE
+
+Inside computeUIState, execute in EXACT order:
+
+Step 1 — Resolve Selection
+find selected position
+find selected employee
+Step 2 — Build Org Tree
+derive hierarchy using reportsToId
+recursive structure
+sort by position.order
+stable keys ONLY (position.id)
+Step 3 — Compute Signals
+
+Rules:
+
+position has no employee → VACANT
+employee.on_leave → INFO
+employee.offboarding → CRITICAL
+missing compliance → WARNING
+
+Signals MUST be deterministic.
+
+Step 4 — Compute Actions
+
+Derived from signals:
+
+assign employee
+fix compliance
+complete offboarding
+
+Actions must:
+
+have unique IDs
+be derived only
+be removable via resolvedActions
+Step 5 — Assemble UIState
+
+Return final snapshot object.
+
+5. STATE MANAGEMENT (useOrgState)
+
+Must include:
+
+positions
+employees
+compliance
+scenario
+selectedPositionId
+selectedEmployeeId
+resolvedActions[]
+
+Allowed mutations:
+
+addPosition
+updatePosition
+updateEmployee
+resolveAction
+setScenario
+setSelectedPositionId
+
+NO OTHER MUTATIONS ALLOWED.
+
+6. SCENARIO SYSTEM (DEV CONTROL)
+
+Must implement:
+
+DEFAULT_VIEW
+VACANT_POSITION_FOCUS
+ON_LEAVE_EMPLOYEE_FOCUS
+OFFBOARDING_EMPLOYEE_FOCUS
+MISSING_COMPLIANCE_FOCUS
+FULL_ORG_VIEW
+
+Scenario rules:
+
+ONLY sets selectedPositionId / selectedEmployeeId
+NEVER modifies data arrays
+triggers recomputation of computeUIState()
+7. REACT ARCHITECTURE RULE
+
+React is a PURE RENDERER.
+
+Allowed:
+
+useState (scenario, selected ids, resolvedActions)
+useMemo (computeUIState result)
+
+Forbidden:
+
+computing signals in components
+computing org tree in UI
+duplicated business logic
+derived state stored in React state
+8. COMPONENT CONTRACTS (STRICT)
+OrgTree
+consumes uiState.orgTree only
+recursive rendering
+no computation
+safe fallback if empty
+EmployeeDetail
+consumes uiState.selectedEmployee
+must render fallback if null
+PositionForm
+editable fields:
+title
+department
+reportsToId
+employeeId
+location
+phone
+email
+startDate
+order
+live updates via updatePosition
+must always be visible and stable
+SignalsPanel
+consumes uiState.signals only
+ActionsPanel
+consumes uiState.actions only
+resolve removes action immediately
+JsonInspector (MANDATORY)
+
+Must display:
+
+positions
+employees
+compliance
+scenario
+UIState snapshot
+
+Must NEVER crash.
+
+9. DETERMINISM RULE (ABSOLUTE)
+
+Given identical inputs:
+
+positions
+employees
+compliance
+scenario
+resolvedActions
+
+OUTPUT MUST ALWAYS BE IDENTICAL.
+
+No randomness allowed anywhere.
+
+10. FILE STRUCTURE (STRICT)
+src/
+  data/
+    positions.ts
+    employees.ts
+    compliance.ts
+
+  state/
+    useOrgState.ts
+
+  logic/
+    computeUIState.ts
+    org.ts
+    signals.ts
+    actions.ts
+
+  components/
+    OrgTree.tsx
+    PositionForm.tsx
+    EmployeeDetail.tsx
+    SignalsPanel.tsx
+    ActionsPanel.tsx
+    JsonInspector.tsx
+
+  App.tsx
+  main.tsx
+11. BOOT REQUIREMENTS (CRITICAL)
+
+The app MUST:
+
+compile on first run
+render App.tsx without errors
+mount correctly via main.tsx
+import CSS correctly
+never crash on empty datasets
+12. SAMPLE DATA REQUIREMENTS
+
+Must include:
+
+6–10 positions
+4–6 employees
+3+ compliance items
+
+Must include:
+
+1 vacant position
+1 on_leave employee
+1 offboarding employee
+1 missing compliance case
+13. QUALITY GATES (PASS/FAIL)
+
+App is ONLY correct if:
+
+UI boots successfully
+OrgTree renders safely
+PositionForm updates state live
+Scenario switching works instantly
+Signals + actions are deterministic
+JSON inspector is always accurate
+computeUIState is the ONLY business logic layer
+no duplicated computation exists in UI
+no runtime crashes under any state
+END GOAL
+
+You are building a:
+
+🧠 Deterministic Frontend Simulation Engine
+
+React is ONLY a rendering shell.
+
+The system behaves like a replayable UI state machine, not an app
