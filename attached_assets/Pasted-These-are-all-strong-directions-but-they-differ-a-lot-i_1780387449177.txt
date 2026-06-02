@@ -1,0 +1,132 @@
+These are all strong directions, but they differ a lot in value density, build complexity, and how defensible the product is. If you’re trying to pick one that is both high-impact and clean to execute as a system, here’s the structured breakdown.
+
+🧠 Evaluation Framework (what actually matters)
+
+For a startup HR tool, the winning idea is usually:
+
+Immediate pain (weekly/daily use)
+Low data dependency (works even with partial data)
+Clear visual output (one screen = insight)
+Actionability (not just reporting)
+Natural expansion path (becomes platform later)
+⚖️ Option Comparison
+A. Onboarding & Compliance Tracker
+Strengths
+Very concrete and easy to understand
+High-frequency operational use
+Easy to build MVP (checklist engine + status tracking)
+Naturally ties into your existing TeamFrame signals/actions model
+Weaknesses
+Slightly narrow scope (HR ops only)
+Can become “task list tool” unless expanded
+Verdict
+
+Strong MVP candidate, but not the most strategic long-term wedge
+
+B. Equity & Vesting Dashboard
+Strengths
+High value in startups (founder + early employees care deeply)
+Financially sensitive → strong retention driver
+Clear structured data model
+Weaknesses
+Requires precision (legal/finance expectations are high)
+Harder to simulate meaningfully without real cap table data
+Less connected to org structure / operations layer
+Verdict
+
+High value but high risk + narrow audience
+
+C. People Risk Heatmap ⭐ (BEST OPTION)
+Strengths
+Combines everything you already built:
+org structure
+compliance state
+leave/offboarding
+reporting depth
+Extremely visual (perfect for a single dashboard)
+High executive value (founder/CEO tool)
+Naturally supports your computeUIState architecture
+Expandable into a “people intelligence layer”
+Weaknesses
+Slightly abstract at first (needs good UX framing)
+Verdict
+
+Best overall choice — highest leverage + aligns perfectly with your simulation engine
+
+D. Hire Plan / Budget Simulation
+Strengths
+Strategic planning value
+Finance + HR intersection = strong product category
+Weaknesses
+Requires assumptions (salary, runway, forecasting logic)
+Less “truth-based”, more modeling-heavy
+Can drift into spreadsheet territory
+Verdict
+
+Powerful later-stage feature, not ideal MVP core
+
+🏆 Final Recommendation
+👉 Build: C. People Risk Heatmap
+
+Because it:
+
+Uses your existing deterministic compute engine directly
+Turns signals → executive insight (perfect abstraction layer)
+Makes your org model instantly valuable
+Is visually compelling in a single screen
+
+Creates a natural product identity:
+
+“real-time people risk intelligence system”
+
+🧩 How it maps to your current system
+
+You already have:
+
+positions → structure risk
+employees → availability risk
+compliance → legal risk
+leave/offboarding → operational risk
+signals/actions → event layer
+
+So your system becomes:
+
+computeUIState()
+    ↓
+Risk Engine
+    ↓
+Heatmap Visualization
+    ↓
+Executive Decisions
+🔥 What the MVP should look like
+
+Instead of multiple panels, the core screen becomes:
+
+🟥 Risk Heatmap View
+
+Each position node shows:
+
+Signal Type	Meaning
+🟡 Vacancy	unfilled role risk
+🔴 Offboarding	security / continuity risk
+🟣 Leave	coverage risk
+🟠 Missing compliance	legal exposure
+🔵 Overloaded manager	org structure risk
+🚀 Why this is the strongest direction
+
+This is important:
+
+You’re no longer building:
+
+“HR dashboard”
+
+You’re building:
+
+organizational risk simulation layer
+
+That is:
+
+more novel
+more defensible
+more aligned with your deterministic engine
+more expandable into “digital twin HR system”

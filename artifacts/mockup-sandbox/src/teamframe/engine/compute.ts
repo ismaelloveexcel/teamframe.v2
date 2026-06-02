@@ -38,6 +38,16 @@ export interface Action {
   relatedSignalId: string | null;
 }
 
+export interface RiskItem {
+  positionId: string;
+  positionTitle: string;
+  category: "vacancy" | "offboarding" | "leave" | "compliance" | "overload" | "single_point";
+  level: "critical" | "warning" | "info";
+  score: number;
+  message: string;
+  detail: string;
+}
+
 export interface UIState {
   selectedPosition: Position | null;
   selectedEmployee: Employee | null;
@@ -58,6 +68,9 @@ export interface UIState {
     offboardingPct: number;
   };
   signalSummary: { critical: number; high: number; medium: number; low: number };
+  risks: RiskItem[];
+  riskScore: number;
+  riskBreakdown: { vacancy: number; offboarding: number; leave: number; compliance: number; overload: number; single_point: number };
 }
 
 export const SCENARIOS: Record<string, Partial<ControlState>> = {
@@ -263,6 +276,82 @@ function computeActions(signals: Signal[], resolvedActions: string[]): Action[] 
   return actions;
 }
 
+function computeRisks(seed: SeedData, signals: Signal[]): RiskItem[] {
+  const risks: RiskItem[] = [];
+  for (const signal of signals) {
+    const pos = seed.positions.find((p) => p.id === signal.positionId);
+    if (!pos) continue;
+    let category: RiskItem["category"] = "compliance";
+    let score = 0;
+    if (signal.message === "Vacant Position") { category = "vacancy"; score = 30; }
+    else if (signal.message === "Employee On Leave") { category = "leave"; score = 20; }
+    else if (signal.message === "Offboarding in Progress") { category = "offboarding"; score = 50; }
+    else if (signal.message === "Missing Compliance") { category = "compliance"; score = 35; }
+    else if (signal.message === "High Turnover Risk") { category = "overload"; score = 40; }
+    risks.push({
+      positionId: pos.id,
+      positionTitle: pos.title,
+      category,
+      level: signal.level,
+      score,
+      message: signal.message,
+      detail: signal.detail,
+    });
+  }
+
+  const reportCounts = new Map<string, number>();
+  for (const pos of seed.positions) {
+    if (!pos.reportsToId) continue;
+    reportCounts.set(pos.reportsToId, (reportCounts.get(pos.reportsToId) ?? 0) + 1);
+  }
+  for (const [managerId, count] of reportCounts.entries()) {
+    if (count >= 5) {
+      const pos = seed.positions.find((p) => p.id === managerId);
+      if (pos) {
+        const emp = seed.employees.find((e) => e.positionId === pos.id);
+        risks.push({
+          positionId: pos.id,
+          positionTitle: pos.title,
+          category: "overload",
+          level: "warning",
+          score: 25,
+          message: "Overloaded Manager",
+          detail: `${emp?.name ?? pos.title} has ${count} direct reports (recommended max: 5)`,
+        });
+      }
+    }
+  }
+
+  const deptEmployees = new Map<string, string[]>();
+  for (const emp of seed.employees) {
+    const pos = seed.positions.find((p) => p.id === emp.positionId);
+    if (pos) {
+      const list = deptEmployees.get(pos.department) ?? [];
+      list.push(emp.id);
+      deptEmployees.set(pos.department, list);
+    }
+  }
+  for (const [, ids] of deptEmployees.entries()) {
+    if (ids.length === 1) {
+      const emp = seed.employees.find((e) => e.id === ids[0]);
+      const pos = seed.positions.find((p) => p.id === emp?.positionId);
+      if (pos && emp) {
+        risks.push({
+          positionId: pos.id,
+          positionTitle: pos.title,
+          category: "single_point",
+          level: "warning",
+          score: 20,
+          message: "Single Point of Failure",
+          detail: `${emp.name} is the only person in ${pos.department}`,
+        });
+      }
+    }
+  }
+
+  return risks.sort((a, b) => b.score - a.score);
+}
+
 export function computeUIState(seed: SeedData, controlState: ControlState): UIState {
   const seedWithEdits = applyPositionEdits(seed, controlState.positionEdits ?? []);
   const scenario = SCENARIOS[controlState.scenarioId] ?? {};
@@ -312,6 +401,17 @@ export function computeUIState(seed: SeedData, controlState: ControlState): UISt
     low: Math.floor(signals.length * 0.2),
   };
 
+  const risks = computeRisks(seedWithEdits, signals);
+  const riskScore = risks.reduce((sum, r) => sum + r.score, 0);
+  const riskBreakdown = {
+    vacancy: risks.filter((r) => r.category === "vacancy").reduce((s, r) => s + r.score, 0),
+    offboarding: risks.filter((r) => r.category === "offboarding").reduce((s, r) => s + r.score, 0),
+    leave: risks.filter((r) => r.category === "leave").reduce((s, r) => s + r.score, 0),
+    compliance: risks.filter((r) => r.category === "compliance").reduce((s, r) => s + r.score, 0),
+    overload: risks.filter((r) => r.category === "overload").reduce((s, r) => s + r.score, 0),
+    single_point: risks.filter((r) => r.category === "single_point").reduce((s, r) => s + r.score, 0),
+  };
+
   return {
     selectedPosition,
     selectedEmployee,
@@ -332,5 +432,8 @@ export function computeUIState(seed: SeedData, controlState: ControlState): UISt
       offboardingPct: Math.round((offboardingCount / totalPositions) * 1000) / 10,
     },
     signalSummary,
+    risks,
+    riskScore,
+    riskBreakdown,
   };
 }

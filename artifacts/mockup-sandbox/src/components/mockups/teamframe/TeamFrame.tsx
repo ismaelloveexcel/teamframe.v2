@@ -7,6 +7,7 @@ import {
   Signal,
   Action,
   PositionEdit,
+  RiskItem,
   SCENARIOS,
   computeUIState,
 } from "../../../teamframe/engine/compute";
@@ -22,6 +23,7 @@ const SCENARIO_LABELS: Record<string, string> = {
 
 const NAV_ITEMS = [
   { id: "org", label: "Org Chart", icon: "⬡" },
+  { id: "risk", label: "Risk Heatmap", icon: "🔥", badge: true },
   { id: "positions", label: "Positions", icon: "◈" },
   { id: "employees", label: "Employees", icon: "◉" },
   { id: "signals", label: "Signals", icon: "△", badge: true },
@@ -235,6 +237,157 @@ function OrgTreeView({
             {label}
           </div>
         ))}
+      </div>
+    </div>
+  );
+}
+
+function RiskHeatmapView({
+  uiState,
+  onSelectPosition,
+}: {
+  uiState: UIState;
+  onSelectPosition: (id: string) => void;
+}) {
+  const rb = uiState.riskBreakdown;
+  const maxScore = Math.max(rb.vacancy, rb.offboarding, rb.leave, rb.compliance, rb.overload, rb.single_point, 1);
+  const total = uiState.riskScore;
+  const riskLevel = total >= 150 ? "critical" : total >= 80 ? "warning" : "healthy";
+  const riskColor = riskLevel === "critical" ? "#ef4444" : riskLevel === "warning" ? "#f59e0b" : "#22c55e";
+  const riskBg = riskLevel === "critical" ? "rgba(239,68,68,0.12)" : riskLevel === "warning" ? "rgba(245,158,11,0.12)" : "rgba(34,197,94,0.12)";
+
+  const bars = [
+    { label: "Vacancy", value: rb.vacancy, color: "#f59e0b" },
+    { label: "Offboarding", value: rb.offboarding, color: "#ef4444" },
+    { label: "On Leave", value: rb.leave, color: "#f59e0b" },
+    { label: "Compliance", value: rb.compliance, color: "#f97316" },
+    { label: "Overload", value: rb.overload, color: "#8b5cf6" },
+    { label: "Single Point", value: rb.single_point, color: "#ec4899" },
+  ];
+
+  const categoryMeta: Record<string, { label: string; color: string; icon: string }> = {
+    vacancy: { label: "Vacancy", color: "#f59e0b", icon: "◈" },
+    offboarding: { label: "Offboarding", color: "#ef4444", icon: "❌" },
+    leave: { label: "Leave", color: "#f59e0b", icon: "△" },
+    compliance: { label: "Compliance", color: "#f97316", icon: "⚠" },
+    overload: { label: "Overload", color: "#8b5cf6", icon: "⚡" },
+    single_point: { label: "Single Point", color: "#ec4899", icon: "✶" },
+  };
+
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
+      {/* Top Score Card */}
+      <div style={{
+        display: "flex", gap: 16, alignItems: "stretch",
+      }}>
+        <div style={{
+          flex: 1, padding: "20px 24px", borderRadius: 14,
+          background: riskBg, border: `1.5px solid ${riskColor}40`,
+          display: "flex", alignItems: "center", gap: 20,
+        }}>
+          <div style={{
+            width: 72, height: 72, borderRadius: "50%",
+            border: `3px solid ${riskColor}`, display: "flex",
+            alignItems: "center", justifyContent: "center",
+            fontSize: 28, fontWeight: 800, color: riskColor,
+          }}>
+            {total}
+          </div>
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em" }}>
+              Organization Risk Score
+            </div>
+            <div style={{ fontSize: 22, fontWeight: 800, color: riskColor, marginTop: 4 }}>
+              {riskLevel === "critical" ? "CRITICAL RISK" : riskLevel === "warning" ? "MODERATE RISK" : "HEALTHY"}
+            </div>
+            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
+              {uiState.risks.length} active risk items across {uiState.stats.totalPositions} positions
+            </div>
+          </div>
+        </div>
+        <div style={{
+          width: 340, padding: "20px 24px", borderRadius: 14,
+          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
+            Risk Breakdown
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {bars.map(({ label, value, color }) => (
+              <div key={label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
+                <span style={{ width: 80, fontSize: 10, color: "#94a3b8", fontWeight: 500 }}>{label}</span>
+                <div style={{ flex: 1, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
+                  <div style={{
+                    height: "100%", borderRadius: 4, background: color,
+                    width: `${(value / maxScore) * 100}%`,
+                    transition: "width 0.3s ease",
+                  }} />
+                </div>
+                <span style={{ width: 28, fontSize: 10, fontWeight: 700, color, textAlign: "right" }}>{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Risk Heatmap Grid */}
+      <div style={{
+        padding: "20px 24px", borderRadius: 14,
+        background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
+      }}>
+        <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>
+          People Risk Map
+        </div>
+        <div style={{
+          display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10,
+        }}>
+          {uiState.risks.map((risk) => {
+            const meta = categoryMeta[risk.category] ?? categoryMeta.compliance;
+            return (
+              <div
+                key={`${risk.positionId}-${risk.category}`}
+                onClick={() => onSelectPosition(risk.positionId)}
+                style={{
+                  padding: "12px 14px", borderRadius: 10, textAlign: "left",
+                  background: risk.level === "critical" ? "rgba(239,68,68,0.08)"
+                    : risk.level === "warning" ? "rgba(245,158,11,0.08)"
+                    : "rgba(99,102,241,0.08)",
+                  border: `1.5px solid ${risk.level === "critical" ? "rgba(239,68,68,0.25)"
+                    : risk.level === "warning" ? "rgba(245,158,11,0.25)"
+                    : "rgba(99,102,241,0.25)"}`,
+                  cursor: "pointer",
+                }}
+              >
+                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <span style={{ fontSize: 14, color: meta.color }}>{meta.icon}</span>
+                  <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    {meta.label}
+                  </span>
+                  <span style={{
+                    marginLeft: "auto", fontSize: 10, fontWeight: 800,
+                    color: risk.level === "critical" ? "#ef4444" : risk.level === "warning" ? "#f59e0b" : "#818cf8",
+                  }}>
+                    +{risk.score}
+                  </span>
+                </div>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", marginBottom: 2 }}>
+                  {risk.positionTitle}
+                </div>
+                <div style={{ fontSize: 10, color: "#94a3b8" }}>
+                  {risk.message}
+                </div>
+                <div style={{ fontSize: 9, color: "#64748b", marginTop: 2 }}>
+                  {risk.detail}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+        {uiState.risks.length === 0 && (
+          <div style={{ color: "#22c55e", fontSize: 14, padding: "40px 0", textAlign: "center" }}>
+            ✓ No risks detected — organization is healthy
+          </div>
+        )}
       </div>
     </div>
   );
@@ -669,7 +822,9 @@ export function TeamFrame() {
           {NAV_ITEMS.map((item) => {
             const isActive = activeNav === item.id;
             const count = item.id === "signals" ? uiState.signals.length
-              : item.id === "actions" ? uiState.actions.length : 0;
+              : item.id === "actions" ? uiState.actions.length
+              : item.id === "risk" ? uiState.risks.length
+              : 0;
             return (
               <button
                 key={item.id}
@@ -761,6 +916,7 @@ export function TeamFrame() {
           <div style={{ flex: 1 }}>
             <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#fff" }}>
               {activeNav === "org" ? "Organization Chart"
+                : activeNav === "risk" ? "People Risk Heatmap"
                 : activeNav === "signals" ? "Signals"
                 : activeNav === "actions" ? "Actions"
                 : activeNav === "compliance" ? "Compliance"
@@ -859,6 +1015,9 @@ export function TeamFrame() {
           <div style={{ flex: 1, overflowX: "auto", overflowY: "auto", padding: "28px 24px" }}>
             {activeNav === "org" && (
               <OrgTreeView uiState={uiState} onSelectPosition={setSelectedPositionId} />
+            )}
+            {activeNav === "risk" && (
+              <RiskHeatmapView uiState={uiState} onSelectPosition={setSelectedPositionId} />
             )}
             {activeNav === "signals" && (
               <div>
