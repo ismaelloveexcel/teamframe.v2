@@ -1,0 +1,462 @@
+Below is the **fully consolidated, engineering-locked Replit Agent prompt**, incorporating your deterministic simulation architecture, corrected control-state model, and removal of all ambiguity that causes agent drift.
+
+This is now a **strict UI simulation kernel spec (not a normal app prompt anymore)**.
+
+---
+
+# 🚀 REPLIT AGENT PROMPT — TEAMFRAME V2 (DETERMINISTIC UI SIMULATION ENGINE)
+
+You are building a **fully working frontend-only React (Vite + TypeScript) application**:
+
+# TeamFrame V2 — Org Operations & Compliance Simulation Engine
+
+This is a **deterministic UI state machine simulator** for organizational structure, employees, compliance, signals, and actions.
+
+It must run immediately:
+
+```bash
+npm install
+npm run dev
+```
+
+No backend, no APIs, no database.
+
+---
+
+# 1. SYSTEM TYPE (CRITICAL DEFINITION)
+
+This is NOT a dashboard.
+
+It is a:
+
+## 🧠 PURE FUNCTION UI SIMULATION ENGINE
+
+### Core rule:
+
+```txt
+UI = f(seedData, controlState)
+```
+
+No UI state exists outside this function.
+
+---
+
+# 2. TECH STACK (STRICT)
+
+ONLY:
+
+* React (Vite)
+* TypeScript
+* Functional components
+* React hooks (useState, useMemo only)
+* Plain CSS or minimal styling
+
+NO:
+
+* Redux
+* Zustand
+* external state libraries
+* API calls
+* backend logic
+
+---
+
+# 3. SYSTEM LAYERS
+
+## LAYER 1 — IMMUTABLE SEED DATA
+
+Located in:
+
+```
+src/data/
+```
+
+### Includes:
+
+* positions[]
+* employees[]
+* compliance[]
+
+Rules:
+
+* loaded ONCE at boot
+* NEVER mutated
+* NEVER duplicated in state logic
+
+---
+
+## LAYER 2 — CONTROL STATE (ONLY MUTABLE STATE)
+
+```ts
+controlState = {
+  scenarioId: string,
+  selectedPositionId: string,
+  selectedEmployeeId: string | null,
+  resolvedActions: string[]
+}
+```
+
+Rules:
+
+* only user-driven state
+* no derived fields
+* no computed logic
+
+---
+
+## LAYER 3 — COMPUTE ENGINE (CORE SYSTEM)
+
+### SINGLE ENTRY POINT:
+
+```ts
+computeUIState(seed, controlState): UIState
+```
+
+This is the ONLY place where logic is allowed.
+
+---
+
+## LAYER 4 — UI STATE (DERIVED SNAPSHOT)
+
+```ts
+UIState = {
+  selectedPosition,
+  selectedEmployee,
+  orgTree,
+  signals,
+  actions,
+  complianceView
+}
+```
+
+Rules:
+
+* fully derived
+* never stored in React state
+* recomputed on every controlState change
+
+---
+
+## LAYER 5 — PRESENTATION LAYER
+
+React components ONLY render UIState.
+
+No logic allowed.
+
+---
+
+# 4. COMPUTE ENGINE SPECIFICATION
+
+## MUST IMPLEMENT:
+
+```ts
+computeUIState(seed, controlState)
+```
+
+---
+
+## EXECUTION ORDER (MANDATORY)
+
+### STEP 1 — Resolve Selection Context
+
+* find selectedPosition
+* find selectedEmployee
+
+---
+
+### STEP 2 — Build Org Tree
+
+* derive hierarchy using reportsToId
+* sort by order
+* ensure stable recursion
+* handle missing nodes safely
+
+---
+
+### STEP 3 — Compute Signals (PURE FUNCTION)
+
+Rules:
+
+* position has no employee → VACANT (info)
+* employee on_leave → INFO
+* employee offboarding → CRITICAL
+* missing compliance → WARNING
+
+---
+
+### STEP 4 — Compute Actions (PURE FUNCTION)
+
+Derived from signals:
+
+* assign employee
+* fix compliance
+* complete offboarding
+
+Actions must:
+
+* have unique id
+* be deterministic
+* be removable via resolvedActions
+
+---
+
+### STEP 5 — RETURN SNAPSHOT
+
+```ts
+return {
+  selectedPosition,
+  selectedEmployee,
+  orgTree,
+  signals,
+  actions,
+  complianceView
+}
+```
+
+---
+
+# 5. SCENARIO SYSTEM (CONTROL STATE OVERLAY)
+
+## Scenario definition registry:
+
+```ts
+SCENARIOS = {
+  DEFAULT_VIEW,
+  VACANT_POSITION_FOCUS,
+  ON_LEAVE_EMPLOYEE_FOCUS,
+  OFFBOARDING_EMPLOYEE_FOCUS,
+  MISSING_COMPLIANCE_FOCUS,
+  FULL_ORGANIZATION_VIEW
+}
+```
+
+---
+
+## Scenario model:
+
+```ts
+{
+  selectedPositionId: string,
+  selectedEmployeeId: string | null
+}
+```
+
+---
+
+## EXECUTION RULE:
+
+```txt
+scenarioId → SCENARIOS[scenarioId] → merged into controlState → computeUIState()
+```
+
+---
+
+## CRITICAL RULE:
+
+Scenarios MUST NOT:
+
+* mutate seed data
+* compute signals
+* compute actions
+
+They only define UI focus.
+
+---
+
+# 6. REACT ARCHITECTURE RULES
+
+React is ONLY a renderer.
+
+### Allowed:
+
+* useState(controlState)
+* useMemo(UIState = computeUIState(...))
+
+### Forbidden:
+
+* any derived business logic in components
+* recomputation outside computeUIState
+* duplicated logic across components
+
+---
+
+# 7. MUTATION RULES (ONLY VALID ACTIONS)
+
+Only these functions may update controlState:
+
+* setScenario(scenarioId)
+* setSelectedPositionId(id)
+* setSelectedEmployeeId(id)
+* resolveAction(actionId)
+* updatePosition()
+* updateEmployee()
+
+Everything else is derived.
+
+---
+
+# 8. COMPONENT CONTRACTS (STRICT)
+
+## OrgTree
+
+* consumes UIState.orgTree only
+* no internal computation
+* recursive render allowed
+* safe fallback required
+
+---
+
+## EmployeeDetail
+
+* consumes UIState.selectedEmployee
+* must handle null safely
+
+---
+
+## PositionForm
+
+* consumes selectedPosition
+* updates via updatePosition()
+* always fully visible fields
+
+---
+
+## SignalsPanel
+
+* consumes UIState.signals only
+
+---
+
+## ActionsPanel
+
+* consumes UIState.actions only
+* resolves actions via resolveAction()
+
+---
+
+## JsonInspector
+
+Must display safely:
+
+* seed data
+* controlState
+* full UIState
+
+Never crash.
+
+---
+
+# 9. ERROR SAFETY RULE (ABSOLUTE)
+
+Every component MUST:
+
+* handle undefined
+* handle empty arrays
+* handle missing relationships
+* render fallback UI instead of crashing
+
+Fallback examples:
+
+* "No data available"
+* "Vacant position"
+* "No employee assigned"
+
+---
+
+# 10. ORG TREE RULES
+
+* recursive only
+* stable keys = position.id
+* sorted by order
+* no index keys
+* no mutation
+
+---
+
+# 11. SEED DATA REQUIREMENTS
+
+Must include:
+
+* 6–10 positions
+* 4–6 employees
+* 3+ compliance items
+
+Must include:
+
+* 1 vacant position
+* 1 on_leave employee
+* 1 offboarding employee
+* 1 missing compliance scenario
+
+---
+
+# 12. DETERMINISM GUARANTEE (CRITICAL)
+
+System is ONLY valid if:
+
+```txt
+same seed + same controlState → identical UIState
+```
+
+Rules:
+
+* no randomness
+* no time dependency
+* no unstable sorting
+* no hidden state
+* no side effects in compute engine
+
+---
+
+# 13. FINAL SYSTEM ARCHITECTURE
+
+```txt
+          IMMUTABLE SEED DATA
+   (positions / employees / compliance)
+                    +
+            CONTROL STATE
+   (scenario + selection + resolvedActions)
+                    ↓
+        computeUIState(seed, controlState)
+                    ↓
+              UI SNAPSHOT
+                    ↓
+             React Renderer
+```
+
+---
+
+# 14. FINAL QUALITY GATE (PASS / FAIL)
+
+The build is ONLY correct if:
+
+* app boots successfully on first run
+* org tree renders without crash
+* all forms fully functional and visible
+* scenario switching works instantly
+* signals and actions are fully deterministic
+* JSON inspector always accurate
+* no business logic exists in React components
+* computeUIState is the single source of truth
+* UI is fully reproducible from same inputs
+
+---
+
+# END GOAL
+
+You are building a:
+
+## 🧠 Deterministic UI Simulation Kernel (Frontend Only)
+
+Not a dashboard.
+
+Not a CRUD app.
+
+A fully reproducible organizational simulation engine where:
+
+* UI is a pure function
+* scenarios are reproducible snapshots
+* all logic is centralized in a compute engine
+* React is only a rendering layer
+
+---
