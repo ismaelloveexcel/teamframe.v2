@@ -1,5 +1,3 @@
-export type EmploymentStatusId = "active" | "on_leave" | "offboarding";
-
 export interface Position {
   id: string;
   title: string;
@@ -7,38 +5,15 @@ export interface Position {
   reportsToId: string | null;
   order: number;
   level: number;
-}
-
-export interface CompensationComponent {
-  label: string;
-  amount: number;
-  currency: string;
-}
-
-export interface WorkContact {
-  email: string;
-  phone: string;
-  extension?: string;
-}
-
-export interface PersonalContact {
-  mobile: string;
-  personalEmail?: string;
-}
-
-export interface EmergencyContact {
-  name: string;
-  relationship: string;
-  phone: string;
-  email?: string;
+  isCriticalPosition?: boolean;
+  lifecycleStatus?: "active" | "frozen";
 }
 
 export interface Employee {
   id: string;
-  employeeCode: string;
   name: string;
   positionId: string;
-  status: EmploymentStatusId;
+  status: "active" | "on_leave" | "offboarding";
   email: string;
   phone: string;
   location: string;
@@ -46,14 +21,9 @@ export interface Employee {
   avatarInitials: string;
   avatarColor: string;
   salary: number;
-  workContact: WorkContact;
-  personalContact: PersonalContact;
-  compensationComponents: CompensationComponent[];
   bankName: string;
   bankAccount: string;
-  iban: string;
   onboardingStatus: "complete" | "in_progress" | "not_started";
-  emergencyContacts: EmergencyContact[];
 }
 
 export interface ComplianceItem {
@@ -64,200 +34,162 @@ export interface ComplianceItem {
   description: string;
 }
 
-export interface TeamFrameConfig {
-  employmentStatuses: { id: EmploymentStatusId; label: string; dotColor: string }[];
-  documentTypes: string[];
-  policyCategories: string[];
-  compensationComponentTemplates: string[];
-  riskCategories: string[];
-}
-
 export interface SeedData {
   positions: Position[];
   employees: Employee[];
   compliance: ComplianceItem[];
-  config: TeamFrameConfig;
 }
 
 export const SEED: SeedData = {
   positions: [
-    { id: "1-001", title: "CEO", department: "Executive", reportsToId: null, order: 0, level: 0 },
-    { id: "1-002", title: "COO", department: "Operations", reportsToId: "1-001", order: 1, level: 1 },
-    { id: "1-003", title: "CTO", department: "Engineering", reportsToId: "1-001", order: 2, level: 1 },
-    { id: "1-004", title: "Head of People", department: "People", reportsToId: "1-002", order: 3, level: 2 },
+    { id: "1-001", title: "CEO", department: "Executive", reportsToId: null, order: 0, level: 0, isCriticalPosition: true },
+    { id: "1-002", title: "Head of People", department: "HR", reportsToId: "1-001", order: 1, level: 1 },
+    { id: "1-003", title: "CTO", department: "Engineering", reportsToId: "1-001", order: 2, level: 1, isCriticalPosition: true },
+    { id: "1-004", title: "COO", department: "Operations", reportsToId: "1-001", order: 3, level: 1 },
     { id: "2-001", title: "VP Engineering", department: "Engineering", reportsToId: "1-003", order: 4, level: 2 },
-    { id: "2-002", title: "VP Marketing", department: "Marketing", reportsToId: "1-002", order: 5, level: 2 },
-    { id: "2-003", title: "VP Finance", department: "Finance", reportsToId: "1-002", order: 6, level: 2 },
-    { id: "2-004", title: "VP Sales", department: "Sales", reportsToId: "1-002", order: 7, level: 2 },
-    { id: "3-001", title: "Backend Lead", department: "Engineering", reportsToId: "2-001", order: 8, level: 3 },
-    { id: "3-002", title: "Frontend Lead", department: "Engineering", reportsToId: "2-001", order: 9, level: 3 },
-    { id: "3-003", title: "Finance Manager", department: "Finance", reportsToId: "2-003", order: 10, level: 3 },
-    { id: "3-004", title: "Sales Manager", department: "Sales", reportsToId: "2-004", order: 11, level: 3 },
+    { id: "2-002", title: "VP Marketing", department: "Marketing", reportsToId: "1-004", order: 5, level: 2 },
+    { id: "2-003", title: "VP Product", department: "Product", reportsToId: "1-003", order: 6, level: 2 },
+    { id: "2-004", title: "VP Finance", department: "Finance", reportsToId: "1-004", order: 7, level: 2, isCriticalPosition: true },
+    { id: "2-005", title: "VP Sales", department: "Sales", reportsToId: "1-004", order: 8, level: 2 },
+    { id: "3-001", title: "Tech Lead Backend", department: "Engineering", reportsToId: "2-001", order: 9, level: 3 },
+    { id: "3-002", title: "Tech Lead Frontend", department: "Engineering", reportsToId: "2-001", order: 10, level: 3, isCriticalPosition: true },
+    { id: "3-003", title: "QA Manager", department: "Engineering", reportsToId: "2-001", order: 11, level: 3 },
+    { id: "3-004", title: "DevOps Lead", department: "Engineering", reportsToId: "2-001", order: 12, level: 3 },
+    { id: "3-005", title: "Product Manager", department: "Product", reportsToId: "2-003", order: 13, level: 3 },
+    { id: "3-006", title: "Product Designer", department: "Product", reportsToId: "2-003", order: 14, level: 3 },
+    { id: "3-007", title: "UX Researcher", department: "Product", reportsToId: "2-003", order: 15, level: 3 },
+    { id: "3-008", title: "Finance Manager", department: "Finance", reportsToId: "2-004", order: 16, level: 3 },
+    { id: "3-009", title: "Accountant", department: "Finance", reportsToId: "2-004", order: 17, level: 3 },
+    { id: "3-010", title: "Payroll Specialist", department: "Finance", reportsToId: "2-004", order: 18, level: 3 },
+    { id: "3-011", title: "Marketing Manager", department: "Marketing", reportsToId: "2-002", order: 19, level: 3 },
+    { id: "3-012", title: "Content Lead", department: "Marketing", reportsToId: "2-002", order: 20, level: 3 },
+    { id: "3-013", title: "Brand Designer", department: "Marketing", reportsToId: "2-002", order: 21, level: 3 },
+    { id: "3-014", title: "Sales Development", department: "Sales", reportsToId: "2-005", order: 22, level: 3 },
+    { id: "3-015", title: "Sales Manager", department: "Sales", reportsToId: "2-005", order: 23, level: 3 },
+    { id: "3-016", title: "Account Executive", department: "Sales", reportsToId: "2-005", order: 24, level: 3 },
+    { id: "3-017", title: "Sales Development", department: "Sales", reportsToId: "2-005", order: 25, level: 3, lifecycleStatus: "frozen" },
   ],
   employees: [
     {
-      id: "e-001",
-      employeeCode: "EMP-1001",
-      name: "Alex Thompson",
-      positionId: "1-001",
-      status: "active",
-      email: "alex.thompson@company.com",
-      phone: "+1 415 555 0100",
-      location: "San Francisco, CA",
-      startDate: "2018-01-01",
-      avatarInitials: "AT",
-      avatarColor: "#6366f1",
-      salary: 180000,
-      workContact: { email: "alex.thompson@company.com", phone: "+1 415 555 0100", extension: "101" },
-      personalContact: { mobile: "+1 415 555 0190", personalEmail: "alex.personal@example.com" },
-      compensationComponents: [
-        { label: "Basic Salary", amount: 180000, currency: "USD" },
-        { label: "Leadership Allowance", amount: 25000, currency: "USD" },
-      ],
-      bankName: "Chase",
-      bankAccount: "1234567890",
-      iban: "US64CHAS1234567890",
+      id: "e-001", name: "Alex Thompson", positionId: "1-001", status: "active",
+      email: "alex.thompson@company.com", phone: "(415) 555-0100",
+      location: "San Francisco, CA", startDate: "Jan 1, 2018",
+      avatarInitials: "AT", avatarColor: "#6366f1",
+      salary: 180000, bankName: "Chase", bankAccount: "1234567890",
       onboardingStatus: "complete",
-      emergencyContacts: [{ name: "Maya Thompson", relationship: "Spouse", phone: "+1 415 555 0144", email: "maya@example.com" }],
     },
     {
-      id: "e-002",
-      employeeCode: "EMP-1002",
-      name: "Lina Brooks",
-      positionId: "1-002",
-      status: "active",
-      email: "lina.brooks@company.com",
-      phone: "+971 50 100 1002",
-      location: "Dubai, UAE",
-      startDate: "2019-03-15",
-      avatarInitials: "LB",
-      avatarColor: "#8b5cf6",
-      salary: 160000,
-      workContact: { email: "lina.brooks@company.com", phone: "+971 50 100 1002" },
-      personalContact: { mobile: "+971 50 100 2002" },
-      compensationComponents: [
-        { label: "Basic Salary", amount: 160000, currency: "USD" },
-        { label: "Housing", amount: 22000, currency: "USD" },
-        { label: "Transport", amount: 6000, currency: "USD" },
-      ],
-      bankName: "Emirates NBD",
-      bankAccount: "2345678901",
-      iban: "AE0703312345678901",
+      id: "e-002", name: "Emma Davis", positionId: "1-002", status: "active",
+      email: "emma.davis@company.com", phone: "(415) 555-0101",
+      location: "San Francisco, CA", startDate: "Mar 15, 2019",
+      avatarInitials: "ED", avatarColor: "#8b5cf6",
+      salary: 160000, bankName: "Chase", bankAccount: "2345678901",
       onboardingStatus: "complete",
-      emergencyContacts: [{ name: "Nora Brooks", relationship: "Sister", phone: "+971 55 222 9001" }],
     },
     {
-      id: "e-003",
-      employeeCode: "EMP-1003",
-      name: "Michael Chen",
-      positionId: "1-003",
-      status: "active",
-      email: "michael.chen@company.com",
-      phone: "+49 170 500 0003",
-      location: "Berlin, DE",
-      startDate: "2019-02-01",
-      avatarInitials: "MC",
-      avatarColor: "#f59e0b",
-      salary: 175000,
-      workContact: { email: "michael.chen@company.com", phone: "+49 170 500 0003", extension: "301" },
-      personalContact: { mobile: "+49 170 500 1003" },
-      compensationComponents: [
-        { label: "Basic Salary", amount: 175000, currency: "EUR" },
-        { label: "Engineering Incentive", amount: 12000, currency: "EUR" },
-      ],
-      bankName: "Deutsche Bank",
-      bankAccount: "3456789012",
-      iban: "DE89370400440532013000",
+      id: "e-003", name: "Michael Chen", positionId: "1-003", status: "active",
+      email: "michael.chen@company.com", phone: "(415) 555-0102",
+      location: "San Francisco, CA", startDate: "Feb 1, 2019",
+      avatarInitials: "MC", avatarColor: "#f59e0b",
+      salary: 175000, bankName: "Bank of America", bankAccount: "3456789012",
       onboardingStatus: "complete",
-      emergencyContacts: [{ name: "Nina Chen", relationship: "Partner", phone: "+49 160 900 3000" }],
     },
     {
-      id: "e-004",
-      employeeCode: "EMP-1004",
-      name: "Emma Davis",
-      positionId: "1-004",
-      status: "active",
-      email: "emma.davis@company.com",
-      phone: "+1 415 555 0104",
-      location: "San Francisco, CA",
-      startDate: "2020-01-20",
-      avatarInitials: "ED",
-      avatarColor: "#10b981",
-      salary: 145000,
-      workContact: { email: "emma.davis@company.com", phone: "+1 415 555 0104" },
-      personalContact: { mobile: "+1 415 555 0204" },
-      compensationComponents: [{ label: "Basic Salary", amount: 145000, currency: "USD" }],
-      bankName: "Chase",
-      bankAccount: "4567890123",
-      iban: "US64CHAS4567890123",
+      id: "e-004", name: "Lisa Martinez", positionId: "1-004", status: "active",
+      email: "lisa.martinez@company.com", phone: "(415) 555-0103",
+      location: "Austin, TX", startDate: "Jul 10, 2019",
+      avatarInitials: "LM", avatarColor: "#10b981",
+      salary: 165000, bankName: "Wells Fargo", bankAccount: "4567890123",
       onboardingStatus: "complete",
-      emergencyContacts: [{ name: "James Davis", relationship: "Brother", phone: "+1 415 555 0444" }],
     },
     {
-      id: "e-005",
-      employeeCode: "EMP-1005",
-      name: "James Wilson",
-      positionId: "2-001",
-      status: "active",
-      email: "james.wilson@company.com",
-      phone: "+1 415 555 0123",
-      location: "San Francisco, CA",
-      startDate: "2020-01-15",
-      avatarInitials: "JW",
-      avatarColor: "#3b82f6",
-      salary: 155000,
-      workContact: { email: "james.wilson@company.com", phone: "+1 415 555 0123", extension: "501" },
-      personalContact: { mobile: "+1 415 555 0223" },
-      compensationComponents: [
-        { label: "Basic Salary", amount: 155000, currency: "USD" },
-        { label: "Sales Incentive", amount: 10000, currency: "USD" },
-      ],
-      bankName: "Chase",
-      bankAccount: "5678901234",
-      iban: "US64CHAS5678901234",
+      id: "e-005", name: "James Wilson", positionId: "2-001", status: "active",
+      email: "james.wilson@company.com", phone: "(415) 555-0123",
+      location: "San Francisco, CA", startDate: "Jan 15, 2020",
+      avatarInitials: "JW", avatarColor: "#3b82f6",
+      salary: 155000, bankName: "Chase", bankAccount: "5678901234",
       onboardingStatus: "complete",
-      emergencyContacts: [{ name: "Liam Wilson", relationship: "Spouse", phone: "+1 415 555 0455", email: "liam@example.com" }],
     },
     {
-      id: "e-006",
-      employeeCode: "EMP-1006",
-      name: "Rachel Green",
-      positionId: "2-002",
-      status: "on_leave",
-      email: "rachel.green@company.com",
-      phone: "+1 415 555 0106",
-      location: "New York, NY",
-      startDate: "2020-04-22",
-      avatarInitials: "RG",
-      avatarColor: "#ec4899",
-      salary: 145000,
-      workContact: { email: "rachel.green@company.com", phone: "+1 415 555 0106" },
-      personalContact: { mobile: "+1 415 555 0206", personalEmail: "rachel.personal@example.com" },
-      compensationComponents: [{ label: "Basic Salary", amount: 145000, currency: "USD" }],
-      bankName: "Citibank",
-      bankAccount: "6789012345",
-      iban: "US64CITI6789012345",
+      id: "e-006", name: "Rachel Green", positionId: "2-002", status: "on_leave",
+      email: "rachel.green@company.com", phone: "(415) 555-0104",
+      location: "New York, NY", startDate: "Apr 22, 2020",
+      avatarInitials: "RG", avatarColor: "#ec4899",
+      salary: 145000, bankName: "Citibank", bankAccount: "6789012345",
       onboardingStatus: "complete",
-      emergencyContacts: [{ name: "Monica Green", relationship: "Sister", phone: "+1 415 555 0466" }],
+    },
+    {
+      id: "e-007", name: "Priya Patel", positionId: "2-003", status: "active",
+      email: "priya.patel@company.com", phone: "(415) 555-0105",
+      location: "San Francisco, CA", startDate: "Jun 1, 2020",
+      avatarInitials: "PP", avatarColor: "#06b6d4",
+      salary: 150000, bankName: "Chase", bankAccount: "7890123456",
+      onboardingStatus: "complete",
+    },
+    {
+      id: "e-008", name: "Daniel Kim", positionId: "2-004", status: "offboarding",
+      email: "daniel.kim@company.com", phone: "(415) 555-0106",
+      location: "Chicago, IL", startDate: "Sep 15, 2020",
+      avatarInitials: "DK", avatarColor: "#f97316",
+      salary: 140000, bankName: "Bank of America", bankAccount: "8901234567",
+      onboardingStatus: "complete",
+    },
+    {
+      id: "e-009", name: "Robert Brown", positionId: "2-005", status: "active",
+      email: "robert.brown@company.com", phone: "(415) 555-0107",
+      location: "Dallas, TX", startDate: "Nov 3, 2020",
+      avatarInitials: "RB", avatarColor: "#84cc16",
+      salary: 135000, bankName: "Wells Fargo", bankAccount: "9012345678",
+      onboardingStatus: "complete",
+    },
+    {
+      id: "e-010", name: "Sarah Lee", positionId: "3-001", status: "active",
+      email: "sarah.lee@company.com", phone: "(415) 555-0108",
+      location: "San Francisco, CA", startDate: "Jan 10, 2021",
+      avatarInitials: "SL", avatarColor: "#a78bfa",
+      salary: 125000, bankName: "Chase", bankAccount: "0123456789",
+      onboardingStatus: "in_progress",
+    },
+    {
+      id: "e-011", name: "Tom Nguyen", positionId: "3-011", status: "active",
+      email: "tom.nguyen@company.com", phone: "(415) 555-0109",
+      location: "New York, NY", startDate: "Mar 5, 2021",
+      avatarInitials: "TN", avatarColor: "#fb923c",
+      salary: 110000, bankName: "Citibank", bankAccount: "1123456789",
+      onboardingStatus: "complete",
+    },
+    {
+      id: "e-012", name: "Amy Chen", positionId: "3-005", status: "active",
+      email: "amy.chen@company.com", phone: "(415) 555-0110",
+      location: "San Francisco, CA", startDate: "May 17, 2021",
+      avatarInitials: "AC", avatarColor: "#34d399",
+      salary: 120000, bankName: "Chase", bankAccount: "2123456789",
+      onboardingStatus: "not_started",
+    },
+    {
+      id: "e-013", name: "Mark Davis", positionId: "3-008", status: "active",
+      email: "mark.davis@company.com", phone: "(415) 555-0111",
+      location: "Chicago, IL", startDate: "Jul 22, 2021",
+      avatarInitials: "MD", avatarColor: "#60a5fa",
+      salary: 105000, bankName: "Bank of America", bankAccount: "3123456789",
+      onboardingStatus: "complete",
+    },
+    {
+      id: "e-014", name: "Nina Foster", positionId: "3-015", status: "active",
+      email: "nina.foster@company.com", phone: "(415) 555-0112",
+      location: "Dallas, TX", startDate: "Aug 30, 2021",
+      avatarInitials: "NF", avatarColor: "#f472b6",
+      salary: 100000, bankName: "Wells Fargo", bankAccount: "4123456789",
+      onboardingStatus: "complete",
     },
   ],
   compliance: [
-    { id: "c-001", positionId: "2-001", type: "IT Policy", status: "expired", description: "Policy acknowledgement expired" },
-    { id: "c-002", positionId: "2-003", type: "Passport Copy", status: "missing", description: "Passport copy is not uploaded" },
-    { id: "c-003", positionId: "2-002", type: "Onboarding Step 3", status: "missing", description: "Required onboarding step is pending" },
+    { id: "c-001", positionId: "2-001", type: "Security Training", status: "expired", description: "Annual security training expired" },
+    { id: "c-002", positionId: "2-004", type: "Background Check", status: "missing", description: "Background check not on file" },
+    { id: "c-003", positionId: "2-002", type: "Confidentiality Agreement", status: "missing", description: "NDA not signed" },
     { id: "c-004", positionId: "1-001", type: "Board Fiduciary", status: "complete", description: "Board duties acknowledged" },
     { id: "c-005", positionId: "3-001", type: "Code of Conduct", status: "complete", description: "Code of conduct signed" },
-    { id: "c-006", positionId: "3-003", type: "Data Privacy", status: "expired", description: "Data privacy refresh needed" },
+    { id: "c-006", positionId: "3-011", type: "Data Privacy", status: "expired", description: "GDPR training expired" },
+    { id: "c-007", positionId: "3-005", type: "IP Agreement", status: "missing", description: "IP assignment not on file" },
   ],
-  config: {
-    employmentStatuses: [
-      { id: "active", label: "Active", dotColor: "#22c55e" },
-      { id: "on_leave", label: "On Leave", dotColor: "#f59e0b" },
-      { id: "offboarding", label: "Offboarding", dotColor: "#ef4444" },
-    ],
-    documentTypes: ["Passport Copy", "Employment Contract", "Residence Authorization", "NDA", "Job Description", "Other"],
-    policyCategories: ["Employee Handbook", "Code of Conduct", "IT Policy", "Data Protection Policy", "Remote Work Policy", "Leave Policy"],
-    compensationComponentTemplates: ["Basic Salary", "Housing", "Transport", "Sales Incentive", "Other"],
-    riskCategories: ["Vacancy", "Offboarding", "Leave", "Compliance", "Capacity"],
-  },
 };
