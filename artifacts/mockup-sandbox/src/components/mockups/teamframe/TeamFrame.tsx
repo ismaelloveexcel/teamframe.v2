@@ -1,13 +1,13 @@
-import { useMemo, useState, type ReactNode } from "react";
+import { useMemo, useState, type ChangeEvent, type ReactNode } from "react";
+
 import { SEED, type Employee, type Position } from "../../../teamframe/data/seed";
-import { type ActionItem, type ControlState, type OrgNode, computeUIState } from "../../../teamframe/engine/compute";
+import { type ActionItem as EngineAction, type ControlState, computeUIState } from "../../../teamframe/engine/compute";
 
 const NAV_ITEMS = [
   { id: "org", label: "Organization Map" },
   { id: "actions", label: "Actions" },
-  { id: "people", label: "People" },
+  { id: "team", label: "Team" },
   { id: "policies", label: "Policies" },
-  { id: "finance", label: "Finance" },
   { id: "administration", label: "Administration" },
 ] as const;
 
@@ -19,50 +19,108 @@ const ACTION_FILTERS = [
 ] as const;
 
 type NavId = (typeof NAV_ITEMS)[number]["id"];
-type ActionStatus = "open" | "in_progress" | "completed";
 type ActionFilter = (typeof ACTION_FILTERS)[number]["id"];
+type ActionStatus = "open" | "in_progress" | "completed";
 
-type ActionOverride = {
-  status?: ActionStatus;
-  ownerId?: string;
-  dueDate?: string;
-  comments?: string[];
+type PositionRecord = {
+  position: Position;
+  employee: Employee | null;
 };
 
-type ActionView = {
-  action: ActionItem;
-  position: Position | null;
-  employee: Employee | null;
-  manager: Employee | null;
+type DepartmentNode = {
+  id: string;
+  name: string;
+  executiveId: string | null;
+  head: PositionRecord | null;
+  members: PositionRecord[];
+};
+
+type ExecutiveNode = {
+  executive: PositionRecord | null;
+  label: string;
+  departments: DepartmentNode[];
+};
+
+type ActionRuntime = {
   status: ActionStatus;
   ownerId: string;
   dueDate: string;
   comments: string[];
+};
+
+type ActionView = {
+  action: EngineAction;
+  position: Position | null;
+  employee: Employee | null;
+  manager: Employee | null;
   priority: "critical" | "high" | "normal" | "low";
+  status: ActionStatus;
+  ownerId: string;
+  dueDate: string;
+  comments: string[];
   isOverdue: boolean;
   isDueSoon: boolean;
 };
 
-function Avatar({ initials, color, size = 32 }: { initials: string; color: string; size?: number }) {
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: color,
-        color: "#fff",
-        fontSize: size * 0.34,
-        fontWeight: 700,
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        flexShrink: 0,
-      }}
-    >
-      {initials}
-    </div>
-  );
+type PolicyFolder = {
+  id: string;
+  name: string;
+  parentId: string | null;
+};
+
+type PolicyDocument = {
+  id: string;
+  name: string;
+  folderId: string | null;
+  uploadDate: string;
+  lastUpdated?: string;
+};
+
+const THEME = {
+  background: "#F7F9FC",
+  panel: "#FFFFFF",
+  panelSoft: "#F9FAFB",
+  border: "#E5E7EB",
+  textStrong: "#0F172A",
+  textBody: "#1F2937",
+  textMuted: "#64748B",
+  accent: "#6366F1",
+};
+
+function createId(prefix: string): string {
+  return `${prefix}-${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function csvEscape(value: unknown): string {
+  if (value === null || value === undefined) return "";
+  const stringValue = String(value);
+  if (/[",\n]/.test(stringValue)) {
+    return `"${stringValue.replace(/"/g, '""')}"`;
+  }
+  return stringValue;
+}
+
+function toDateString(value: Date): string {
+  return value.toISOString().slice(0, 10);
+}
+
+function parseDueDate(dueIn: string): string {
+  const match = dueIn.toLowerCase().match(/(\d+)\s+(day|days|week|weeks)/);
+  if (!match) return toDateString(new Date(Date.now() + 7 * 24 * 60 * 60 * 1000));
+  const amount = Number(match[1]);
+  const days = match[2].startsWith("week") ? amount * 7 : amount;
+  return toDateString(new Date(Date.now() + days * 24 * 60 * 60 * 1000));
+}
+
+function actionPriority(action: EngineAction): "critical" | "high" | "normal" | "low" {
+  return action.priority;
+}
+
+function priorityStyles(priority: ActionView["priority"]): { bg: string; text: string } {
+  if (priority === "critical") return { bg: "rgba(239,68,68,0.14)", text: "#DC2626" };
+  if (priority === "high") return { bg: "rgba(245,158,11,0.14)", text: "#D97706" };
+  if (priority === "normal") return { bg: "rgba(99,102,241,0.14)", text: "#4F46E5" };
+  return { bg: "rgba(148,163,184,0.14)", text: "#64748B" };
 }
 
 function statusForEmployee(employee: Employee | null): "filled" | "on_leave" | "offboarding" | "vacant" {
@@ -72,18 +130,27 @@ function statusForEmployee(employee: Employee | null): "filled" | "on_leave" | "
   return "filled";
 }
 
-function statusLabel(status: ReturnType<typeof statusForEmployee>) {
+function statusColor(status: ReturnType<typeof statusForEmployee>): string {
+  if (status === "filled") return "#16A34A";
+  if (status === "on_leave") return "#D97706";
+  if (status === "offboarding") return "#DC2626";
+  return "#64748B";
+}
+
+function statusLabel(status: ReturnType<typeof statusForEmployee>): string {
   if (status === "filled") return "Filled";
   if (status === "on_leave") return "On Leave";
   if (status === "offboarding") return "Offboarding";
   return "Vacant";
 }
 
-function statusColor(status: ReturnType<typeof statusForEmployee>) {
-  if (status === "filled") return "#22c55e";
-  if (status === "on_leave") return "#f59e0b";
-  if (status === "offboarding") return "#ef4444";
-  return "#64748b";
+function completionPercent(employee: Employee | null): number {
+  if (!employee) return 0;
+  const complianceItems = SEED.compliance.filter((item) => item.positionId === employee.positionId);
+  const unresolvedCompliance = complianceItems.filter((item) => item.status !== "complete").length;
+  const onboardingPenalty = employee.onboardingStatus === "complete" ? 0 : 1;
+  const missingCount = unresolvedCompliance + onboardingPenalty;
+  return Math.max(0, 100 - missingCount * 20);
 }
 
 function managerForPosition(position: Position | null): Employee | null {
@@ -91,456 +158,159 @@ function managerForPosition(position: Position | null): Employee | null {
   return SEED.employees.find((employee) => employee.positionId === position.reportsToId) ?? null;
 }
 
-function priorityForAction(action: ActionItem): ActionView["priority"] {
-  return action.priority;
+function initials(name: string): string {
+  return name
+    .split(" ")
+    .map((chunk) => chunk[0])
+    .join("")
+    .slice(0, 2)
+    .toUpperCase();
 }
 
-function priorityStyle(priority: ActionView["priority"]) {
-  if (priority === "critical") return { bg: "rgba(239,68,68,0.16)", text: "#ef4444" };
-  if (priority === "high") return { bg: "rgba(245,158,11,0.16)", text: "#f59e0b" };
-  if (priority === "normal") return { bg: "rgba(99,102,241,0.16)", text: "#818cf8" };
-  return { bg: "rgba(148,163,184,0.16)", text: "#94a3b8" };
+function Avatar({ name, color, size = 30 }: { name: string; color: string; size?: number }) {
+  return (
+    <div
+      style={{
+        width: size,
+        height: size,
+        borderRadius: "50%",
+        background: color,
+        color: "#fff",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: Math.max(10, size * 0.35),
+        fontWeight: 700,
+        flexShrink: 0,
+      }}
+    >
+      {initials(name)}
+    </div>
+  );
 }
 
-function dueInToDateValue(dueIn: string): string {
-  const match = dueIn.toLowerCase().match(/(\d+)\s+(day|days|week|weeks)/);
-  const now = Date.now();
-  if (!match) {
-    return new Date(now + 7 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-  }
-  const amount = Number(match[1]);
-  const days = match[2].startsWith("week") ? amount * 7 : amount;
-  return new Date(now + days * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
-}
+function KpiCard({ label, value, tone }: { label: string; value: number; tone: "default" | "good" | "warn" | "critical" }) {
+  const toneStyles =
+    tone === "good"
+      ? { valueColor: "#16A34A", bg: "rgba(22,163,74,0.1)" }
+      : tone === "warn"
+      ? { valueColor: "#D97706", bg: "rgba(217,119,6,0.1)" }
+      : tone === "critical"
+      ? { valueColor: "#DC2626", bg: "rgba(220,38,38,0.1)" }
+      : { valueColor: THEME.textStrong, bg: THEME.panel };
 
-function formatDueDate(value: string) {
-  const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "No date";
-  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
-}
-
-function ownerName(actionView: ActionView) {
-  if (actionView.ownerId === "manager") {
-    return actionView.manager?.name ?? "Manager";
-  }
-  return SEED.employees.find((employee) => employee.id === actionView.ownerId)?.name ?? "Manager";
-}
-
-function collectCollapsibleIds(nodes: OrgNode[]): string[] {
-  const ids: string[] = [];
-  const stack = [...nodes];
-  while (stack.length > 0) {
-    const current = stack.pop();
-    if (!current) continue;
-    if (current.children.length > 0) {
-      ids.push(current.position.id);
-      stack.push(...current.children);
-    }
-  }
-  return ids;
-}
-
-function buildPathSet(selectedPositionId: string | null): Set<string> {
-  const path = new Set<string>();
-  let current = selectedPositionId;
-  while (current) {
-    path.add(current);
-    const position = SEED.positions.find((item) => item.id === current);
-    current = position?.reportsToId ?? null;
-  }
-  return path;
-}
-
-function KpiCard({
-  label,
-  value,
-  tone,
-}: {
-  label: string;
-  value: number;
-  tone: "default" | "good" | "warn" | "critical";
-}) {
-  const colors = {
-    default: { value: "#f8fafc", bg: "rgba(255,255,255,0.03)" },
-    good: { value: "#22c55e", bg: "rgba(34,197,94,0.12)" },
-    warn: { value: "#f59e0b", bg: "rgba(245,158,11,0.12)" },
-    critical: { value: "#ef4444", bg: "rgba(239,68,68,0.12)" },
-  };
-  const toneColor = colors[tone];
   return (
     <div
       style={{
         borderRadius: 10,
-        border: "1px solid rgba(255,255,255,0.08)",
-        background: toneColor.bg,
+        border: `1px solid ${THEME.border}`,
+        background: toneStyles.bg,
         padding: "8px 10px",
-        minHeight: 56,
+        minHeight: 60,
       }}
     >
-      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#94a3b8" }}>{label}</div>
-      <div style={{ fontSize: 20, lineHeight: 1.15, fontWeight: 800, color: toneColor.value }}>{value}</div>
-    </div>
-  );
-}
-
-function PanelSection({ title, children }: { title: string; children: ReactNode }) {
-  return (
-    <div style={{ padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-      <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: "#94a3b8", marginBottom: 8 }}>
-        {title}
+      <div
+        style={{
+          fontSize: 10,
+          fontWeight: 700,
+          textTransform: "uppercase",
+          letterSpacing: "0.06em",
+          color: THEME.textMuted,
+          marginBottom: 3,
+        }}
+      >
+        {label}
       </div>
-      {children}
+      <div style={{ fontSize: 20, fontWeight: 800, color: toneStyles.valueColor, lineHeight: 1.15 }}>{value}</div>
     </div>
   );
 }
 
-function OrgTree({
-  nodes,
-  selectedPositionId,
-  onSelectPosition,
-  collapsedIds,
-  onToggleCollapse,
-  focusPathOnly,
-  pathSet,
-}: {
-  nodes: OrgNode[];
-  selectedPositionId: string | null;
-  onSelectPosition: (id: string) => void;
-  collapsedIds: Set<string>;
-  onToggleCollapse: (id: string) => void;
-  focusPathOnly: boolean;
-  pathSet: Set<string>;
-}) {
-  if (nodes.length === 0) return null;
+function FullProfileDrawer({ employeeId, onClose }: { employeeId: string | null; onClose: () => void }) {
+  if (!employeeId) return null;
+  const employee = SEED.employees.find((item) => item.id === employeeId);
+  if (!employee) return null;
+  const position = SEED.positions.find((item) => item.id === employee.positionId) ?? null;
+  const manager = managerForPosition(position);
+
   return (
-    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "center", gap: 28 }}>
-      {nodes.map((node) => {
-        const isSelected = node.position.id === selectedPositionId;
-        const isCollapsed = collapsedIds.has(node.position.id);
-        const inPath = pathSet.has(node.position.id);
-        const muted = focusPathOnly && !inPath;
-        const employee = node.employee;
-        const nodeStatus = statusForEmployee(employee);
+    <div
+      style={{
+        position: "fixed",
+        top: 0,
+        right: 0,
+        bottom: 0,
+        width: 410,
+        background: THEME.panel,
+        borderLeft: `1px solid ${THEME.border}`,
+        boxShadow: "-12px 0 28px rgba(15,23,42,0.12)",
+        zIndex: 40,
+        display: "flex",
+        flexDirection: "column",
+      }}
+    >
+      <div
+        style={{
+          padding: "14px 16px",
+          borderBottom: `1px solid ${THEME.border}`,
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        <div>
+          <div style={{ fontSize: 16, fontWeight: 800, color: THEME.textStrong }}>Employee Profile</div>
+          <div style={{ fontSize: 11, color: THEME.textMuted }}>Complete employee details</div>
+        </div>
+        <button
+          onClick={onClose}
+          style={{
+            border: `1px solid ${THEME.border}`,
+            borderRadius: 8,
+            background: THEME.panelSoft,
+            color: THEME.textBody,
+            fontSize: 11,
+            fontWeight: 700,
+            padding: "6px 10px",
+            cursor: "pointer",
+          }}
+        >
+          Close
+        </button>
+      </div>
 
-        return (
-          <div key={node.position.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", minWidth: 200 }}>
-            <button
-              onClick={() => onSelectPosition(node.position.id)}
-              style={{
-                width: 200,
-                textAlign: "left",
-                borderRadius: 12,
-                border: `1px solid ${isSelected ? "rgba(99,102,241,0.95)" : "rgba(255,255,255,0.08)"}`,
-                background: isSelected ? "rgba(99,102,241,0.2)" : "rgba(15,23,42,0.92)",
-                boxShadow: isSelected ? "0 0 0 2px rgba(99,102,241,0.32), 0 10px 20px rgba(0,0,0,0.24)" : "none",
-                color: "#e2e8f0",
-                cursor: "pointer",
-                padding: "10px 12px",
-                opacity: muted ? 0.35 : 1,
-              }}
-            >
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-                <span style={{ fontSize: 12, fontWeight: 800, color: "#fff", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", maxWidth: 140 }}>
-                  {node.position.title}
-                </span>
-                {node.children.length > 0 && (
-                  <span
-                    onClick={(event) => {
-                      event.stopPropagation();
-                      onToggleCollapse(node.position.id);
-                    }}
-                    style={{
-                      fontSize: 10,
-                      color: "#94a3b8",
-                      border: "1px solid rgba(255,255,255,0.14)",
-                      background: "rgba(255,255,255,0.04)",
-                      borderRadius: 999,
-                      padding: "1px 7px",
-                    }}
-                  >
-                    {isCollapsed ? "Expand" : "Collapse"}
-                  </span>
-                )}
-              </div>
-              <div style={{ fontSize: 11, color: employee ? "#cbd5e1" : "#94a3b8", marginBottom: 7 }}>{employee?.name ?? "Vacant"}</div>
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", fontSize: 10 }}>
-                <span style={{ display: "inline-flex", alignItems: "center", gap: 6, color: "#94a3b8" }}>
-                  <span style={{ width: 8, height: 8, borderRadius: "50%", background: statusColor(nodeStatus), display: "inline-block" }} />
-                  {statusLabel(nodeStatus)}
-                </span>
-                <span style={{ color: "#64748b" }}>{node.children.length} reports</span>
-              </div>
-            </button>
-
-            {node.children.length > 0 && isCollapsed && (
-              <div
-                style={{
-                  marginTop: 8,
-                  fontSize: 10,
-                  color: "#94a3b8",
-                  borderRadius: 999,
-                  border: "1px dashed rgba(255,255,255,0.2)",
-                  padding: "3px 8px",
-                }}
-              >
-                +{node.children.length} hidden
-              </div>
-            )}
-
-            {node.children.length > 0 && !isCollapsed && (
-              <>
-                <div style={{ width: 2, height: 16, background: "rgba(255,255,255,0.12)" }} />
-                <div style={{ borderTop: "1px solid rgba(255,255,255,0.1)", paddingTop: 16, paddingLeft: 10, paddingRight: 10 }}>
-                  <OrgTree
-                    nodes={node.children}
-                    selectedPositionId={selectedPositionId}
-                    onSelectPosition={onSelectPosition}
-                    collapsedIds={collapsedIds}
-                    onToggleCollapse={onToggleCollapse}
-                    focusPathOnly={focusPathOnly}
-                    pathSet={pathSet}
-                  />
-                </div>
-              </>
-            )}
+      <div style={{ padding: 16, overflowY: "auto", display: "flex", flexDirection: "column", gap: 12 }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Avatar name={employee.name} color={employee.avatarColor} size={40} />
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 800, color: THEME.textStrong }}>{employee.name}</div>
+            <div style={{ fontSize: 12, color: THEME.textMuted }}>{position?.title ?? "Unknown Position"}</div>
           </div>
-        );
-      })}
-    </div>
-  );
-}
-
-function PositionPanel({
-  selectedPosition,
-  selectedEmployee,
-  directReports,
-  positionActions,
-  onSelectPosition,
-  onUpdateAction,
-  onAddComment,
-}: {
-  selectedPosition: Position | null;
-  selectedEmployee: Employee | null;
-  directReports: { position: Position; employee: Employee | null }[];
-  positionActions: ActionView[];
-  onSelectPosition: (id: string) => void;
-  onUpdateAction: (id: string, patch: ActionOverride) => void;
-  onAddComment: (id: string, comment: string) => void;
-}) {
-  if (!selectedPosition) {
-    return <div style={{ padding: 24, color: "#94a3b8", fontSize: 13 }}>Select a position</div>;
-  }
-
-  const manager = managerForPosition(selectedPosition);
-  const positionStatus = statusForEmployee(selectedEmployee);
-  const missingCompliance = SEED.compliance.filter((item) => item.positionId === selectedPosition.id && item.status !== "complete").map((item) => item.type);
-  if (selectedEmployee && selectedEmployee.onboardingStatus !== "complete") {
-    missingCompliance.push("Onboarding Task");
-  }
-  const readiness = Math.max(0, 100 - missingCompliance.length * 18 - Math.min(positionActions.length, 3) * 6);
-  const openActions = positionActions.filter((item) => item.status !== "completed");
-
-  return (
-    <div style={{ height: "100%", overflowY: "auto" }}>
-      <div style={{ padding: "16px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-        <div style={{ fontSize: 18, fontWeight: 800, color: "#fff", lineHeight: 1.2 }}>{selectedPosition.title}</div>
-        <div style={{ fontSize: 13, color: "#cbd5e1", marginTop: 4 }}>{selectedEmployee?.name ?? "Vacant"}</div>
-        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>
-          {selectedPosition.department} · Reporting Manager: {manager?.name ?? "None"}
         </div>
-        <div style={{ marginTop: 8, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "#cbd5e1" }}>
-          <span style={{ width: 8, height: 8, borderRadius: "50%", background: statusColor(positionStatus), display: "inline-block" }} />
-          {statusLabel(positionStatus)}
-        </div>
-      </div>
 
-      <PanelSection title="Position Information">
-        <div style={{ fontSize: 12, color: "#cbd5e1" }}>Position ID: {selectedPosition.id}</div>
-        <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 4 }}>Department: {selectedPosition.department}</div>
-        <div style={{ fontSize: 12, color: "#cbd5e1", marginTop: 4 }}>Direct Reports: {directReports.length}</div>
-      </PanelSection>
-
-      <PanelSection title="Assigned Employee">
-        {selectedEmployee ? (
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-            <Avatar initials={selectedEmployee.avatarInitials} color={selectedEmployee.avatarColor} size={34} />
-            <div>
-              <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 700 }}>{selectedEmployee.name}</div>
-              <div style={{ fontSize: 11, color: "#94a3b8" }}>{selectedEmployee.email}</div>
-              <div style={{ fontSize: 11, color: "#94a3b8" }}>{selectedEmployee.phone}</div>
+        {[
+          { label: "Employee Number", value: employee.id },
+          { label: "Department", value: position?.department ?? "" },
+          { label: "Manager", value: manager?.name ?? "" },
+          { label: "Work Location", value: employee.location },
+          { label: "Email", value: employee.email },
+          { label: "Phone", value: employee.phone },
+          { label: "Date of Joining", value: employee.startDate },
+          { label: "Employment Status", value: employee.status.replace("_", " ") },
+          { label: "Onboarding", value: employee.onboardingStatus.replace("_", " ") },
+          { label: "Salary", value: employee.salary ? `$${employee.salary.toLocaleString()}` : "" },
+          { label: "Bank Name", value: employee.bankName },
+          { label: "IBAN", value: employee.bankAccount ?? "" },
+          { label: "SWIFT / BIC", value: "" },
+        ].map((item) => (
+          <div key={item.label} style={{ border: `1px solid ${THEME.border}`, borderRadius: 10, padding: "10px 12px", background: THEME.panelSoft }}>
+            <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: THEME.textMuted }}>
+              {item.label}
             </div>
+            <div style={{ fontSize: 13, color: THEME.textBody, marginTop: 3 }}>{item.value || "—"}</div>
           </div>
-        ) : (
-          <div style={{ fontSize: 12, color: "#94a3b8" }}>No employee assigned</div>
-        )}
-      </PanelSection>
-
-      <PanelSection title="Position Status">
-        <div style={{ display: "flex", alignItems: "center", gap: 7 }}>
-          <span style={{ width: 10, height: 10, borderRadius: "50%", background: statusColor(positionStatus), display: "inline-block" }} />
-          <span style={{ fontSize: 13, fontWeight: 700, color: "#e2e8f0" }}>{statusLabel(positionStatus)}</span>
-        </div>
-      </PanelSection>
-
-      <PanelSection title="Readiness">
-        <div style={{ fontSize: 11, color: "#94a3b8", textTransform: "uppercase", letterSpacing: "0.06em" }}>Readiness</div>
-        <div style={{ fontSize: 34, lineHeight: 1.15, color: "#fff", fontWeight: 800, marginTop: 4 }}>{readiness}%</div>
-        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 9, marginBottom: 5 }}>Missing Items</div>
-        {missingCompliance.length > 0 ? (
-          <ul style={{ margin: 0, paddingLeft: 16, color: "#cbd5e1", fontSize: 12, lineHeight: 1.5 }}>
-            {missingCompliance.slice(0, 5).map((item) => (
-              <li key={item}>{item}</li>
-            ))}
-          </ul>
-        ) : (
-          <div style={{ fontSize: 12, color: "#22c55e" }}>No missing items</div>
-        )}
-      </PanelSection>
-
-      <PanelSection title="Open Actions">
-        {openActions.length === 0 ? (
-          <div style={{ fontSize: 12, color: "#94a3b8" }}>No open actions</div>
-        ) : (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {openActions.map((item) => {
-              const priority = priorityStyle(item.priority);
-              return (
-                <div key={item.action.id} style={{ border: "1px solid rgba(255,255,255,0.09)", borderRadius: 9, padding: "9px 10px" }}>
-                  <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-                    <div style={{ fontSize: 12, color: "#e2e8f0", fontWeight: 700 }}>{item.action.title}</div>
-                    <span style={{ fontSize: 10, fontWeight: 700, color: priority.text, background: priority.bg, borderRadius: 999, padding: "2px 7px" }}>
-                      {item.priority}
-                    </span>
-                  </div>
-                  <div style={{ fontSize: 11, color: item.isOverdue ? "#ef4444" : item.isDueSoon ? "#f59e0b" : "#94a3b8", marginTop: 5 }}>
-                    Due {formatDueDate(item.dueDate)} · Owner {ownerName(item)}
-                  </div>
-                  <div style={{ display: "flex", gap: 6, marginTop: 8 }}>
-                    <button
-                      onClick={() => onUpdateAction(item.action.id, { status: "completed" })}
-                      style={{
-                        border: "1px solid rgba(34,197,94,0.34)",
-                        borderRadius: 6,
-                        background: "rgba(34,197,94,0.1)",
-                        color: "#22c55e",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: "4px 8px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      Complete
-                    </button>
-                    <button
-                      onClick={() => onUpdateAction(item.action.id, { status: "in_progress" })}
-                      style={{
-                        border: "1px solid rgba(99,102,241,0.34)",
-                        borderRadius: 6,
-                        background: "rgba(99,102,241,0.1)",
-                        color: "#818cf8",
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: "4px 8px",
-                        cursor: "pointer",
-                      }}
-                    >
-                      In Progress
-                    </button>
-                  </div>
-                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 6, marginTop: 8 }}>
-                    <select
-                      value={item.ownerId}
-                      onChange={(event) => onUpdateAction(item.action.id, { ownerId: event.target.value })}
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.16)",
-                        borderRadius: 6,
-                        background: "rgba(255,255,255,0.03)",
-                        color: "#cbd5e1",
-                        fontSize: 11,
-                        padding: "4px 6px",
-                      }}
-                    >
-                      <option value="manager">Manager</option>
-                      {SEED.employees.map((employee) => (
-                        <option key={employee.id} value={employee.id}>
-                          {employee.name}
-                        </option>
-                      ))}
-                    </select>
-                    <input
-                      type="date"
-                      value={item.dueDate}
-                      onChange={(event) => onUpdateAction(item.action.id, { dueDate: event.target.value })}
-                      style={{
-                        border: "1px solid rgba(255,255,255,0.16)",
-                        borderRadius: 6,
-                        background: "rgba(255,255,255,0.03)",
-                        color: "#cbd5e1",
-                        fontSize: 11,
-                        padding: "4px 6px",
-                      }}
-                    />
-                  </div>
-                  <button
-                    onClick={() => onAddComment(item.action.id, "Updated from position panel")}
-                    style={{
-                      marginTop: 7,
-                      border: "1px solid rgba(255,255,255,0.16)",
-                      borderRadius: 6,
-                      background: "rgba(255,255,255,0.03)",
-                      color: "#cbd5e1",
-                      fontSize: 10,
-                      fontWeight: 700,
-                      padding: "4px 8px",
-                      cursor: "pointer",
-                    }}
-                  >
-                    Add Comment
-                  </button>
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </PanelSection>
-
-      <PanelSection title="Supporting Information">
-        {selectedEmployee ? (
-          <>
-            <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 4 }}>Location: {selectedEmployee.location}</div>
-            <div style={{ fontSize: 12, color: "#cbd5e1", marginBottom: 4 }}>Start Date: {selectedEmployee.startDate}</div>
-            <div style={{ fontSize: 12, color: "#cbd5e1" }}>Bank: {selectedEmployee.bankName}</div>
-          </>
-        ) : (
-          <div style={{ fontSize: 12, color: "#94a3b8" }}>No supporting data</div>
-        )}
-      </PanelSection>
-
-      <PanelSection title="Reporting Line">
-        {directReports.length > 0 ? (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {directReports.slice(0, 6).map((report) => (
-              <button
-                key={report.position.id}
-                onClick={() => onSelectPosition(report.position.id)}
-                style={{
-                  border: "1px solid rgba(255,255,255,0.14)",
-                  borderRadius: 8,
-                  background: "rgba(255,255,255,0.03)",
-                  color: "#cbd5e1",
-                  fontSize: 10,
-                  padding: "4px 8px",
-                  cursor: "pointer",
-                }}
-              >
-                {report.position.title}
-              </button>
-            ))}
-          </div>
-        ) : (
-          <div style={{ fontSize: 12, color: "#94a3b8" }}>No direct reports</div>
-        )}
-      </PanelSection>
+        ))}
+      </div>
     </div>
   );
 }
@@ -557,43 +327,186 @@ export function TeamFrame() {
     actionOverrides: {},
   });
   const [actionFilter, setActionFilter] = useState<ActionFilter>("all");
-  const [employeeSearch, setEmployeeSearch] = useState("");
-  const [peopleStatusFilter, setPeopleStatusFilter] = useState<"all" | Employee["status"]>("all");
+  const [actionRuntime, setActionRuntime] = useState<Record<string, ActionRuntime>>({});
   const [actionCommentDrafts, setActionCommentDrafts] = useState<Record<string, string>>({});
-  const actionOverrides = controlState.actionOverrides;
-  const [collapsedIds, setCollapsedIds] = useState<Set<string>>(new Set());
+  const [teamSearch, setTeamSearch] = useState("");
+  const [fullProfileEmployeeId, setFullProfileEmployeeId] = useState<string | null>(null);
   const [focusPathOnly, setFocusPathOnly] = useState(false);
+  const [collapsedDepartmentIds, setCollapsedDepartmentIds] = useState<Set<string>>(new Set());
+
+  const [policyFolders, setPolicyFolders] = useState<PolicyFolder[]>([
+    { id: "folder-company", name: "Company Policies", parentId: null },
+    { id: "folder-hr", name: "HR", parentId: "folder-company" },
+    { id: "folder-security", name: "IT & Security", parentId: "folder-company" },
+    { id: "folder-onboarding", name: "Onboarding", parentId: "folder-hr" },
+  ]);
+  const [policyDocuments, setPolicyDocuments] = useState<PolicyDocument[]>(
+    SEED.compliance.map((item, index) => ({
+      id: `doc-${index + 1}`,
+      name: `${item.type}.pdf`,
+      folderId:
+        item.type.toLowerCase().includes("security") || item.type.toLowerCase().includes("privacy")
+          ? "folder-security"
+          : item.type.toLowerCase().includes("conduct")
+          ? "folder-onboarding"
+          : "folder-hr",
+      uploadDate: toDateString(new Date(Date.now() - (index + 3) * 86400000)),
+      lastUpdated: index % 2 === 0 ? toDateString(new Date(Date.now() - (index + 1) * 86400000)) : undefined,
+    })),
+  );
+  const [selectedFolderId, setSelectedFolderId] = useState<string | null>("folder-company");
+  const [newFolderName, setNewFolderName] = useState("");
+  const [newFolderParentId, setNewFolderParentId] = useState<string | null>("folder-company");
 
   const uiState = useMemo(() => computeUIState(SEED, controlState), [controlState]);
 
+  const positionMap = useMemo(() => new Map(SEED.positions.map((position) => [position.id, position])), []);
+  const employeeByPositionMap = useMemo(
+    () => new Map(SEED.employees.map((employee) => [employee.positionId, employee])),
+    [],
+  );
+
+  const executives = useMemo(() => {
+    const positions = [...SEED.positions].sort((a, b) => a.order - b.order);
+    const isExecutive = (position: Position): boolean => {
+      const manager = position.reportsToId ? positionMap.get(position.reportsToId) ?? null : null;
+      return position.reportsToId === null || Boolean(manager && manager.reportsToId === null) || position.level <= 1;
+    };
+
+    const executiveIds = new Set(positions.filter((position) => isExecutive(position)).map((position) => position.id));
+    const departments = [...new Set(positions.map((position) => position.department))].sort((a, b) => a.localeCompare(b));
+
+    const departmentNodes: DepartmentNode[] = departments.map((departmentName) => {
+      const records = positions
+        .filter((position) => position.department === departmentName)
+        .map((position) => ({
+          position,
+          employee: employeeByPositionMap.get(position.id) ?? null,
+        }))
+        .sort((left, right) => {
+          if (left.position.level === right.position.level) return left.position.order - right.position.order;
+          return left.position.level - right.position.level;
+        });
+
+      const head = records[0] ?? null;
+
+      let executiveId: string | null = null;
+      let cursor: Position | null = head?.position ?? null;
+      while (cursor) {
+        if (executiveIds.has(cursor.id)) {
+          executiveId = cursor.id;
+          break;
+        }
+        cursor = cursor.reportsToId ? positionMap.get(cursor.reportsToId) ?? null : null;
+      }
+
+      return {
+        id: `dept-${departmentName.toLowerCase().replace(/\s+/g, "-")}-${executiveId ?? "unassigned"}`,
+        name: departmentName,
+        executiveId,
+        head,
+        members: records.slice(1),
+      };
+    });
+
+    const grouped = new Map<string, DepartmentNode[]>();
+    for (const node of departmentNodes) {
+      const key = node.executiveId ?? "unassigned";
+      if (!grouped.has(key)) grouped.set(key, []);
+      grouped.get(key)?.push(node);
+    }
+
+    const executiveRows: ExecutiveNode[] = [...executiveIds]
+      .sort((leftId, rightId) => {
+        const left = positionMap.get(leftId);
+        const right = positionMap.get(rightId);
+        return (left?.order ?? 0) - (right?.order ?? 0);
+      })
+      .map((executiveId) => {
+        const position = positionMap.get(executiveId) ?? null;
+        return {
+          executive: position
+            ? {
+                position,
+                employee: employeeByPositionMap.get(position.id) ?? null,
+              }
+            : null,
+          label: position?.title ?? "Executive",
+          departments: (grouped.get(executiveId) ?? []).sort((a, b) => a.name.localeCompare(b.name)),
+        };
+      });
+
+    if ((grouped.get("unassigned") ?? []).length > 0) {
+      executiveRows.push({
+        executive: null,
+        label: "Flexible Roles",
+        departments: grouped.get("unassigned") ?? [],
+      });
+    }
+
+    return executiveRows;
+  }, [employeeByPositionMap, positionMap]);
+
+  const departmentIds = useMemo(
+    () => executives.flatMap((executive) => executive.departments.map((department) => department.id)),
+    [executives],
+  );
+
+  const selectedPositionId = uiState.selectedPosition?.id ?? null;
+
+  const selectedExecutiveAndDepartment = useMemo(() => {
+    if (!selectedPositionId) return { executiveId: null as string | null, departmentId: null as string | null };
+    for (const executive of executives) {
+      for (const department of executive.departments) {
+        const inDepartment =
+          department.head?.position.id === selectedPositionId ||
+          department.members.some((member) => member.position.id === selectedPositionId);
+        if (inDepartment) {
+          return {
+            executiveId: executive.executive?.position.id ?? executive.label,
+            departmentId: department.id,
+          };
+        }
+      }
+    }
+    return { executiveId: null as string | null, departmentId: null as string | null };
+  }, [executives, selectedPositionId]);
+
   const actionViews = useMemo<ActionView[]>(() => {
-    const now = new Date();
-    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfToday = new Date();
+    startOfToday.setHours(0, 0, 0, 0);
     const dueSoonThreshold = Date.now() + 48 * 60 * 60 * 1000;
 
     return uiState.actions
       .map((action) => {
-        const position = SEED.positions.find((item) => item.id === action.relatedPositionId) ?? null;
-        const employee = SEED.employees.find((item) => item.positionId === action.relatedPositionId) ?? null;
-        const manager = managerForPosition(position ?? null);
-        const override = actionOverrides[action.id];
-        const dueDate = override?.dueDate ?? action.dueDate;
-        const status = override?.status ?? "open";
-        const ownerId = override?.ownerId ?? employee?.id ?? manager?.id ?? "manager";
-        const comments = override?.comments ?? [];
-        const dueAt = new Date(dueDate).getTime();
-        const isOverdue = status !== "completed" && Number.isFinite(dueAt) && dueAt < startOfToday;
-        const isDueSoon = status !== "completed" && Number.isFinite(dueAt) && dueAt >= startOfToday && dueAt <= dueSoonThreshold;
+        const position = positionMap.get(action.relatedPositionId) ?? null;
+        const employee = employeeByPositionMap.get(action.relatedPositionId) ?? null;
+        const manager = managerForPosition(position);
+        const defaultOwner = employee?.id ?? manager?.id ?? "";
+        const runtime = actionRuntime[action.id] ?? {
+          status: action.status,
+          ownerId: action.ownerId || defaultOwner,
+          dueDate: action.dueDate,
+          comments: action.comments ?? [],
+        };
+        const dueTime = runtime.dueDate ? new Date(runtime.dueDate).getTime() : Number.NaN;
+        const isOverdue = runtime.status !== "completed" && Number.isFinite(dueTime) && dueTime < startOfToday.getTime();
+        const isDueSoon =
+          runtime.status !== "completed" &&
+          Number.isFinite(dueTime) &&
+          dueTime >= startOfToday.getTime() &&
+          dueTime <= dueSoonThreshold;
+
         return {
           action,
           position,
           employee,
           manager,
-          status,
-          ownerId,
-          dueDate,
-          comments,
-          priority: priorityForAction(action),
+          priority: actionPriority(action),
+          status: runtime.status,
+          ownerId: runtime.ownerId,
+          dueDate: runtime.dueDate,
+          comments: runtime.comments,
           isOverdue,
           isDueSoon,
         };
@@ -603,95 +516,203 @@ export function TeamFrame() {
         const rightRank = right.isOverdue ? 0 : right.isDueSoon ? 1 : right.priority === "critical" ? 2 : right.priority === "high" ? 3 : 4;
         return leftRank - rightRank;
       });
-  }, [uiState.actions, actionOverrides]);
+  }, [actionRuntime, employeeByPositionMap, positionMap, uiState.actions]);
 
   const filteredActions = useMemo(
     () => actionViews.filter((action) => actionFilter === "all" || action.status === actionFilter),
     [actionFilter, actionViews],
   );
 
-  const selectedPositionActions = useMemo(
-    () => actionViews.filter((item) => item.position?.id === uiState.selectedPosition?.id),
-    [actionViews, uiState.selectedPosition?.id],
+  const totalPositions = SEED.positions.length;
+  const filledPositions = SEED.positions.filter((position) => employeeByPositionMap.has(position.id)).length;
+  const vacantPositions = totalPositions - filledPositions;
+  const criticalVacancies = SEED.positions.filter(
+    (position) => position.isCriticalPosition && !employeeByPositionMap.has(position.id),
+  ).length;
+  const needsAttention = actionViews.filter((action) => action.isOverdue).length;
+  const dueSoon = actionViews.filter((action) => action.isDueSoon).length;
+
+  const teamRows = useMemo(
+    () =>
+      SEED.employees
+        .map((employee) => {
+          const position = positionMap.get(employee.positionId) ?? null;
+          return {
+            employee,
+            position,
+            completion: completionPercent(employee),
+          };
+        })
+        .filter((row) => {
+          const query = teamSearch.trim().toLowerCase();
+          if (!query) return true;
+          return (
+            row.employee.name.toLowerCase().includes(query) ||
+            row.employee.email.toLowerCase().includes(query) ||
+            row.employee.phone.toLowerCase().includes(query) ||
+            (row.position?.title.toLowerCase().includes(query) ?? false) ||
+            (row.position?.department.toLowerCase().includes(query) ?? false)
+          );
+        }),
+    [positionMap, teamSearch],
   );
 
-  const directReports = useMemo(() => {
-    if (!uiState.selectedPosition) return [];
-    return SEED.positions
-      .filter((position) => position.reportsToId === uiState.selectedPosition?.id)
-      .sort((a, b) => a.order - b.order)
-      .map((position) => ({
-        position,
-        employee: SEED.employees.find((employee) => employee.positionId === position.id) ?? null,
-      }));
-  }, [uiState.selectedPosition]);
+  const selectedFolder = policyFolders.find((folder) => folder.id === selectedFolderId) ?? null;
+  const childFolders = policyFolders.filter((folder) => folder.parentId === selectedFolderId);
+  const visibleDocuments = policyDocuments.filter((document) => document.folderId === selectedFolderId);
 
-  const peopleRows = useMemo(() => {
-    return SEED.employees
-      .filter((employee) => {
-        const position = SEED.positions.find((item) => item.id === employee.positionId);
-        const manager = managerForPosition(position ?? null);
-        const query = employeeSearch.trim().toLowerCase();
-        const matchesQuery =
-          !query ||
-          employee.name.toLowerCase().includes(query) ||
-          employee.email.toLowerCase().includes(query) ||
-          employee.phone.toLowerCase().includes(query) ||
-          (position?.title.toLowerCase().includes(query) ?? false) ||
-          (position?.department.toLowerCase().includes(query) ?? false) ||
-          (manager?.name.toLowerCase().includes(query) ?? false);
-        const matchesStatus = peopleStatusFilter === "all" || peopleStatusFilter === employee.status;
-        return matchesQuery && matchesStatus;
-      })
-      .map((employee) => {
-        const position = SEED.positions.find((item) => item.id === employee.positionId) ?? null;
-        const manager = managerForPosition(position ?? null);
-        return { employee, position, manager };
-      });
-  }, [employeeSearch, peopleStatusFilter]);
+  const selectedQuickRecord = selectedPositionId
+    ? {
+        position: positionMap.get(selectedPositionId) ?? null,
+        employee: employeeByPositionMap.get(selectedPositionId) ?? null,
+      }
+    : { position: null, employee: null };
 
-  const allCollapsibleIds = useMemo(() => collectCollapsibleIds(uiState.orgTree), [uiState.orgTree]);
-  const pathSet = useMemo(() => buildPathSet(uiState.selectedPosition?.id ?? null), [uiState.selectedPosition?.id]);
+  const quickManager = managerForPosition(selectedQuickRecord.position);
+  const quickCompletion = completionPercent(selectedQuickRecord.employee);
 
-  const overdueCount = actionViews.filter((item) => item.isOverdue).length;
-  const dueSoonCount = actionViews.filter((item) => item.isDueSoon).length;
-  const criticalVacancyCount = uiState.stats.criticalVacancies;
+  const updateActionRuntime = (actionId: string, patch: Partial<ActionRuntime>) => {
+    setActionRuntime((prev) => {
+      const existing = prev[actionId] ?? {
+        status: "open" as ActionStatus,
+        ownerId: "",
+        dueDate: parseDueDate("Due in 1 week"),
+        comments: [],
+      };
+      return {
+        ...prev,
+        [actionId]: {
+          ...existing,
+          ...patch,
+        },
+      };
+    });
+  };
 
-  const selectPosition = (id: string) => {
-    const employee = SEED.employees.find((item) => item.positionId === id);
+  const addActionComment = (actionId: string) => {
+    const text = (actionCommentDrafts[actionId] ?? "").trim();
+    if (!text) return;
+    setActionRuntime((prev) => {
+      const existing = prev[actionId] ?? {
+        status: "open" as ActionStatus,
+        ownerId: "",
+        dueDate: parseDueDate("Due in 1 week"),
+        comments: [],
+      };
+      return {
+        ...prev,
+        [actionId]: {
+          ...existing,
+          comments: [...existing.comments, text],
+        },
+      };
+    });
+    setActionCommentDrafts((prev) => ({ ...prev, [actionId]: "" }));
+  };
+
+  const selectPosition = (positionId: string) => {
+    const employee = employeeByPositionMap.get(positionId) ?? null;
     setControlState((prev) => ({
       ...prev,
-      selectedPositionId: id,
+      selectedPositionId: positionId,
       selectedEmployeeId: employee?.id ?? null,
       scenarioId: "DEFAULT_VIEW",
     }));
   };
 
-  const updateAction = (id: string, patch: ActionOverride) => {
-    setControlState((prev) => ({
-      ...prev,
-      actionOverrides: {
-        ...prev.actionOverrides,
-        [id]: { ...prev.actionOverrides[id], ...patch },
-      },
-    }));
+  const downloadPayrollReport = () => {
+    const headers = [
+      "Employee Number",
+      "Full Name",
+      "Date of Joining",
+      "Position",
+      "Department",
+      "Location",
+      "Salary Breakdown",
+      "Basic",
+      "Allowances",
+      "Bonuses",
+      "Deductions",
+      "Currency",
+      "Bank Name",
+      "IBAN",
+      "SWIFT / BIC",
+    ];
+
+    const rows = SEED.employees.map((employee) => {
+      const position = positionMap.get(employee.positionId) ?? null;
+      const basic = employee.salary ?? "";
+      const salaryBreakdown = basic ? `Basic: ${basic}` : "";
+      return [
+        employee.id ?? "",
+        employee.name ?? "",
+        employee.startDate ?? "",
+        position?.title ?? "",
+        position?.department ?? "",
+        employee.location ?? "",
+        salaryBreakdown,
+        basic,
+        "",
+        "",
+        "",
+        "",
+        employee.bankName ?? "",
+        employee.bankAccount ?? "",
+        "",
+      ];
+    });
+
+    const csv = [headers, ...rows].map((row) => row.map(csvEscape).join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.download = `payroll-report-${toDateString(new Date())}.csv`;
+    anchor.click();
+    URL.revokeObjectURL(href);
   };
 
-  const addComment = (id: string, comment: string) => {
-    if (!comment.trim()) return;
-    setControlState((prev) => {
-      const existing = prev.actionOverrides[id];
-      const comments = existing?.comments ?? [];
-      return {
-        ...prev,
-        actionOverrides: {
-          ...prev.actionOverrides,
-          [id]: { ...existing, comments: [...comments, comment.trim()] },
-        },
-      };
-    });
-    setActionCommentDrafts((prev) => ({ ...prev, [id]: "" }));
+  const createFolder = () => {
+    const name = newFolderName.trim();
+    if (!name) return;
+    setPolicyFolders((prev) => [
+      ...prev,
+      {
+        id: createId("folder"),
+        name,
+        parentId: newFolderParentId,
+      },
+    ]);
+    setNewFolderName("");
   };
+
+  const uploadPolicyFiles = (event: ChangeEvent<HTMLInputElement>) => {
+    const files = event.target.files;
+    if (!files || files.length === 0) return;
+    const now = toDateString(new Date());
+    const newDocs = Array.from(files).map((file) => ({
+      id: createId("doc"),
+      name: file.name,
+      folderId: selectedFolderId,
+      uploadDate: now,
+      lastUpdated: now,
+    }));
+    setPolicyDocuments((prev) => [...prev, ...newDocs]);
+    event.target.value = "";
+  };
+
+  const folderPath = useMemo(() => {
+    if (!selectedFolder) return "All folders";
+    const path: string[] = [selectedFolder.name];
+    let cursor = selectedFolder;
+    while (cursor.parentId) {
+      const parent = policyFolders.find((folder) => folder.id === cursor.parentId) ?? null;
+      if (!parent) break;
+      path.unshift(parent.name);
+      cursor = parent;
+    }
+    return path.join(" / ");
+  }, [policyFolders, selectedFolder]);
 
   return (
     <div
@@ -699,30 +720,30 @@ export function TeamFrame() {
         width: "100vw",
         height: "100vh",
         display: "flex",
-        overflow: "hidden",
-        background: "#0b1220",
-        color: "#e2e8f0",
+        background: THEME.background,
+        color: THEME.textBody,
         fontFamily: "'Inter', system-ui, sans-serif",
+        overflow: "hidden",
       }}
     >
       <aside
         style={{
           width: 220,
           flexShrink: 0,
-          background: "#0f172a",
-          borderRight: "1px solid rgba(255,255,255,0.08)",
+          background: THEME.panel,
+          borderRight: `1px solid ${THEME.border}`,
           display: "flex",
           flexDirection: "column",
         }}
       >
-        <div style={{ padding: "16px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 9 }}>
+        <div style={{ padding: "15px 14px", borderBottom: `1px solid ${THEME.border}` }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div
               style={{
                 width: 30,
                 height: 30,
                 borderRadius: 8,
-                background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
+                background: "linear-gradient(135deg, #6366F1, #8B5CF6)",
                 color: "#fff",
                 fontSize: 13,
                 fontWeight: 800,
@@ -733,50 +754,31 @@ export function TeamFrame() {
             >
               T
             </div>
-            <div style={{ fontSize: 14, fontWeight: 700, color: "#fff" }}>TeamFrame V2</div>
+            <div style={{ fontSize: 14, fontWeight: 800, color: THEME.textStrong }}>TeamFrame V2</div>
           </div>
         </div>
 
         <nav style={{ padding: "8px 0", flex: 1 }}>
           {NAV_ITEMS.map((item) => {
             const active = activeNav === item.id;
-            const badge =
-              item.id === "actions" ? actionViews.filter((entry) => entry.status !== "completed").length : item.id === "org" ? uiState.stats.vacantPositions : 0;
             return (
               <button
                 key={item.id}
                 onClick={() => setActiveNav(item.id)}
                 style={{
                   width: "100%",
+                  textAlign: "left",
+                  padding: "11px 14px",
                   border: "none",
-                  borderLeft: `2px solid ${active ? "#818cf8" : "transparent"}`,
-                  background: active ? "rgba(99,102,241,0.16)" : "transparent",
-                  color: active ? "#c7d2fe" : "#94a3b8",
+                  borderLeft: `2px solid ${active ? THEME.accent : "transparent"}`,
+                  background: active ? "rgba(99,102,241,0.09)" : "transparent",
+                  color: active ? "#4338CA" : THEME.textMuted,
                   fontSize: 12,
                   fontWeight: active ? 700 : 500,
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "space-between",
-                  padding: "11px 14px",
-                  textAlign: "left",
                   cursor: "pointer",
                 }}
               >
-                <span>{item.label}</span>
-                {badge > 0 && (
-                  <span
-                    style={{
-                      background: "rgba(99,102,241,0.3)",
-                      color: "#c7d2fe",
-                      borderRadius: 999,
-                      padding: "1px 7px",
-                      fontSize: 10,
-                      fontWeight: 700,
-                    }}
-                  >
-                    {badge}
-                  </span>
-                )}
+                {item.label}
               </button>
             );
           })}
@@ -788,52 +790,65 @@ export function TeamFrame() {
           style={{
             height: 56,
             flexShrink: 0,
-            background: "#0f172a",
-            borderBottom: "1px solid rgba(255,255,255,0.08)",
+            background: THEME.panel,
+            borderBottom: `1px solid ${THEME.border}`,
             display: "flex",
             alignItems: "center",
             justifyContent: "space-between",
-            padding: "0 18px",
+            padding: "0 16px",
           }}
         >
-          <h1 style={{ margin: 0, fontSize: 16, fontWeight: 800, color: "#fff" }}>
+          <div style={{ fontSize: 16, fontWeight: 800, color: THEME.textStrong }}>
             {activeNav === "org"
               ? "Organization Map"
               : activeNav === "actions"
               ? "Actions"
-              : activeNav === "people"
-              ? "People Directory"
+              : activeNav === "team"
+              ? "Team"
               : activeNav === "policies"
-              ? "Policy & Compliance"
-              : activeNav === "finance"
-              ? "Finance Report"
+              ? "Policies"
               : "Administration"}
-          </h1>
-          <div style={{ width: 34, height: 34, borderRadius: "50%", background: "rgba(99,102,241,0.24)", color: "#e2e8f0", fontSize: 11, fontWeight: 700, display: "flex", alignItems: "center", justifyContent: "center" }}>
-            COO
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <button
+              onClick={downloadPayrollReport}
+              style={{
+                border: `1px solid rgba(99,102,241,0.35)`,
+                borderRadius: 8,
+                background: "rgba(99,102,241,0.08)",
+                color: "#4338CA",
+                fontSize: 11,
+                fontWeight: 700,
+                padding: "7px 10px",
+                cursor: "pointer",
+              }}
+            >
+              Download Payroll Report
+            </button>
           </div>
         </header>
 
         <div style={{ flex: 1, overflow: "hidden" }}>
           {activeNav === "org" && (
-            <div style={{ height: "100%", position: "relative", display: "flex", flexDirection: "column" }}>
-              <div style={{ padding: "11px 16px 10px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
+            <div style={{ position: "relative", height: "100%", display: "flex", flexDirection: "column" }}>
+              <div style={{ background: THEME.panel, borderBottom: `1px solid ${THEME.border}`, padding: "10px 14px" }}>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(120px, 1fr))", gap: 8 }}>
-                  <KpiCard label="Total Positions" value={uiState.stats.totalPositions} tone="default" />
-                  <KpiCard label="Filled Positions" value={uiState.stats.filledPositions} tone="good" />
-                  <KpiCard label="Vacant Positions" value={uiState.stats.vacantPositions} tone="warn" />
-                  <KpiCard label="Critical Vacancies" value={criticalVacancyCount} tone="critical" />
-                  <KpiCard label="Needs Attention" value={overdueCount} tone={overdueCount > 0 ? "critical" : "default"} />
-                  <KpiCard label="Due Soon" value={dueSoonCount} tone={dueSoonCount > 0 ? "warn" : "default"} />
+                  <KpiCard label="Total Positions" value={totalPositions} tone="default" />
+                  <KpiCard label="Filled Positions" value={filledPositions} tone="good" />
+                  <KpiCard label="Vacant Positions" value={vacantPositions} tone="warn" />
+                  <KpiCard label="Critical Vacancies" value={criticalVacancies} tone="critical" />
+                  <KpiCard label="Needs Attention" value={needsAttention} tone={needsAttention ? "critical" : "default"} />
+                  <KpiCard label="Due Soon" value={dueSoon} tone={dueSoon ? "warn" : "default"} />
                 </div>
-                <div style={{ display: "flex", gap: 8, marginTop: 9 }}>
+                <div style={{ display: "flex", gap: 8, marginTop: 8 }}>
                   <button
-                    onClick={() => setCollapsedIds(new Set(allCollapsibleIds))}
+                    onClick={() => setCollapsedDepartmentIds(new Set(departmentIds))}
                     style={{
-                      border: "1px solid rgba(255,255,255,0.14)",
-                      borderRadius: 7,
-                      background: "rgba(255,255,255,0.04)",
-                      color: "#cbd5e1",
+                      border: `1px solid ${THEME.border}`,
+                      borderRadius: 8,
+                      background: THEME.panelSoft,
+                      color: THEME.textBody,
                       fontSize: 11,
                       fontWeight: 700,
                       padding: "5px 9px",
@@ -843,12 +858,12 @@ export function TeamFrame() {
                     Collapse All
                   </button>
                   <button
-                    onClick={() => setCollapsedIds(new Set())}
+                    onClick={() => setCollapsedDepartmentIds(new Set())}
                     style={{
-                      border: "1px solid rgba(255,255,255,0.14)",
-                      borderRadius: 7,
-                      background: "rgba(255,255,255,0.04)",
-                      color: "#cbd5e1",
+                      border: `1px solid ${THEME.border}`,
+                      borderRadius: 8,
+                      background: THEME.panelSoft,
+                      color: THEME.textBody,
                       fontSize: 11,
                       fontWeight: 700,
                       padding: "5px 9px",
@@ -860,10 +875,10 @@ export function TeamFrame() {
                   <button
                     onClick={() => setFocusPathOnly((prev) => !prev)}
                     style={{
-                      border: `1px solid ${focusPathOnly ? "rgba(99,102,241,0.6)" : "rgba(255,255,255,0.14)"}`,
-                      borderRadius: 7,
-                      background: focusPathOnly ? "rgba(99,102,241,0.17)" : "rgba(255,255,255,0.04)",
-                      color: focusPathOnly ? "#c7d2fe" : "#cbd5e1",
+                      border: `1px solid ${focusPathOnly ? "rgba(99,102,241,0.35)" : THEME.border}`,
+                      borderRadius: 8,
+                      background: focusPathOnly ? "rgba(99,102,241,0.09)" : THEME.panelSoft,
+                      color: focusPathOnly ? "#4338CA" : THEME.textBody,
                       fontSize: 11,
                       fontWeight: 700,
                       padding: "5px 9px",
@@ -875,69 +890,274 @@ export function TeamFrame() {
                 </div>
               </div>
 
-              <div style={{ flex: 1, overflow: "auto", padding: "18px 18px 28px" }}>
-                {uiState.orgTree.length === 0 ? (
-                  <div style={{ color: "#94a3b8", fontSize: 14 }}>No organization structure available.</div>
-                ) : (
-                  <div style={{ minWidth: 1200, paddingRight: 390 }}>
-                    <OrgTree
-                      nodes={uiState.orgTree}
-                      selectedPositionId={uiState.selectedPosition?.id ?? null}
-                      onSelectPosition={selectPosition}
-                      collapsedIds={collapsedIds}
-                      onToggleCollapse={(id) => {
-                        setCollapsedIds((prev) => {
-                          const next = new Set(prev);
-                          if (next.has(id)) next.delete(id);
-                          else next.add(id);
-                          return next;
-                        });
-                      }}
-                      focusPathOnly={focusPathOnly}
-                      pathSet={pathSet}
-                    />
-                  </div>
-                )}
+              <div style={{ flex: 1, overflow: "auto", padding: "14px", paddingRight: 400 }}>
+                <div style={{ display: "flex", gap: 14, alignItems: "flex-start" }}>
+                  {executives.map((executive) => {
+                    const executiveKey = executive.executive?.position.id ?? executive.label;
+                    const executiveDimmed =
+                      focusPathOnly &&
+                      selectedExecutiveAndDepartment.executiveId !== null &&
+                      selectedExecutiveAndDepartment.executiveId !== executiveKey;
+
+                    return (
+                      <div
+                        key={executiveKey}
+                        style={{
+                          minWidth: 270,
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 10,
+                          opacity: executiveDimmed ? 0.35 : 1,
+                        }}
+                      >
+                        <div
+                          style={{
+                            border: `1px solid ${THEME.border}`,
+                            borderRadius: 10,
+                            background: THEME.panel,
+                            padding: "10px 11px",
+                          }}
+                        >
+                          <div
+                            style={{
+                              fontSize: 10,
+                              fontWeight: 700,
+                              textTransform: "uppercase",
+                              letterSpacing: "0.06em",
+                              color: THEME.textMuted,
+                            }}
+                          >
+                            Executive
+                          </div>
+                          <div style={{ fontSize: 13, fontWeight: 800, color: THEME.textStrong, marginTop: 4 }}>
+                            {executive.executive?.position.title ?? executive.label}
+                          </div>
+                          <div style={{ fontSize: 12, color: THEME.textMuted, marginTop: 2 }}>
+                            {executive.executive?.employee?.name ?? "Flexible reporting"}
+                          </div>
+                        </div>
+
+                        {executive.departments.map((department) => {
+                          const collapsed = collapsedDepartmentIds.has(department.id);
+                          const departmentSelected = selectedExecutiveAndDepartment.departmentId === department.id;
+                          const departmentDimmed =
+                            focusPathOnly &&
+                            selectedExecutiveAndDepartment.departmentId !== null &&
+                            !departmentSelected;
+
+                          return (
+                            <div
+                              key={department.id}
+                              style={{
+                                border: `1px solid ${departmentSelected ? "rgba(99,102,241,0.45)" : THEME.border}`,
+                                borderRadius: 10,
+                                background: THEME.panel,
+                                padding: "10px",
+                                boxShadow: departmentSelected ? "0 0 0 2px rgba(99,102,241,0.12)" : "none",
+                                opacity: departmentDimmed ? 0.3 : 1,
+                              }}
+                            >
+                              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                                <div>
+                                  <div
+                                    style={{
+                                      fontSize: 10,
+                                      fontWeight: 700,
+                                      textTransform: "uppercase",
+                                      letterSpacing: "0.06em",
+                                      color: THEME.textMuted,
+                                    }}
+                                  >
+                                    Department
+                                  </div>
+                                  <div style={{ fontSize: 13, fontWeight: 800, color: THEME.textStrong }}>{department.name}</div>
+                                </div>
+                                <button
+                                  onClick={() =>
+                                    setCollapsedDepartmentIds((prev) => {
+                                      const next = new Set(prev);
+                                      if (next.has(department.id)) next.delete(department.id);
+                                      else next.add(department.id);
+                                      return next;
+                                    })
+                                  }
+                                  style={{
+                                    border: `1px solid ${THEME.border}`,
+                                    borderRadius: 999,
+                                    background: THEME.panelSoft,
+                                    color: THEME.textMuted,
+                                    fontSize: 10,
+                                    fontWeight: 700,
+                                    padding: "2px 8px",
+                                    cursor: "pointer",
+                                  }}
+                                >
+                                  {collapsed ? "Expand" : "Collapse"}
+                                </button>
+                              </div>
+
+                              {!collapsed && (
+                                <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 8 }}>
+                                  <div>
+                                    <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4 }}>Department Head</div>
+                                    {department.head ? (
+                                      <button
+                                        onClick={() => selectPosition(department.head?.position.id ?? "")}
+                                        style={{
+                                          width: "100%",
+                                          textAlign: "left",
+                                          border: `1px solid ${selectedPositionId === department.head.position.id ? "rgba(99,102,241,0.45)" : THEME.border}`,
+                                          borderRadius: 9,
+                                          background:
+                                            selectedPositionId === department.head.position.id
+                                              ? "rgba(99,102,241,0.09)"
+                                              : THEME.panelSoft,
+                                          padding: "8px 9px",
+                                          cursor: "pointer",
+                                        }}
+                                      >
+                                        <div style={{ fontSize: 12, fontWeight: 700, color: THEME.textStrong }}>
+                                          {department.head.position.title}
+                                        </div>
+                                        <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 2 }}>
+                                          {department.head.employee?.name ?? "Vacant"}
+                                        </div>
+                                      </button>
+                                    ) : (
+                                      <div style={{ fontSize: 11, color: THEME.textMuted }}>No department head assigned</div>
+                                    )}
+                                  </div>
+
+                                  <div>
+                                    <div style={{ fontSize: 10, color: THEME.textMuted, marginBottom: 4 }}>Teams / Employees</div>
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                                      {department.members.map((member) => {
+                                        const nodeSelected = selectedPositionId === member.position.id;
+                                        const nodeDimmed = focusPathOnly && selectedPositionId !== null && !nodeSelected;
+                                        const status = statusForEmployee(member.employee);
+                                        return (
+                                          <button
+                                            key={member.position.id}
+                                            onClick={() => selectPosition(member.position.id)}
+                                            style={{
+                                              textAlign: "left",
+                                              border: `1px solid ${nodeSelected ? "rgba(99,102,241,0.45)" : THEME.border}`,
+                                              borderRadius: 8,
+                                              background: nodeSelected ? "rgba(99,102,241,0.08)" : THEME.panel,
+                                              padding: "7px 8px",
+                                              cursor: "pointer",
+                                              opacity: nodeDimmed ? 0.45 : 1,
+                                            }}
+                                          >
+                                            <div style={{ fontSize: 12, fontWeight: 700, color: THEME.textStrong }}>
+                                              {member.position.title}
+                                            </div>
+                                            <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 1 }}>
+                                              {member.employee?.name ?? "Vacant"}
+                                            </div>
+                                            <div style={{ marginTop: 4, display: "inline-flex", alignItems: "center", gap: 6 }}>
+                                              <span
+                                                style={{
+                                                  width: 7,
+                                                  height: 7,
+                                                  borderRadius: "50%",
+                                                  background: statusColor(status),
+                                                  display: "inline-block",
+                                                }}
+                                              />
+                                              <span style={{ fontSize: 10, color: THEME.textMuted }}>{statusLabel(status)}</span>
+                                            </div>
+                                          </button>
+                                        );
+                                      })}
+                                      {department.members.length === 0 && (
+                                        <div style={{ fontSize: 11, color: THEME.textMuted }}>No team members listed</div>
+                                      )}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+
+                              {collapsed && (
+                                <div style={{ fontSize: 10, color: THEME.textMuted, marginTop: 8 }}>
+                                  {department.members.length + (department.head ? 1 : 0)} role(s) hidden
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
 
               <div
                 style={{
                   position: "absolute",
+                  top: 98,
                   right: 12,
-                  top: 114,
                   bottom: 12,
                   width: 360,
+                  border: `1px solid ${THEME.border}`,
                   borderRadius: 12,
-                  border: "1px solid rgba(255,255,255,0.08)",
-                  background: "rgba(15,23,42,0.96)",
-                  boxShadow: "0 18px 42px rgba(0,0,0,0.45)",
-                  overflow: "hidden",
+                  background: THEME.panel,
+                  overflowY: "auto",
                 }}
               >
-                <PositionPanel
-                  selectedPosition={uiState.selectedPosition}
-                  selectedEmployee={uiState.selectedEmployee}
-                  directReports={directReports}
-                  positionActions={selectedPositionActions}
-                  onSelectPosition={selectPosition}
-                  onUpdateAction={updateAction}
-                  onAddComment={addComment}
-                />
+                <div style={{ padding: "14px 16px", borderBottom: `1px solid ${THEME.border}` }}>
+                  <div style={{ fontSize: 16, fontWeight: 800, color: THEME.textStrong }}>Quick Inspection</div>
+                  <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 2 }}>Org chart node details</div>
+                </div>
+
+                {selectedQuickRecord.position ? (
+                  <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10 }}>
+                    {[
+                      { label: "Full Name", value: selectedQuickRecord.employee?.name ?? "Vacant" },
+                      { label: "Position / Role", value: selectedQuickRecord.position.title },
+                      { label: "Department", value: selectedQuickRecord.position.department },
+                      { label: "Reporting Manager", value: quickManager?.name ?? "" },
+                      { label: "Work Location", value: selectedQuickRecord.employee?.location ?? "" },
+                      {
+                        label: "Primary Contact",
+                        value: selectedQuickRecord.employee?.email || selectedQuickRecord.employee?.phone || "",
+                      },
+                      {
+                        label: "Phone (optional)",
+                        value: selectedQuickRecord.employee?.email ? selectedQuickRecord.employee.phone : "",
+                      },
+                      {
+                        label: "Employment Status",
+                        value: selectedQuickRecord.employee?.status.replace("_", " ") ?? "",
+                      },
+                      { label: "Completion %", value: `${quickCompletion}%` },
+                    ].map((item) => (
+                      <div key={item.label} style={{ border: `1px solid ${THEME.border}`, borderRadius: 10, background: THEME.panelSoft, padding: "9px 10px" }}>
+                        <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: THEME.textMuted }}>
+                          {item.label}
+                        </div>
+                        <div style={{ fontSize: 13, color: THEME.textBody, marginTop: 3 }}>{item.value || "—"}</div>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div style={{ padding: 18, color: THEME.textMuted, fontSize: 12 }}>Select a role in the map.</div>
+                )}
               </div>
             </div>
           )}
 
           {activeNav === "actions" && (
-            <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: "12px 16px", gap: 10 }}>
+            <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: "12px 14px", gap: 10 }}>
               <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <div style={{ borderRadius: 999, border: "1px solid rgba(239,68,68,0.35)", background: "rgba(239,68,68,0.14)", color: "#ef4444", fontSize: 11, fontWeight: 700, padding: "4px 10px" }}>
-                  Overdue {overdueCount}
+                <div style={{ borderRadius: 999, border: `1px solid ${THEME.border}`, background: THEME.panel, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#DC2626" }}>
+                  Overdue {needsAttention}
                 </div>
-                <div style={{ borderRadius: 999, border: "1px solid rgba(245,158,11,0.35)", background: "rgba(245,158,11,0.14)", color: "#f59e0b", fontSize: 11, fontWeight: 700, padding: "4px 10px" }}>
-                  Due Soon {dueSoonCount}
+                <div style={{ borderRadius: 999, border: `1px solid ${THEME.border}`, background: THEME.panel, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#D97706" }}>
+                  Due Soon {dueSoon}
                 </div>
-                <div style={{ borderRadius: 999, border: "1px solid rgba(99,102,241,0.35)", background: "rgba(99,102,241,0.14)", color: "#818cf8", fontSize: 11, fontWeight: 700, padding: "4px 10px" }}>
-                  Open {actionViews.filter((item) => item.status !== "completed").length}
+                <div style={{ borderRadius: 999, border: `1px solid ${THEME.border}`, background: THEME.panel, padding: "4px 10px", fontSize: 11, fontWeight: 700, color: "#4338CA" }}>
+                  Open {actionViews.filter((action) => action.status !== "completed").length}
                 </div>
               </div>
 
@@ -949,10 +1169,10 @@ export function TeamFrame() {
                       key={filter.id}
                       onClick={() => setActionFilter(filter.id)}
                       style={{
-                        border: `1px solid ${active ? "rgba(99,102,241,0.55)" : "rgba(255,255,255,0.14)"}`,
+                        border: `1px solid ${active ? "rgba(99,102,241,0.35)" : THEME.border}`,
                         borderRadius: 8,
-                        background: active ? "rgba(99,102,241,0.18)" : "rgba(255,255,255,0.03)",
-                        color: active ? "#c7d2fe" : "#cbd5e1",
+                        background: active ? "rgba(99,102,241,0.08)" : THEME.panel,
+                        color: active ? "#4338CA" : THEME.textBody,
                         fontSize: 11,
                         fontWeight: 700,
                         padding: "6px 10px",
@@ -966,81 +1186,54 @@ export function TeamFrame() {
               </div>
 
               <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 7 }}>
-                {filteredActions.length === 0 && (
-                  <div style={{ marginTop: 40, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
-                    No actions in this view.
-                  </div>
-                )}
                 {filteredActions.map((item) => {
-                  const priority = priorityStyle(item.priority);
-                  const rowBorder = item.isOverdue ? "rgba(239,68,68,0.5)" : item.isDueSoon ? "rgba(245,158,11,0.45)" : "rgba(255,255,255,0.09)";
-                  const rowBg = item.isOverdue ? "rgba(239,68,68,0.08)" : item.isDueSoon ? "rgba(245,158,11,0.08)" : "rgba(255,255,255,0.02)";
-                  const draft = actionCommentDrafts[item.action.id] ?? "";
+                  const priority = priorityStyles(item.priority);
+                  const rowBorder = item.isOverdue ? "rgba(220,38,38,0.35)" : item.isDueSoon ? "rgba(217,119,6,0.35)" : THEME.border;
+                  const ownerLabel = SEED.employees.find((employee) => employee.id === item.ownerId)?.name ?? item.manager?.name ?? "Unassigned";
                   return (
-                    <div key={item.action.id} style={{ border: `1px solid ${rowBorder}`, background: rowBg, borderRadius: 10, padding: "10px 12px" }}>
-                      <div style={{ display: "grid", gridTemplateColumns: "minmax(220px, 2fr) 110px 150px 170px 130px", gap: 10, alignItems: "center" }}>
+                    <div key={item.action.id} style={{ border: `1px solid ${rowBorder}`, borderRadius: 10, background: THEME.panel, padding: "10px 11px" }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "minmax(220px,2fr) 110px 140px 170px 120px", gap: 10, alignItems: "center" }}>
                         <div>
-                          <div style={{ fontSize: 13, color: "#f8fafc", fontWeight: 700 }}>{item.action.title}</div>
-                          <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-                            {item.position?.title ?? "Unknown Position"} · {item.position?.department ?? "Unknown Department"}
+                          <div style={{ fontSize: 13, fontWeight: 700, color: THEME.textStrong }}>{item.action.title}</div>
+                          <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 2 }}>
+                            {item.position?.title ?? "Unknown Position"} · {item.position?.department ?? ""}
                           </div>
                         </div>
-                        <span style={{ fontSize: 10, fontWeight: 700, color: priority.text, background: priority.bg, borderRadius: 999, padding: "3px 8px", width: "fit-content" }}>
+                        <span style={{ width: "fit-content", padding: "3px 8px", borderRadius: 999, fontSize: 10, fontWeight: 700, color: priority.text, background: priority.bg }}>
                           {item.priority}
                         </span>
-                        <div style={{ fontSize: 11, color: item.isOverdue ? "#ef4444" : item.isDueSoon ? "#f59e0b" : "#cbd5e1", fontWeight: 700 }}>
-                          {formatDueDate(item.dueDate)}
+                        <div style={{ fontSize: 11, fontWeight: 700, color: item.isOverdue ? "#DC2626" : item.isDueSoon ? "#D97706" : THEME.textBody }}>
+                          {formatDateLabel(item.dueDate)}
                         </div>
-                        <div style={{ fontSize: 11, color: "#cbd5e1" }}>{ownerName(item)}</div>
-                        <div style={{ fontSize: 11, color: "#cbd5e1", fontWeight: 700 }}>
+                        <div style={{ fontSize: 11, color: THEME.textBody }}>{ownerLabel}</div>
+                        <div style={{ fontSize: 11, color: THEME.textBody, fontWeight: 700 }}>
                           {item.status === "in_progress" ? "In Progress" : item.status === "completed" ? "Completed" : "Open"}
                         </div>
                       </div>
 
                       <div style={{ display: "grid", gridTemplateColumns: "auto auto 180px 150px 1fr auto", gap: 6, marginTop: 8, alignItems: "center" }}>
                         <button
-                          onClick={() => updateAction(item.action.id, { status: item.status === "completed" ? "open" : "completed" })}
-                          style={{
-                            border: "1px solid rgba(34,197,94,0.35)",
-                            borderRadius: 7,
-                            background: "rgba(34,197,94,0.12)",
-                            color: "#22c55e",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: "5px 8px",
-                            cursor: "pointer",
-                          }}
+                          onClick={() =>
+                            updateActionRuntime(item.action.id, {
+                              status: item.status === "completed" ? "open" : "completed",
+                            })
+                          }
+                          style={actionButtonStyle("success")}
                         >
                           {item.status === "completed" ? "Reopen" : "Complete"}
                         </button>
                         <button
-                          onClick={() => updateAction(item.action.id, { status: "in_progress" })}
-                          style={{
-                            border: "1px solid rgba(99,102,241,0.35)",
-                            borderRadius: 7,
-                            background: "rgba(99,102,241,0.12)",
-                            color: "#818cf8",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: "5px 8px",
-                            cursor: "pointer",
-                          }}
+                          onClick={() => updateActionRuntime(item.action.id, { status: "in_progress" })}
+                          style={actionButtonStyle("primary")}
                         >
                           In Progress
                         </button>
                         <select
                           value={item.ownerId}
-                          onChange={(event) => updateAction(item.action.id, { ownerId: event.target.value })}
-                          style={{
-                            border: "1px solid rgba(255,255,255,0.16)",
-                            borderRadius: 7,
-                            background: "rgba(255,255,255,0.03)",
-                            color: "#cbd5e1",
-                            fontSize: 11,
-                            padding: "5px 8px",
-                          }}
+                          onChange={(event) => updateActionRuntime(item.action.id, { ownerId: event.target.value })}
+                          style={inputStyle()}
                         >
-                          <option value="manager">Manager</option>
+                          <option value="">Unassigned</option>
                           {SEED.employees.map((employee) => (
                             <option key={employee.id} value={employee.id}>
                               {employee.name}
@@ -1050,214 +1243,426 @@ export function TeamFrame() {
                         <input
                           type="date"
                           value={item.dueDate}
-                          onChange={(event) => updateAction(item.action.id, { dueDate: event.target.value })}
-                          style={{
-                            border: "1px solid rgba(255,255,255,0.16)",
-                            borderRadius: 7,
-                            background: "rgba(255,255,255,0.03)",
-                            color: "#cbd5e1",
-                            fontSize: 11,
-                            padding: "5px 8px",
-                          }}
+                          onChange={(event) => updateActionRuntime(item.action.id, { dueDate: event.target.value })}
+                          style={inputStyle()}
                         />
                         <input
-                          value={draft}
-                          onChange={(event) => setActionCommentDrafts((prev) => ({ ...prev, [item.action.id]: event.target.value }))}
+                          value={actionCommentDrafts[item.action.id] ?? ""}
+                          onChange={(event) =>
+                            setActionCommentDrafts((prev) => ({
+                              ...prev,
+                              [item.action.id]: event.target.value,
+                            }))
+                          }
                           placeholder="Add comment"
-                          style={{
-                            border: "1px solid rgba(255,255,255,0.16)",
-                            borderRadius: 7,
-                            background: "rgba(255,255,255,0.03)",
-                            color: "#cbd5e1",
-                            fontSize: 11,
-                            padding: "5px 8px",
-                            outline: "none",
-                          }}
+                          style={inputStyle()}
                         />
-                        <button
-                          onClick={() => addComment(item.action.id, draft)}
-                          style={{
-                            border: "1px solid rgba(255,255,255,0.16)",
-                            borderRadius: 7,
-                            background: "rgba(255,255,255,0.05)",
-                            color: "#e2e8f0",
-                            fontSize: 10,
-                            fontWeight: 700,
-                            padding: "5px 8px",
-                            cursor: "pointer",
-                          }}
-                        >
+                        <button onClick={() => addActionComment(item.action.id)} style={actionButtonStyle("default")}>
                           Add
                         </button>
                       </div>
                     </div>
                   );
                 })}
+
+                {filteredActions.length === 0 && (
+                  <div style={{ marginTop: 40, textAlign: "center", color: THEME.textMuted, fontSize: 13 }}>No actions in this view.</div>
+                )}
               </div>
             </div>
           )}
 
-          {activeNav === "people" && (
-            <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: "12px 16px", gap: 10 }}>
-              <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <div style={{ flex: 1, maxWidth: 440, display: "flex", alignItems: "center", gap: 8, border: "1px solid rgba(255,255,255,0.16)", borderRadius: 8, background: "rgba(255,255,255,0.03)", padding: "7px 10px" }}>
-                  <span style={{ fontSize: 11, color: "#94a3b8" }}>Search</span>
-                  <input
-                    value={employeeSearch}
-                    onChange={(event) => setEmployeeSearch(event.target.value)}
-                    placeholder="Name, position, manager, contact"
-                    style={{
-                      border: "none",
-                      background: "transparent",
-                      color: "#e2e8f0",
-                      fontSize: 12,
-                      outline: "none",
-                      width: "100%",
-                    }}
-                  />
-                </div>
-                <select
-                  value={peopleStatusFilter}
-                  onChange={(event) => setPeopleStatusFilter(event.target.value as "all" | Employee["status"])}
+          {activeNav === "team" && (
+            <div style={{ height: "100%", display: "flex", flexDirection: "column", padding: "12px 14px", gap: 10 }}>
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <div
                   style={{
-                    border: "1px solid rgba(255,255,255,0.16)",
+                    width: 380,
+                    border: `1px solid ${THEME.border}`,
                     borderRadius: 8,
-                    background: "rgba(255,255,255,0.03)",
-                    color: "#cbd5e1",
-                    fontSize: 12,
-                    padding: "7px 10px",
+                    background: THEME.panel,
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: "7px 9px",
                   }}
                 >
-                  <option value="all">All Statuses</option>
-                  <option value="active">Active</option>
-                  <option value="on_leave">On Leave</option>
-                  <option value="offboarding">Offboarding</option>
-                </select>
+                  <span style={{ fontSize: 11, color: THEME.textMuted }}>Search</span>
+                  <input
+                    value={teamSearch}
+                    onChange={(event) => setTeamSearch(event.target.value)}
+                    placeholder="Name, position, department, email"
+                    style={{ border: "none", background: "transparent", outline: "none", color: THEME.textBody, width: "100%", fontSize: 12 }}
+                  />
+                </div>
               </div>
 
-              <div style={{ flex: 1, overflowY: "auto", display: "flex", flexDirection: "column", gap: 7 }}>
-                {peopleRows.length === 0 && (
-                  <div style={{ marginTop: 40, textAlign: "center", color: "#94a3b8", fontSize: 13 }}>
-                    No employees match this filter.
-                  </div>
-                )}
-                {peopleRows.map(({ employee, position, manager }) => {
-                  const currentStatus = statusForEmployee(employee);
-                  return (
-                    <button
-                      key={employee.id}
-                      onClick={() => {
-                        selectPosition(employee.positionId);
-                        setActiveNav("org");
-                      }}
+              <div style={{ flex: 1, overflowY: "auto", border: `1px solid ${THEME.border}`, borderRadius: 10, background: THEME.panel }}>
+                <div
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "minmax(180px,2fr) minmax(160px,1.4fr) minmax(140px,1.2fr) minmax(140px,1fr) minmax(130px,1fr) minmax(220px,1.8fr) 110px",
+                    gap: 10,
+                    padding: "10px 12px",
+                    borderBottom: `1px solid ${THEME.border}`,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    letterSpacing: "0.06em",
+                    textTransform: "uppercase",
+                    color: THEME.textMuted,
+                  }}
+                >
+                  <span>Name</span>
+                  <span>Position</span>
+                  <span>Department</span>
+                  <span>Work Location</span>
+                  <span>Phone</span>
+                  <span>Email</span>
+                  <span>Completion %</span>
+                </div>
+
+                {teamRows.map((row) => (
+                  <button
+                    key={row.employee.id}
+                    onClick={() => setFullProfileEmployeeId(row.employee.id)}
+                    style={{
+                      width: "100%",
+                      border: "none",
+                      borderBottom: `1px solid ${THEME.border}`,
+                      background: "transparent",
+                      textAlign: "left",
+                      cursor: "pointer",
+                      padding: 0,
+                    }}
+                  >
+                    <div
                       style={{
-                        textAlign: "left",
-                        border: "1px solid rgba(255,255,255,0.08)",
-                        borderRadius: 10,
-                        background: "rgba(255,255,255,0.02)",
-                        color: "#e2e8f0",
                         display: "grid",
-                        gridTemplateColumns: "minmax(260px, 2fr) minmax(210px, 1fr) minmax(180px, 1fr)",
+                        gridTemplateColumns: "minmax(180px,2fr) minmax(160px,1.4fr) minmax(140px,1.2fr) minmax(140px,1fr) minmax(130px,1fr) minmax(220px,1.8fr) 110px",
                         gap: 10,
-                        alignItems: "center",
                         padding: "10px 12px",
-                        cursor: "pointer",
+                        alignItems: "center",
                       }}
                     >
-                      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                        <Avatar initials={employee.avatarInitials} color={employee.avatarColor} size={34} />
-                        <div>
-                          <div style={{ fontSize: 14, fontWeight: 800, color: "#f8fafc" }}>{employee.name}</div>
-                          <div style={{ fontSize: 11, color: "#94a3b8" }}>
-                            {position?.title ?? "Unknown Position"} · {position?.department ?? "Unknown Department"}
-                          </div>
-                        </div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 12, color: "#cbd5e1" }}>{employee.email}</div>
-                        <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{employee.phone}</div>
-                      </div>
-                      <div>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>Manager: {manager?.name ?? "None"}</div>
-                        <div style={{ marginTop: 3, display: "inline-flex", alignItems: "center", gap: 6, fontSize: 11, color: "#cbd5e1" }}>
-                          <span style={{ width: 8, height: 8, borderRadius: "50%", background: statusColor(currentStatus), display: "inline-block" }} />
-                          {statusLabel(currentStatus)}
-                        </div>
-                      </div>
-                    </button>
-                  );
-                })}
+                      <span style={{ fontSize: 13, fontWeight: 700, color: THEME.textStrong }}>{row.employee.name}</span>
+                      <span style={{ fontSize: 12, color: THEME.textBody }}>{row.position?.title ?? ""}</span>
+                      <span style={{ fontSize: 12, color: THEME.textBody }}>{row.position?.department ?? ""}</span>
+                      <span style={{ fontSize: 12, color: THEME.textBody }}>{row.employee.location}</span>
+                      <span style={{ fontSize: 12, color: THEME.textBody }}>{row.employee.phone}</span>
+                      <span style={{ fontSize: 12, color: THEME.textBody }}>{row.employee.email}</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: row.completion < 70 ? "#D97706" : "#16A34A" }}>
+                        {row.completion}%
+                      </span>
+                    </div>
+                  </button>
+                ))}
+
+                {teamRows.length === 0 && (
+                  <div style={{ padding: 22, textAlign: "center", fontSize: 12, color: THEME.textMuted }}>
+                    No team members match this search.
+                  </div>
+                )}
               </div>
             </div>
           )}
 
           {activeNav === "policies" && (
-            <div style={{ height: "100%", overflowY: "auto", padding: "12px 16px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                {SEED.compliance.map((item) => {
-                  const position = SEED.positions.find((positionItem) => positionItem.id === item.positionId);
-                  const statusText = item.status;
-                  const statusTone =
-                    item.status === "complete"
-                      ? { bg: "rgba(34,197,94,0.14)", color: "#22c55e" }
-                      : item.status === "expired"
-                      ? { bg: "rgba(245,158,11,0.14)", color: "#f59e0b" }
-                      : { bg: "rgba(239,68,68,0.14)", color: "#ef4444" };
-                  return (
-                    <div key={item.id} style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, background: "rgba(255,255,255,0.02)", padding: "10px 12px", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10 }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc" }}>{item.type}</div>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{position?.title ?? "Unknown Position"}</div>
-                      </div>
-                      <span style={{ fontSize: 10, fontWeight: 700, borderRadius: 999, padding: "3px 8px", background: statusTone.bg, color: statusTone.color }}>
-                        {statusText}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
+            <div style={{ height: "100%", display: "flex", padding: 12, gap: 10 }}>
+              <div
+                style={{
+                  width: 260,
+                  flexShrink: 0,
+                  border: `1px solid ${THEME.border}`,
+                  borderRadius: 10,
+                  background: THEME.panel,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <div style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.border}` }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: THEME.textStrong }}>Folders</div>
+                </div>
 
-          {activeNav === "finance" && (
-            <div style={{ height: "100%", overflowY: "auto", padding: "12px 16px" }}>
-              <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-                {SEED.employees.map((employee) => {
-                  const position = SEED.positions.find((positionItem) => positionItem.id === employee.positionId);
-                  return (
-                    <div key={employee.id} style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, background: "rgba(255,255,255,0.02)", padding: "10px 12px", display: "grid", gridTemplateColumns: "minmax(220px, 2fr) 130px 190px 120px", gap: 10, alignItems: "center" }}>
-                      <div>
-                        <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc" }}>{employee.name}</div>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{position?.title ?? "Unknown Position"}</div>
-                      </div>
-                      <div style={{ fontSize: 12, fontWeight: 700, color: "#22c55e" }}>${employee.salary.toLocaleString()}</div>
-                      <div style={{ fontSize: 11, color: "#cbd5e1" }}>{employee.bankName} · ****{employee.bankAccount.slice(-4)}</div>
-                      <div style={{ fontSize: 11, color: "#94a3b8" }}>{employee.status}</div>
+                <div style={{ padding: "8px 10px", overflowY: "auto", flex: 1 }}>
+                  <button
+                    onClick={() => setSelectedFolderId(null)}
+                    style={folderButtonStyle(selectedFolderId === null)}
+                  >
+                    All Documents
+                  </button>
+                  {renderFolderTree(policyFolders, selectedFolderId, setSelectedFolderId, null, 0)}
+                </div>
+              </div>
+
+              <div
+                style={{
+                  flex: 1,
+                  border: `1px solid ${THEME.border}`,
+                  borderRadius: 10,
+                  background: THEME.panel,
+                  display: "flex",
+                  flexDirection: "column",
+                }}
+              >
+                <div style={{ padding: "10px 12px", borderBottom: `1px solid ${THEME.border}` }}>
+                  <div style={{ fontSize: 12, fontWeight: 800, color: THEME.textStrong }}>{folderPath}</div>
+                  <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 2 }}>Folder-based policy explorer</div>
+                </div>
+
+                <div style={{ padding: 12, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, borderBottom: `1px solid ${THEME.border}` }}>
+                  <div style={{ border: `1px solid ${THEME.border}`, borderRadius: 10, background: THEME.panelSoft, padding: "10px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: THEME.textMuted, marginBottom: 6 }}>
+                      Create Folder
                     </div>
-                  );
-                })}
+                    <input
+                      value={newFolderName}
+                      onChange={(event) => setNewFolderName(event.target.value)}
+                      placeholder="Folder name"
+                      style={inputStyle()}
+                    />
+                    <select
+                      value={newFolderParentId ?? ""}
+                      onChange={(event) => setNewFolderParentId(event.target.value || null)}
+                      style={{ ...inputStyle(), marginTop: 6 }}
+                    >
+                      <option value="">Top Level</option>
+                      {policyFolders.map((folder) => (
+                        <option key={folder.id} value={folder.id}>
+                          {folder.name}
+                        </option>
+                      ))}
+                    </select>
+                    <button onClick={createFolder} style={{ ...actionButtonStyle("primary"), marginTop: 8 }}>
+                      Create Folder
+                    </button>
+                  </div>
+
+                  <div style={{ border: `1px solid ${THEME.border}`, borderRadius: 10, background: THEME.panelSoft, padding: "10px" }}>
+                    <div style={{ fontSize: 10, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.06em", color: THEME.textMuted, marginBottom: 6 }}>
+                      Upload Documents
+                    </div>
+                    <input type="file" multiple onChange={uploadPolicyFiles} style={{ fontSize: 12 }} />
+                    <div style={{ fontSize: 11, color: THEME.textMuted, marginTop: 8 }}>
+                      Upload target: {selectedFolder?.name ?? "All Documents"}
+                    </div>
+                  </div>
+                </div>
+
+                <div style={{ flex: 1, overflowY: "auto", padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+                  {childFolders.map((folder) => (
+                    <div
+                      key={folder.id}
+                      style={{
+                        border: `1px solid ${THEME.border}`,
+                        borderRadius: 9,
+                        background: THEME.panelSoft,
+                        padding: "9px 10px",
+                        display: "flex",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: THEME.textStrong }}>{folder.name}</div>
+                        <div style={{ fontSize: 11, color: THEME.textMuted }}>Folder</div>
+                      </div>
+                      <button onClick={() => setSelectedFolderId(folder.id)} style={actionButtonStyle("default")}>
+                        Open
+                      </button>
+                    </div>
+                  ))}
+
+                  {visibleDocuments.map((document) => (
+                    <div
+                      key={document.id}
+                      style={{
+                        border: `1px solid ${THEME.border}`,
+                        borderRadius: 9,
+                        background: THEME.panel,
+                        padding: "9px 10px",
+                        display: "grid",
+                        gridTemplateColumns: "1fr auto auto",
+                        gap: 10,
+                        alignItems: "center",
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: 13, fontWeight: 700, color: THEME.textStrong }}>{document.name}</div>
+                        <div style={{ fontSize: 11, color: THEME.textMuted }}>Upload Date: {document.uploadDate}</div>
+                      </div>
+                      <div style={{ fontSize: 11, color: THEME.textMuted }}>
+                        Last Updated: {document.lastUpdated ?? "—"}
+                      </div>
+                    </div>
+                  ))}
+
+                  {childFolders.length === 0 && visibleDocuments.length === 0 && (
+                    <div
+                      style={{
+                        border: `1px dashed ${THEME.border}`,
+                        borderRadius: 10,
+                        padding: "20px",
+                        textAlign: "center",
+                        color: THEME.textMuted,
+                        fontSize: 12,
+                        background: THEME.panelSoft,
+                      }}
+                    >
+                      No folders or documents here.
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           )}
 
           {activeNav === "administration" && (
-            <div style={{ height: "100%", overflowY: "auto", padding: "12px 16px" }}>
+            <div style={{ height: "100%", padding: 12 }}>
               <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(220px, 1fr))", gap: 8 }}>
-                {[
-                  { title: "Data Import", value: "CSV tools" },
-                  { title: "Configuration", value: "Operational settings" },
-                  { title: "Audit History", value: "Recent changes" },
-                ].map((item) => (
-                  <div key={item.title} style={{ border: "1px solid rgba(255,255,255,0.08)", borderRadius: 10, background: "rgba(255,255,255,0.02)", padding: 12 }}>
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#f8fafc" }}>{item.title}</div>
-                    <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 4 }}>{item.value}</div>
-                  </div>
-                ))}
+                <div style={adminCardStyle()}>
+                  <div style={adminTitleStyle()}>Download Payroll Report</div>
+                  <div style={adminBodyStyle()}>Generate CSV export from employee and organization data.</div>
+                  <button onClick={downloadPayrollReport} style={{ ...actionButtonStyle("primary"), marginTop: 8 }}>
+                    Download Report
+                  </button>
+                </div>
+                <div style={adminCardStyle()}>
+                  <div style={adminTitleStyle()}>Data Import</div>
+                  <div style={adminBodyStyle()}>Use upload tools for operational records.</div>
+                </div>
+                <div style={adminCardStyle()}>
+                  <div style={adminTitleStyle()}>Audit Trail</div>
+                  <div style={adminBodyStyle()}>Recent changes and activity logs.</div>
+                </div>
               </div>
             </div>
           )}
         </div>
       </main>
+
+      <FullProfileDrawer employeeId={fullProfileEmployeeId} onClose={() => setFullProfileEmployeeId(null)} />
     </div>
   );
+}
+
+function formatDateLabel(dateValue: string): string {
+  if (!dateValue) return "No date";
+  const date = new Date(dateValue);
+  if (Number.isNaN(date.getTime())) return dateValue;
+  return date.toLocaleDateString(undefined, { month: "short", day: "numeric" });
+}
+
+function actionButtonStyle(tone: "primary" | "success" | "default") {
+  if (tone === "primary") {
+    return {
+      border: "1px solid rgba(99,102,241,0.32)",
+      borderRadius: 7,
+      background: "rgba(99,102,241,0.1)",
+      color: "#4338CA",
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "5px 8px",
+      cursor: "pointer",
+    } as const;
+  }
+  if (tone === "success") {
+    return {
+      border: "1px solid rgba(22,163,74,0.32)",
+      borderRadius: 7,
+      background: "rgba(22,163,74,0.1)",
+      color: "#15803D",
+      fontSize: 10,
+      fontWeight: 700,
+      padding: "5px 8px",
+      cursor: "pointer",
+    } as const;
+  }
+  return {
+    border: "1px solid #E5E7EB",
+    borderRadius: 7,
+    background: "#FFFFFF",
+    color: "#1F2937",
+    fontSize: 10,
+    fontWeight: 700,
+    padding: "5px 8px",
+    cursor: "pointer",
+  } as const;
+}
+
+function inputStyle() {
+  return {
+    border: "1px solid #E5E7EB",
+    borderRadius: 7,
+    background: "#FFFFFF",
+    color: "#1F2937",
+    fontSize: 11,
+    padding: "6px 8px",
+    width: "100%",
+    boxSizing: "border-box" as const,
+    outline: "none",
+  };
+}
+
+function folderButtonStyle(active: boolean) {
+  return {
+    width: "100%",
+    textAlign: "left" as const,
+    border: `1px solid ${active ? "rgba(99,102,241,0.35)" : "#E5E7EB"}`,
+    borderRadius: 8,
+    background: active ? "rgba(99,102,241,0.08)" : "#FFFFFF",
+    color: active ? "#4338CA" : "#1F2937",
+    fontSize: 11,
+    fontWeight: active ? 700 : 500,
+    padding: "6px 8px",
+    cursor: "pointer",
+    marginBottom: 5,
+  };
+}
+
+function renderFolderTree(
+  folders: PolicyFolder[],
+  selectedFolderId: string | null,
+  setSelectedFolderId: (id: string) => void,
+  parentId: string | null,
+  depth: number,
+): ReactNode[] {
+  return folders
+    .filter((folder) => folder.parentId === parentId)
+    .sort((a, b) => a.name.localeCompare(b.name))
+    .flatMap((folder) => {
+      const current = (
+        <div key={folder.id} style={{ marginLeft: depth * 10 }}>
+          <button onClick={() => setSelectedFolderId(folder.id)} style={folderButtonStyle(selectedFolderId === folder.id)}>
+            {folder.name}
+          </button>
+        </div>
+      );
+      const nested = renderFolderTree(folders, selectedFolderId, setSelectedFolderId, folder.id, depth + 1);
+      return [current, ...nested];
+    });
+}
+
+function adminCardStyle() {
+  return {
+    border: "1px solid #E5E7EB",
+    borderRadius: 10,
+    background: "#FFFFFF",
+    padding: 12,
+  };
+}
+
+function adminTitleStyle() {
+  return {
+    fontSize: 13,
+    fontWeight: 800,
+    color: "#0F172A",
+  };
+}
+
+function adminBodyStyle() {
+  return {
+    fontSize: 11,
+    color: "#64748B",
+    marginTop: 4,
+  };
 }
