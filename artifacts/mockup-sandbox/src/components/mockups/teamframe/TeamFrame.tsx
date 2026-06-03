@@ -146,16 +146,32 @@ function statusLabel(status: ReturnType<typeof statusForEmployee>): string {
 
 function completionPercent(employee: Employee | null): number {
   if (!employee) return 0;
-  const complianceItems = SEED.compliance.filter((item) => item.positionId === employee.positionId);
-  const unresolvedCompliance = complianceItems.filter((item) => item.status !== "complete").length;
-  const onboardingPenalty = employee.onboardingStatus === "complete" ? 0 : 1;
-  const missingCount = unresolvedCompliance + onboardingPenalty;
-  return Math.max(0, 100 - missingCount * 20);
+  if (employee.onboardingStatus === "complete") return 100;
+  if (employee.onboardingStatus === "in_progress") return 50;
+  if (employee.onboardingStatus === "not_started") return 0;
+  return 0;
 }
 
 function managerForPosition(position: Position | null): Employee | null {
   if (!position?.reportsToId) return null;
   return SEED.employees.find((employee) => employee.positionId === position.reportsToId) ?? null;
+}
+
+function rootAnchorId(position: Position, positionsById: Map<string, Position>): string | null {
+  let cursor: Position | null = position;
+  const seen = new Set<string>();
+
+  while (cursor) {
+    if (seen.has(cursor.id)) return null;
+    seen.add(cursor.id);
+    if (!cursor.reportsToId) return cursor.id;
+
+    const parentPosition: Position | null = positionsById.get(cursor.reportsToId) ?? null;
+    if (!parentPosition) return null;
+    cursor = parentPosition;
+  }
+
+  return null;
 }
 
 function initials(name: string): string {
@@ -368,12 +384,7 @@ export function TeamFrame() {
 
   const executives = useMemo(() => {
     const positions = [...SEED.positions].sort((a, b) => a.order - b.order);
-    const isExecutive = (position: Position): boolean => {
-      const manager = position.reportsToId ? positionMap.get(position.reportsToId) ?? null : null;
-      return position.reportsToId === null || Boolean(manager && manager.reportsToId === null) || position.level <= 1;
-    };
-
-    const executiveIds = new Set(positions.filter((position) => isExecutive(position)).map((position) => position.id));
+    const executiveIds = new Set(positions.filter((position) => position.reportsToId === null).map((position) => position.id));
     const departments = [...new Set(positions.map((position) => position.department))].sort((a, b) => a.localeCompare(b));
 
     const departmentNodes: DepartmentNode[] = departments.map((departmentName) => {
@@ -390,15 +401,7 @@ export function TeamFrame() {
 
       const head = records[0] ?? null;
 
-      let executiveId: string | null = null;
-      let cursor: Position | null = head?.position ?? null;
-      while (cursor) {
-        if (executiveIds.has(cursor.id)) {
-          executiveId = cursor.id;
-          break;
-        }
-        cursor = cursor.reportsToId ? positionMap.get(cursor.reportsToId) ?? null : null;
-      }
+      const executiveId = head?.position ? rootAnchorId(head.position, positionMap) : null;
 
       return {
         id: `dept-${departmentName.toLowerCase().replace(/\s+/g, "-")}-${executiveId ?? "unassigned"}`,
@@ -439,7 +442,7 @@ export function TeamFrame() {
     if ((grouped.get("unassigned") ?? []).length > 0) {
       executiveRows.push({
         executive: null,
-        label: "Flexible Roles",
+        label: "Unassigned Root",
         departments: grouped.get("unassigned") ?? [],
       });
     }
@@ -463,7 +466,7 @@ export function TeamFrame() {
           department.members.some((member) => member.position.id === selectedPositionId);
         if (inDepartment) {
           return {
-            executiveId: executive.executive?.position.id ?? executive.label,
+            executiveId: executive.executive?.position.id ?? "unassigned-root",
             departmentId: department.id,
           };
         }
@@ -641,8 +644,13 @@ export function TeamFrame() {
 
     const rows = SEED.employees.map((employee) => {
       const position = positionMap.get(employee.positionId) ?? null;
-      const basic = employee.salary ?? "";
-      const salaryBreakdown = basic ? `Basic: ${basic}` : "";
+      const salaryBreakdown = {
+        basic: employee.salary ?? null,
+        allowances: null,
+        bonuses: null,
+        deductions: null,
+        currency: null,
+      };
       return [
         employee.id ?? "",
         employee.name ?? "",
@@ -650,12 +658,12 @@ export function TeamFrame() {
         position?.title ?? "",
         position?.department ?? "",
         employee.location ?? "",
-        salaryBreakdown,
-        basic,
-        "",
-        "",
-        "",
-        "",
+        JSON.stringify(salaryBreakdown),
+        salaryBreakdown.basic,
+        salaryBreakdown.allowances,
+        salaryBreakdown.bonuses,
+        salaryBreakdown.deductions,
+        salaryBreakdown.currency,
         employee.bankName ?? "",
         employee.bankAccount ?? "",
         "",
@@ -1118,14 +1126,8 @@ export function TeamFrame() {
                       { label: "Department", value: selectedQuickRecord.position.department },
                       { label: "Reporting Manager", value: quickManager?.name ?? "" },
                       { label: "Work Location", value: selectedQuickRecord.employee?.location ?? "" },
-                      {
-                        label: "Primary Contact",
-                        value: selectedQuickRecord.employee?.email || selectedQuickRecord.employee?.phone || "",
-                      },
-                      {
-                        label: "Phone (optional)",
-                        value: selectedQuickRecord.employee?.email ? selectedQuickRecord.employee.phone : "",
-                      },
+                      { label: "Email", value: selectedQuickRecord.employee?.email ?? "" },
+                      { label: "Phone", value: selectedQuickRecord.employee?.phone ?? "" },
                       {
                         label: "Employment Status",
                         value: selectedQuickRecord.employee?.status.replace("_", " ") ?? "",
