@@ -150,6 +150,421 @@ function describeError(label: string, error: unknown): string {
   return `${label} failed`;
 }
 
+type LocalDemoState = {
+  organizationId: string;
+  teams: Team[];
+  positions: Position[];
+  people: Person[];
+  actions: Action[];
+  policies: Policy[];
+  teamOwnerships: TeamOwnership[];
+  positionOwnerships: PositionOwnership[];
+};
+
+const LOCAL_DEMO_STATE: LocalDemoState = {
+  organizationId: "00000000-0000-4000-8000-000000000111",
+  teams: [
+    {
+      id: "10000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      name: "Executive",
+      code: "EXEC",
+      parentTeamId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "10000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      name: "Finance",
+      code: "FIN",
+      parentTeamId: "10000000-0000-4000-8000-000000000001",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "10000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      name: "Operations",
+      code: "OPS",
+      parentTeamId: "10000000-0000-4000-8000-000000000001",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "10000000-0000-4000-8000-000000000004",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      name: "Sales",
+      code: "SLS",
+      parentTeamId: "10000000-0000-4000-8000-000000000001",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  positions: [
+    {
+      id: "20000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000001",
+      title: "Chief Executive Officer",
+      reportsToPositionId: null,
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000002",
+      title: "Head of Finance",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000001",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000003",
+      title: "Head of Operations",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000001",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000004",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000004",
+      title: "Head of Sales",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000001",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000005",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000003",
+      title: "Operations Manager",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000003",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000006",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000002",
+      title: "Finance Manager",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000002",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000007",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000004",
+      title: "Sales Manager",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000004",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000008",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000003",
+      title: "Operations Specialist",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000005",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  people: [
+    {
+      id: "30000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "Alex Morgan",
+      email: "alex@demo.teamframe",
+      phone: "+971500000001",
+      positionId: "20000000-0000-4000-8000-000000000001",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "Sarah Lee",
+      email: "sarah@demo.teamframe",
+      phone: "+971500000002",
+      positionId: "20000000-0000-4000-8000-000000000002",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "David Chen",
+      email: "david@demo.teamframe",
+      phone: "+971500000003",
+      positionId: "20000000-0000-4000-8000-000000000003",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000004",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "Michael Scott",
+      email: "michael@demo.teamframe",
+      phone: "+971500000004",
+      positionId: "20000000-0000-4000-8000-000000000004",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000005",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "Lisa Brown",
+      email: "lisa@demo.teamframe",
+      phone: "+971500000005",
+      positionId: "20000000-0000-4000-8000-000000000005",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000006",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "John Kim",
+      email: "john@demo.teamframe",
+      phone: "+971500000006",
+      positionId: "20000000-0000-4000-8000-000000000006",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000007",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "Jim Halpert",
+      email: "jim@demo.teamframe",
+      phone: "+971500000007",
+      positionId: "20000000-0000-4000-8000-000000000007",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000008",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "Anna Patel",
+      email: "anna@demo.teamframe",
+      phone: "+971500000008",
+      positionId: "20000000-0000-4000-8000-000000000008",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  teamOwnerships: [
+    {
+      id: "40000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000002",
+      ownerPersonId: "30000000-0000-4000-8000-000000000002",
+      ownerPositionId: null,
+      responsibilityContext: "Finance controls and payroll accuracy",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "40000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000003",
+      ownerPersonId: "30000000-0000-4000-8000-000000000003",
+      ownerPositionId: null,
+      responsibilityContext: "Operational execution and onboarding readiness",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "40000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000004",
+      ownerPersonId: "30000000-0000-4000-8000-000000000004",
+      ownerPositionId: null,
+      responsibilityContext: "Revenue pipeline accountability",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  positionOwnerships: [
+    {
+      id: "50000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      positionId: "20000000-0000-4000-8000-000000000005",
+      ownerPersonId: "30000000-0000-4000-8000-000000000005",
+      ownerPositionId: null,
+      responsibilityContext: "Weekly operations standup cadence",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "50000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      positionId: "20000000-0000-4000-8000-000000000007",
+      ownerPersonId: "30000000-0000-4000-8000-000000000007",
+      ownerPositionId: null,
+      responsibilityContext: "Sales follow-up execution",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  actions: [
+    {
+      id: "60000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Finalize Q3 hiring budget sign-off",
+      description: "CEO and finance alignment required",
+      status: ActionStatus.open,
+      dueDate: "2026-01-05",
+      blocked: false,
+      ownerPersonId: "30000000-0000-4000-8000-000000000002",
+      ownerPositionId: null,
+      teamId: "10000000-0000-4000-8000-000000000002",
+      positionId: null,
+      personId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "60000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Resolve onboarding process bottleneck",
+      description: "Escalation pending owner confirmation",
+      status: ActionStatus.in_progress,
+      dueDate: "2026-01-04",
+      blocked: true,
+      ownerPersonId: "30000000-0000-4000-8000-000000000003",
+      ownerPositionId: null,
+      teamId: "10000000-0000-4000-8000-000000000003",
+      positionId: null,
+      personId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "60000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Create sales territory ownership map",
+      description: "Ensure every territory has explicit owner",
+      status: ActionStatus.open,
+      dueDate: "2030-02-15",
+      blocked: false,
+      ownerPersonId: "30000000-0000-4000-8000-000000000007",
+      ownerPositionId: null,
+      teamId: "10000000-0000-4000-8000-000000000004",
+      positionId: null,
+      personId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "60000000-0000-4000-8000-000000000004",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Audit policy ownership gaps",
+      description: "Policy scope-owner mapping review",
+      status: ActionStatus.done,
+      dueDate: "2026-01-02",
+      blocked: false,
+      ownerPersonId: "30000000-0000-4000-8000-000000000001",
+      ownerPositionId: null,
+      teamId: null,
+      positionId: "20000000-0000-4000-8000-000000000001",
+      personId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "60000000-0000-4000-8000-000000000005",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Close finance reconciliation checklist",
+      description: "Owner escalation currently blocked",
+      status: ActionStatus.in_progress,
+      dueDate: "2030-01-10",
+      blocked: true,
+      ownerPersonId: "30000000-0000-4000-8000-000000000006",
+      ownerPositionId: null,
+      teamId: null,
+      positionId: "20000000-0000-4000-8000-000000000006",
+      personId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  policies: [
+    {
+      id: "70000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Operating Rhythm",
+      body: "Leadership reviews ownership and blockers every Monday 09:00.",
+      scope: PolicyScope.organization,
+      teamId: null,
+      positionId: null,
+      ownerPersonId: "30000000-0000-4000-8000-000000000001",
+      ownerPositionId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "70000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Finance Spend Controls",
+      body: "All unplanned spend above threshold requires Head of Finance approval.",
+      scope: PolicyScope.team,
+      teamId: "10000000-0000-4000-8000-000000000002",
+      positionId: null,
+      ownerPersonId: "30000000-0000-4000-8000-000000000002",
+      ownerPositionId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "70000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Operations Onboarding SLA",
+      body: "New hires must complete role ownership map within week one.",
+      scope: PolicyScope.position,
+      teamId: null,
+      positionId: "20000000-0000-4000-8000-000000000005",
+      ownerPersonId: "30000000-0000-4000-8000-000000000003",
+      ownerPositionId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+};
+
+function cloneLocalDemoState(): LocalDemoState {
+  return {
+    organizationId: LOCAL_DEMO_STATE.organizationId,
+    teams: LOCAL_DEMO_STATE.teams.map((item) => ({ ...item })),
+    positions: LOCAL_DEMO_STATE.positions.map((item) => ({ ...item })),
+    people: LOCAL_DEMO_STATE.people.map((item) => ({ ...item })),
+    actions: LOCAL_DEMO_STATE.actions.map((item) => ({ ...item })),
+    policies: LOCAL_DEMO_STATE.policies.map((item) => ({ ...item })),
+    teamOwnerships: LOCAL_DEMO_STATE.teamOwnerships.map((item) => ({ ...item })),
+    positionOwnerships: LOCAL_DEMO_STATE.positionOwnerships.map((item) => ({ ...item })),
+  };
+}
+
 export function TeamFrame() {
   const [activeNav, setActiveNav] = useState<NavId>("org");
   const [organizationId, setOrganizationId] = useState<string | null>(null);
@@ -158,6 +573,7 @@ export function TeamFrame() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [demoResetSummary, setDemoResetSummary] = useState<string>("");
+  const [isLocalDemoMode, setIsLocalDemoMode] = useState(false);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -272,6 +688,27 @@ export function TeamFrame() {
     [actions],
   );
 
+  function applyStateSnapshot(snapshot: Omit<LocalDemoState, "organizationId">) {
+    setTeams(snapshot.teams);
+    setPositions(snapshot.positions);
+    setPeople(snapshot.people);
+    setActions(snapshot.actions);
+    setPolicies(snapshot.policies);
+    setTeamOwnerships(snapshot.teamOwnerships);
+    setPositionOwnerships(snapshot.positionOwnerships);
+  }
+
+  function loadLocalDemoSnapshot(message: string) {
+    const snapshot = cloneLocalDemoState();
+    setOrganizationId(snapshot.organizationId);
+    applyStateSnapshot(snapshot);
+    setIsLocalDemoMode(true);
+    setError(message);
+    setDemoResetSummary(
+      `Local demo snapshot loaded: ${snapshot.teams.length} teams, ${snapshot.positions.length} positions, ${snapshot.people.length} people, ${snapshot.actions.length} actions, ${snapshot.policies.length} policies.`,
+    );
+  }
+
   async function executeApiCall<T>(
     label: string,
     operation: (options: RequestInit) => Promise<T>,
@@ -335,13 +772,16 @@ export function TeamFrame() {
         ),
       ]);
 
-    setTeams(teamData.items);
-    setPositions(positionData.items);
-    setPeople(peopleData.items);
-    setActions(actionData.items);
-    setPolicies(policyData.items);
-    setTeamOwnerships(teamOwnerData.items);
-    setPositionOwnerships(positionOwnerData.items);
+    applyStateSnapshot({
+      teams: teamData.items,
+      positions: positionData.items,
+      people: peopleData.items,
+      actions: actionData.items,
+      policies: policyData.items,
+      teamOwnerships: teamOwnerData.items,
+      positionOwnerships: positionOwnerData.items,
+    });
+    setIsLocalDemoMode(false);
   }
 
   async function recoverOrganizationContext(reason: string) {
@@ -352,7 +792,7 @@ export function TeamFrame() {
   }
 
   async function refreshState() {
-    if (!organizationId) return;
+    if (!organizationId || isLocalDemoMode) return;
 
     try {
       await loadOrganizationState(organizationId);
@@ -382,7 +822,10 @@ export function TeamFrame() {
         await loadOrganizationState(orgId);
       } catch (error) {
         if (!cancelled) {
-          setError(error instanceof Error ? error.message : String(error));
+          const reason = error instanceof Error ? error.message : String(error);
+          loadLocalDemoSnapshot(
+            `API unavailable. Loaded local demo snapshot for visual review. (${reason})`,
+          );
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -396,6 +839,11 @@ export function TeamFrame() {
   }, []);
 
   async function runMutation(task: () => Promise<void>) {
+    if (isLocalDemoMode) {
+      setError("Local demo snapshot is read-only. Start API mode to persist changes.");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
@@ -694,6 +1142,12 @@ export function TeamFrame() {
 
   async function handleResetDemoState() {
     if (!organizationId) return;
+
+    if (isLocalDemoMode) {
+      loadLocalDemoSnapshot("Local demo snapshot reset for visual review.");
+      return;
+    }
+
     await runMutation(async () => {
       const result = await executeApiCall("Reset demo state", (options) =>
         resetOrganizationDemoState(organizationId, options),
@@ -705,6 +1159,11 @@ export function TeamFrame() {
   }
 
   async function handleInvalidOrgRecoveryCheck() {
+    if (isLocalDemoMode) {
+      setError("Invalid-org recovery check is available in API mode. Local demo snapshot is already isolated.");
+      return;
+    }
+
     setBusy(true);
     setError(null);
     try {
@@ -817,6 +1276,9 @@ export function TeamFrame() {
               <div style={{ marginTop: 10, color: "#B91C1C", fontSize: 12 }}>{error}</div>
             ) : null}
             {busy ? <div style={{ marginTop: 10, color: "#475569", fontSize: 12 }}>Saving…</div> : null}
+            <div style={{ marginTop: 8, fontSize: 11, color: isLocalDemoMode ? "#92400E" : "#0F766E" }}>
+              Data source: {isLocalDemoMode ? "Local demo snapshot (read-only)" : "Live API state"}
+            </div>
           </section>
 
           {activeNav === "org" && (
@@ -1148,6 +1610,7 @@ export function TeamFrame() {
               ) : null}
               <div style={{ fontSize: 11, color: "#64748B" }}>
                 COO walkthrough baseline: Org Map to Teams to Owners to Actions to Policies.
+                {isLocalDemoMode ? " Local snapshot mode is active for visual review." : ""}
               </div>
             </section>
           )}
