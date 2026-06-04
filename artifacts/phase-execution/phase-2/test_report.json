@@ -1,0 +1,19 @@
+{
+  "phase_id": "phase-2-domain-model",
+  "commit_hash": "f763bf9f20e3f18204ac177611b226df4a65f691",
+  "executed_at": "2026-06-04T17:24:07.920644+00:00",
+  "command": "pnpm --filter @workspace/api-server run test:phase-core",
+  "results": {
+    "total_tests": 14,
+    "passed": 14,
+    "failed": 0,
+    "duration_ms": 201.013294
+  },
+  "phase2_gates": {
+    "tree_acyclic_reparent": "pass",
+    "single_active_assignment_per_position": "pass",
+    "transfer_end_start_atomic_pair": "pass",
+    "assignment_replay_deterministic": "pass"
+  },
+  "status": "PASS"
+}

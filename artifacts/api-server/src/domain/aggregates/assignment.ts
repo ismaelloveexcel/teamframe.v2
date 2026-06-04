@@ -18,7 +18,13 @@ export function deriveAssignments(events: EventEnvelope[]): AssignmentTimeline[]
     .sort((a, b) => {
       const byOccurredAt = a.occurredAt.localeCompare(b.occurredAt);
       if (byOccurredAt !== 0) return byOccurredAt;
-      return a.version - b.version;
+      const byVersion = a.version - b.version;
+      if (byVersion !== 0) return byVersion;
+      const byAggregateId = a.aggregateId.localeCompare(b.aggregateId);
+      if (byAggregateId !== 0) return byAggregateId;
+      const byEventType = a.eventType.localeCompare(b.eventType);
+      if (byEventType !== 0) return byEventType;
+      return stablePayloadOrderKey(a).localeCompare(stablePayloadOrderKey(b));
     });
 
   const map = new Map<string, AssignmentTimeline>();
@@ -59,7 +65,7 @@ export function deriveAssignments(events: EventEnvelope[]): AssignmentTimeline[]
     }
   }
 
-  return [...map.values()];
+  return [...map.values()].sort((a, b) => a.assignmentId.localeCompare(b.assignmentId));
 }
 
 export function isAssignmentActive(assignment: AssignmentTimeline, nowIso: string): boolean {
@@ -193,3 +199,9 @@ export function buildTransferEvents(input: {
   ];
 }
 
+
+function stablePayloadOrderKey(event: EventEnvelope): string {
+  const payload = event.payload as Record<string, unknown>;
+  const assignmentId = payload.assignmentId;
+  return typeof assignmentId === "string" ? assignmentId : event.aggregateId;
+}

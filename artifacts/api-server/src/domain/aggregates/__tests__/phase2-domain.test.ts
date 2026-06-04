@@ -131,6 +131,55 @@ test("Phase 2 gate: transfer emits end+start and keeps occupancy deterministic",
   assert.doesNotThrow(() => assertNoEmployeeOverlap(replayed, NOW, 1));
 });
 
+
+test("Phase 2 gate: employee overlap invariant rejects concurrent active seats", () => {
+  const events = [
+    {
+      orgId: "org-1",
+      aggregateType: "assignment",
+      aggregateId: "asg-10",
+      eventType: "assignment.started",
+      version: 1,
+      occurredAt: "2026-01-01T00:00:00.000Z",
+      actorId: "actor-1",
+      idempotencyKey: "overlap-1",
+      schemaVersion: 1,
+      payload: {
+        assignmentId: "asg-10",
+        positionId: "position-a",
+        employeeId: "person-z",
+        effectiveFrom: "2026-01-01T00:00:00.000Z",
+      },
+      payloadHash: "",
+    },
+    {
+      orgId: "org-1",
+      aggregateType: "assignment",
+      aggregateId: "asg-11",
+      eventType: "assignment.started",
+      version: 2,
+      occurredAt: "2026-01-01T00:00:00.000Z",
+      actorId: "actor-1",
+      idempotencyKey: "overlap-2",
+      schemaVersion: 1,
+      payload: {
+        assignmentId: "asg-11",
+        positionId: "position-b",
+        employeeId: "person-z",
+        effectiveFrom: "2026-01-01T00:00:00.000Z",
+      },
+      payloadHash: "",
+    },
+  ] as EventEnvelope[];
+
+  const replayed = deriveAssignments(events.map((event) => ({ ...event, payloadHash: stableHash(event.payload) })));
+
+  assert.throws(
+    () => assertNoEmployeeOverlap(replayed, NOW, 1),
+    (error: unknown) => error instanceof InvariantViolationError,
+  );
+});
+
 test("Phase 2 gate: replay ordering remains deterministic", () => {
   const seededEvents = withVersion([
     {
