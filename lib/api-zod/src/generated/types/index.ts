@@ -35,6 +35,7 @@ export * from './policyScope';
 export * from './policyScopeUpdateRequest';
 export * from './position';
 export * from './positionCollection';
+export * from './positionExecutionSummary';
 export * from './positionLifecycleStatus';
 export * from './positionOwnership';
 export * from './positionOwnershipCollection';

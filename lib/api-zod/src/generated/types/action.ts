@@ -17,6 +17,7 @@ export interface Action {
   blocked: boolean;
   ownerPersonId?: string | null;
   ownerPositionId?: string | null;
+  assignmentId?: string | null;
   teamId?: string | null;
   positionId?: string | null;
   personId?: string | null;

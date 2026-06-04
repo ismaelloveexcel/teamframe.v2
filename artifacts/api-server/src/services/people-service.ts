@@ -2,9 +2,11 @@ import type { ActorContext } from "../lib/request-context";
 import { badRequest, notFound } from "../lib/http-error";
 import { OrganizationAccessControl } from "../access/organization-access";
 import {
+  ActionRepository,
   MembershipRepository,
   OrganizationRepository,
   PeopleRepository,
+  PersonPositionAssignmentRepository,
   PositionRepository,
 } from "../persistence/repositories";
 
@@ -13,6 +15,8 @@ export class PeopleService {
     private readonly access: OrganizationAccessControl,
     private readonly people: PeopleRepository,
     private readonly positions: PositionRepository,
+    private readonly actions: ActionRepository,
+    private readonly assignments: PersonPositionAssignmentRepository,
   ) {}
 
   async list(actor: ActorContext, organizationId: string) {
@@ -70,8 +74,20 @@ export class PeopleService {
 
   async delete(actor: ActorContext, organizationId: string, personId: string) {
     await this.access.requireMembership(organizationId, actor.userId, "admin");
-    const deleted = await this.people.delete(organizationId, personId);
-    if (!deleted) notFound("Person not found");
+    const person = await this.people.getById(organizationId, personId);
+    if (!person) notFound("Person not found");
+
+    const [hasAssignments, hasActions] = await Promise.all([
+      this.assignments.hasAnyForPerson(organizationId, personId),
+      this.actions.hasAnyForPerson(organizationId, personId),
+    ]);
+
+    if (hasAssignments || hasActions) {
+      await this.people.update(organizationId, personId, { employmentStatus: "offboarding" });
+      return;
+    }
+
+    await this.people.delete(organizationId, personId);
   }
 }
 
@@ -80,5 +96,11 @@ export function buildPeopleService() {
   const memberships = new MembershipRepository();
   const access = new OrganizationAccessControl(organizations, memberships);
 
-  return new PeopleService(access, new PeopleRepository(), new PositionRepository());
+  return new PeopleService(
+    access,
+    new PeopleRepository(),
+    new PositionRepository(),
+    new ActionRepository(),
+    new PersonPositionAssignmentRepository(),
+  );
 }

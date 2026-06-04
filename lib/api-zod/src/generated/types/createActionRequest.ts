@@ -14,6 +14,9 @@ export interface CreateActionRequest {
   description?: string;
   dueDate?: Date;
   blocked?: boolean;
-  owner: OwnershipAssignmentInput;
-  link: ActionLinkInput;
+  assignmentId?: string;
+  personId?: string;
+  positionId?: string;
+  owner?: OwnershipAssignmentInput;
+  link?: ActionLinkInput;
 }

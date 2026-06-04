@@ -11,6 +11,7 @@ import {
   text,
   timestamp,
   unique,
+  uniqueIndex,
   uuid,
 } from "drizzle-orm/pg-core";
 import { createInsertSchema } from "drizzle-zod";
@@ -36,6 +37,10 @@ export const actionStatusEnum = pgEnum("action_status", [
   "in_progress",
   "done",
 ]);
+export const personPositionAssignmentStatusEnum = pgEnum(
+  "person_position_assignment_status",
+  ["active", "ended"],
+);
 export const policyScopeEnum = pgEnum("policy_scope", [
   "organization",
   "team",
@@ -157,6 +162,42 @@ export const peopleTable = pgTable(
   ],
 );
 
+
+export const personPositionAssignmentsTable = pgTable(
+  "person_position_assignments",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    personId: uuid("person_id")
+      .notNull()
+      .references(() => peopleTable.id),
+    positionId: uuid("position_id")
+      .notNull()
+      .references(() => positionsTable.id),
+    startedAt: timestamp("started_at", { withTimezone: true }).notNull().defaultNow(),
+    endedAt: timestamp("ended_at", { withTimezone: true }),
+    status: personPositionAssignmentStatusEnum("status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("person_position_assignments_org_person_idx").on(
+      table.organizationId,
+      table.personId,
+    ),
+    index("person_position_assignments_org_position_idx").on(
+      table.organizationId,
+      table.positionId,
+    ),
+    index("person_position_assignments_person_ended_at_idx").on(table.personId, table.endedAt),
+    uniqueIndex("person_position_assignments_active_person_unique")
+      .on(table.personId)
+      .where(sql`${table.status} = 'active'`),
+  ],
+);
+
 export const teamOwnershipsTable = pgTable(
   "team_ownerships",
   {
@@ -235,6 +276,9 @@ export const actionsTable = pgTable(
     ownerPositionId: uuid("owner_position_id").references(() => positionsTable.id, {
       onDelete: "set null",
     }),
+    assignmentId: uuid("assignment_id").references(() => personPositionAssignmentsTable.id, {
+      onDelete: "set null",
+    }),
     teamId: uuid("team_id").references(() => teamsTable.id, { onDelete: "set null" }),
     positionId: uuid("position_id").references(() => positionsTable.id, {
       onDelete: "set null",
@@ -246,9 +290,12 @@ export const actionsTable = pgTable(
   (table) => [
     index("actions_org_idx").on(table.organizationId),
     index("actions_status_idx").on(table.status),
+    index("actions_org_owner_person_idx").on(table.organizationId, table.ownerPersonId),
+    index("actions_org_owner_position_idx").on(table.organizationId, table.ownerPositionId),
+    index("actions_org_assignment_idx").on(table.organizationId, table.assignmentId),
     check(
       "actions_owner_required",
-      sql`${table.ownerPersonId} IS NOT NULL OR ${table.ownerPositionId} IS NOT NULL`,
+      sql`${table.assignmentId} IS NOT NULL OR ${table.ownerPersonId} IS NOT NULL OR ${table.ownerPositionId} IS NOT NULL`,
     ),
     check(
       "actions_structural_link_required",
@@ -360,6 +407,7 @@ export const createActionSchema = createInsertSchema(actionsTable).pick({
   blocked: true,
   ownerPersonId: true,
   ownerPositionId: true,
+  assignmentId: true,
   teamId: true,
   positionId: true,
   personId: true,
@@ -379,6 +427,7 @@ export type Organization = typeof organizationsTable.$inferSelect;
 export type Team = typeof teamsTable.$inferSelect;
 export type Position = typeof positionsTable.$inferSelect;
 export type Person = typeof peopleTable.$inferSelect;
+export type PersonPositionAssignment = typeof personPositionAssignmentsTable.$inferSelect;
 export type Action = typeof actionsTable.$inferSelect;
 export type Policy = typeof policiesTable.$inferSelect;
 export type TeamOwnership = typeof teamOwnershipsTable.$inferSelect;

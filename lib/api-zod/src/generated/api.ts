@@ -489,6 +489,7 @@ export const ListActionsResponse = zod.object({
   "blocked": zod.boolean(),
   "ownerPersonId": zod.string().uuid().nullish(),
   "ownerPositionId": zod.string().uuid().nullish(),
+  "assignmentId": zod.string().uuid().nullish(),
   "teamId": zod.string().uuid().nullish(),
   "positionId": zod.string().uuid().nullish(),
   "personId": zod.string().uuid().nullish(),
@@ -513,14 +514,92 @@ export const CreateActionBody = zod.object({
   "description": zod.string().optional(),
   "dueDate": zod.coerce.date().optional(),
   "blocked": zod.boolean().default(createActionBodyBlockedDefault),
+  "assignmentId": zod.string().uuid().optional(),
+  "personId": zod.string().uuid().optional(),
+  "positionId": zod.string().uuid().optional(),
   "owner": zod.union([zod.unknown(),zod.unknown()]).and(zod.object({
   "ownerPersonId": zod.string().uuid().nullish(),
   "ownerPositionId": zod.string().uuid().nullish()
-})),
+})).optional(),
   "link": zod.union([zod.unknown(),zod.unknown(),zod.unknown()]).and(zod.object({
   "teamId": zod.string().uuid().nullish(),
   "positionId": zod.string().uuid().nullish(),
   "personId": zod.string().uuid().nullish()
+})).optional()
+})
+
+
+/**
+ * @summary List actions for a position context
+ */
+export const ListPositionActionsParams = zod.object({
+  "organizationId": zod.coerce.string().uuid(),
+  "positionId": zod.coerce.string().uuid()
+})
+
+export const ListPositionActionsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "organizationId": zod.string().uuid(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "status": zod.enum(['open', 'in_progress', 'done']),
+  "dueDate": zod.coerce.date().nullish(),
+  "blocked": zod.boolean(),
+  "ownerPersonId": zod.string().uuid().nullish(),
+  "ownerPositionId": zod.string().uuid().nullish(),
+  "assignmentId": zod.string().uuid().nullish(),
+  "teamId": zod.string().uuid().nullish(),
+  "positionId": zod.string().uuid().nullish(),
+  "personId": zod.string().uuid().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Get execution summary for a position
+ */
+export const GetPositionExecutionSummaryParams = zod.object({
+  "organizationId": zod.coerce.string().uuid(),
+  "positionId": zod.coerce.string().uuid()
+})
+
+export const GetPositionExecutionSummaryResponse = zod.object({
+  "totalActions": zod.number(),
+  "openActions": zod.number(),
+  "inProgressActions": zod.number(),
+  "doneActions": zod.number(),
+  "overdueActions": zod.number()
+})
+
+
+/**
+ * @summary List actions for a person context
+ */
+export const ListPersonActionsParams = zod.object({
+  "organizationId": zod.coerce.string().uuid(),
+  "personId": zod.coerce.string().uuid()
+})
+
+export const ListPersonActionsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "organizationId": zod.string().uuid(),
+  "title": zod.string(),
+  "description": zod.string().nullish(),
+  "status": zod.enum(['open', 'in_progress', 'done']),
+  "dueDate": zod.coerce.date().nullish(),
+  "blocked": zod.boolean(),
+  "ownerPersonId": zod.string().uuid().nullish(),
+  "ownerPositionId": zod.string().uuid().nullish(),
+  "assignmentId": zod.string().uuid().nullish(),
+  "teamId": zod.string().uuid().nullish(),
+  "positionId": zod.string().uuid().nullish(),
+  "personId": zod.string().uuid().nullish(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
 }))
 })
 
@@ -543,6 +622,7 @@ export const GetActionResponse = zod.object({
   "blocked": zod.boolean(),
   "ownerPersonId": zod.string().uuid().nullish(),
   "ownerPositionId": zod.string().uuid().nullish(),
+  "assignmentId": zod.string().uuid().nullish(),
   "teamId": zod.string().uuid().nullish(),
   "positionId": zod.string().uuid().nullish(),
   "personId": zod.string().uuid().nullish(),
@@ -576,6 +656,9 @@ export const UpdateActionDetailsBody = zod.object({
   "description": zod.string().nullish(),
   "dueDate": zod.coerce.date().nullish(),
   "blocked": zod.boolean().optional(),
+  "assignmentId": zod.string().uuid().nullish(),
+  "personId": zod.string().uuid().nullish(),
+  "positionId": zod.string().uuid().nullish(),
   "owner": zod.union([zod.unknown(),zod.unknown()]).and(zod.object({
   "ownerPersonId": zod.string().uuid().nullish(),
   "ownerPositionId": zod.string().uuid().nullish()
@@ -597,6 +680,7 @@ export const UpdateActionDetailsResponse = zod.object({
   "blocked": zod.boolean(),
   "ownerPersonId": zod.string().uuid().nullish(),
   "ownerPositionId": zod.string().uuid().nullish(),
+  "assignmentId": zod.string().uuid().nullish(),
   "teamId": zod.string().uuid().nullish(),
   "positionId": zod.string().uuid().nullish(),
   "personId": zod.string().uuid().nullish(),
@@ -627,6 +711,7 @@ export const TransitionActionStatusResponse = zod.object({
   "blocked": zod.boolean(),
   "ownerPersonId": zod.string().uuid().nullish(),
   "ownerPositionId": zod.string().uuid().nullish(),
+  "assignmentId": zod.string().uuid().nullish(),
   "teamId": zod.string().uuid().nullish(),
   "positionId": zod.string().uuid().nullish(),
   "personId": zod.string().uuid().nullish(),

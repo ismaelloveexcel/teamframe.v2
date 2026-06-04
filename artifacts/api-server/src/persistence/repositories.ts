@@ -1,10 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray, or } from "drizzle-orm";
 import {
   actionsTable,
   auditEventsTable,
   db,
   organizationMembershipsTable,
   organizationsTable,
+  personPositionAssignmentsTable,
   peopleTable,
   policiesTable,
   positionsTable,
@@ -39,6 +40,7 @@ export interface ActionCreateInput {
   blocked: boolean;
   ownerPersonId: string | null;
   ownerPositionId: string | null;
+  assignmentId: string | null;
   teamId: string | null;
   positionId: string | null;
   personId: string | null;
@@ -51,6 +53,7 @@ export interface ActionDetailsUpdateInput {
   blocked?: boolean;
   ownerPersonId?: string | null;
   ownerPositionId?: string | null;
+  assignmentId?: string | null;
   teamId?: string | null;
   positionId?: string | null;
   personId?: string | null;
@@ -419,6 +422,52 @@ export class PeopleRepository {
   }
 }
 
+export class PersonPositionAssignmentRepository {
+  async getById(organizationId: string, assignmentId: string) {
+    const [assignment] = await db
+      .select()
+      .from(personPositionAssignmentsTable)
+      .where(
+        and(
+          eq(personPositionAssignmentsTable.organizationId, organizationId),
+          eq(personPositionAssignmentsTable.id, assignmentId),
+        ),
+      )
+      .limit(1);
+    return assignment ?? null;
+  }
+
+  async getActiveByPersonId(organizationId: string, personId: string) {
+    const [assignment] = await db
+      .select()
+      .from(personPositionAssignmentsTable)
+      .where(
+        and(
+          eq(personPositionAssignmentsTable.organizationId, organizationId),
+          eq(personPositionAssignmentsTable.personId, personId),
+          eq(personPositionAssignmentsTable.status, "active"),
+        ),
+      )
+      .limit(1);
+    return assignment ?? null;
+  }
+
+  async hasAnyForPerson(organizationId: string, personId: string) {
+    const [record] = await db
+      .select({ id: personPositionAssignmentsTable.id })
+      .from(personPositionAssignmentsTable)
+      .where(
+        and(
+          eq(personPositionAssignmentsTable.organizationId, organizationId),
+          eq(personPositionAssignmentsTable.personId, personId),
+        ),
+      )
+      .limit(1);
+
+    return Boolean(record);
+  }
+}
+
 export class OwnershipRepository {
   async listTeamOwnerships(organizationId: string) {
     return db
@@ -516,6 +565,7 @@ export class ActionRepository {
         blocked: input.blocked,
         ownerPersonId: input.ownerPersonId,
         ownerPositionId: input.ownerPositionId,
+        assignmentId: input.assignmentId,
         teamId: input.teamId,
         positionId: input.positionId,
         personId: input.personId,
@@ -537,6 +587,9 @@ export class ActionRepository {
     if (typeof input.ownerPersonId !== "undefined") setValues.ownerPersonId = input.ownerPersonId;
     if (typeof input.ownerPositionId !== "undefined") {
       setValues.ownerPositionId = input.ownerPositionId;
+    }
+    if (typeof input.assignmentId !== "undefined") {
+      setValues.assignmentId = input.assignmentId;
     }
     if (typeof input.teamId !== "undefined") setValues.teamId = input.teamId;
     if (typeof input.positionId !== "undefined") setValues.positionId = input.positionId;
@@ -564,6 +617,107 @@ export class ActionRepository {
       .where(and(eq(actionsTable.organizationId, organizationId), eq(actionsTable.id, actionId)))
       .returning();
     return action ?? null;
+  }
+
+  async listByPositionContext(organizationId: string, positionId: string) {
+    const assignmentSubquery = db
+      .select({ id: personPositionAssignmentsTable.id })
+      .from(personPositionAssignmentsTable)
+      .where(
+        and(
+          eq(personPositionAssignmentsTable.organizationId, organizationId),
+          eq(personPositionAssignmentsTable.positionId, positionId),
+        ),
+      );
+
+    return db
+      .select()
+      .from(actionsTable)
+      .where(
+        and(
+          eq(actionsTable.organizationId, organizationId),
+          or(
+            eq(actionsTable.positionId, positionId),
+            eq(actionsTable.ownerPositionId, positionId),
+            inArray(actionsTable.assignmentId, assignmentSubquery),
+          ),
+        ),
+      );
+  }
+
+  async listByPersonContext(organizationId: string, personId: string) {
+    const assignmentSubquery = db
+      .select({ id: personPositionAssignmentsTable.id })
+      .from(personPositionAssignmentsTable)
+      .where(
+        and(
+          eq(personPositionAssignmentsTable.organizationId, organizationId),
+          eq(personPositionAssignmentsTable.personId, personId),
+        ),
+      );
+
+    return db
+      .select()
+      .from(actionsTable)
+      .where(
+        and(
+          eq(actionsTable.organizationId, organizationId),
+          or(
+            eq(actionsTable.ownerPersonId, personId),
+            eq(actionsTable.personId, personId),
+            inArray(actionsTable.assignmentId, assignmentSubquery),
+          ),
+        ),
+      );
+  }
+
+  async getPositionExecutionSummary(organizationId: string, positionId: string) {
+    const items = await this.listByPositionContext(organizationId, positionId);
+    const now = new Date();
+
+    const overdueActions = items.filter((item) => {
+      if (item.status === "done" || !item.dueDate) return false;
+      const dueAt = new Date(item.dueDate);
+      if (Number.isNaN(dueAt.getTime())) return false;
+      return dueAt < now;
+    }).length;
+
+    return {
+      totalActions: items.length,
+      openActions: items.filter((item) => item.status === "open").length,
+      inProgressActions: items.filter((item) => item.status === "in_progress").length,
+      doneActions: items.filter((item) => item.status === "done").length,
+      overdueActions,
+    };
+  }
+
+  async hasAnyForPerson(organizationId: string, personId: string) {
+    const assignmentSubquery = db
+      .select({ id: personPositionAssignmentsTable.id })
+      .from(personPositionAssignmentsTable)
+      .where(
+        and(
+          eq(personPositionAssignmentsTable.organizationId, organizationId),
+          eq(personPositionAssignmentsTable.personId, personId),
+        ),
+      );
+
+    const [record] = await db
+      .select({ id: actionsTable.id })
+      .from(actionsTable)
+      .where(
+        and(
+          eq(actionsTable.organizationId, organizationId),
+          or(
+            eq(actionsTable.ownerPersonId, personId),
+            eq(actionsTable.personId, personId),
+            inArray(actionsTable.assignmentId, assignmentSubquery),
+          ),
+        ),
+      )
+      .limit(1);
+
+    return Boolean(record);
   }
 
   async delete(organizationId: string, actionId: string) {

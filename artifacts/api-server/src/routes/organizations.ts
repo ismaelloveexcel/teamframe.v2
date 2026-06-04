@@ -26,6 +26,8 @@ import {
   GetOrganizationResponse,
   GetPersonParams,
   GetPersonResponse,
+  GetPositionExecutionSummaryParams,
+  GetPositionExecutionSummaryResponse,
   GetPolicyParams,
   GetPolicyResponse,
   GetPositionParams,
@@ -34,6 +36,10 @@ import {
   GetTeamResponse,
   ListActionsParams,
   ListActionsResponse,
+  ListPersonActionsParams,
+  ListPersonActionsResponse,
+  ListPositionActionsParams,
+  ListPositionActionsResponse,
   ListOrganizationsResponse,
   ListPositionOwnershipsParams,
   ListPositionOwnershipsResponse,
@@ -344,6 +350,41 @@ router.get(
   }),
 );
 
+router.get(
+  "/organizations/:organizationId/positions/:positionId/actions",
+  asyncHandler(async (req, res) => {
+    const params = ListPositionActionsParams.parse(req.params);
+    const items = await actions.listForPosition(
+      actorFromReq(req),
+      params.organizationId,
+      params.positionId,
+    );
+    res.json(ListPositionActionsResponse.parse({ items }));
+  }),
+);
+
+router.get(
+  "/organizations/:organizationId/positions/:positionId/execution-summary",
+  asyncHandler(async (req, res) => {
+    const params = GetPositionExecutionSummaryParams.parse(req.params);
+    const summary = await actions.getPositionExecutionSummary(
+      actorFromReq(req),
+      params.organizationId,
+      params.positionId,
+    );
+    res.json(GetPositionExecutionSummaryResponse.parse(summary));
+  }),
+);
+
+router.get(
+  "/organizations/:organizationId/people/:personId/actions",
+  asyncHandler(async (req, res) => {
+    const params = ListPersonActionsParams.parse(req.params);
+    const items = await actions.listForPerson(actorFromReq(req), params.organizationId, params.personId);
+    res.json(ListPersonActionsResponse.parse({ items }));
+  }),
+);
+
 router.post(
   "/organizations/:organizationId/actions",
   asyncHandler(async (req, res) => {
@@ -354,16 +395,23 @@ router.post(
       description: body.description,
       dueDate: body.dueDate,
       blocked: body.blocked,
-      owner: {
-        ownerPersonId: body.owner.ownerPersonId ?? null,
-        ownerPositionId: body.owner.ownerPositionId ?? null,
-        responsibilityContext: "",
-      },
-      link: {
-        teamId: body.link.teamId ?? null,
-        positionId: body.link.positionId ?? null,
-        personId: body.link.personId ?? null,
-      },
+      assignmentId: body.assignmentId,
+      personId: body.personId,
+      positionId: body.positionId,
+      owner: body.owner
+        ? {
+            ownerPersonId: body.owner.ownerPersonId ?? null,
+            ownerPositionId: body.owner.ownerPositionId ?? null,
+            responsibilityContext: "",
+          }
+        : undefined,
+      link: body.link
+        ? {
+            teamId: body.link.teamId ?? null,
+            positionId: body.link.positionId ?? null,
+            personId: body.link.personId ?? null,
+          }
+        : undefined,
     });
     res.status(201).json(GetActionResponse.parse(created));
   }),
@@ -392,6 +440,9 @@ router.patch(
         description: body.description ?? undefined,
         dueDate: body.dueDate ?? undefined,
         blocked: body.blocked,
+        assignmentId: typeof body.assignmentId === "undefined" ? undefined : body.assignmentId,
+        personId: typeof body.personId === "undefined" ? undefined : body.personId,
+        positionId: typeof body.positionId === "undefined" ? undefined : body.positionId,
         owner: body.owner
           ? {
               ownerPersonId: body.owner.ownerPersonId ?? null,

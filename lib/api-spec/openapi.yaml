@@ -460,6 +460,56 @@ paths:
               schema:
                 $ref: "#/components/schemas/Action"
 
+
+
+  /organizations/{organizationId}/positions/{positionId}/actions:
+    get:
+      operationId: listPositionActions
+      tags: [actions]
+      summary: List actions for a position context
+      parameters:
+        - $ref: "#/components/parameters/OrganizationIdParam"
+        - $ref: "#/components/parameters/PositionIdParam"
+      responses:
+        "200":
+          description: Position actions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionCollection"
+
+  /organizations/{organizationId}/positions/{positionId}/execution-summary:
+    get:
+      operationId: getPositionExecutionSummary
+      tags: [actions]
+      summary: Get execution summary for a position
+      parameters:
+        - $ref: "#/components/parameters/OrganizationIdParam"
+        - $ref: "#/components/parameters/PositionIdParam"
+      responses:
+        "200":
+          description: Position execution summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PositionExecutionSummary"
+
+  /organizations/{organizationId}/people/{personId}/actions:
+    get:
+      operationId: listPersonActions
+      tags: [actions]
+      summary: List actions for a person context
+      parameters:
+        - $ref: "#/components/parameters/OrganizationIdParam"
+        - $ref: "#/components/parameters/PersonIdParam"
+      responses:
+        "200":
+          description: Person actions
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ActionCollection"
+
   /organizations/{organizationId}/actions/{actionId}:
     get:
       operationId: getAction
@@ -1133,6 +1183,10 @@ components:
           type: string
           format: uuid
           nullable: true
+        assignmentId:
+          type: string
+          format: uuid
+          nullable: true
         teamId:
           type: string
           format: uuid
@@ -1175,11 +1229,20 @@ components:
         blocked:
           type: boolean
           default: false
+        assignmentId:
+          type: string
+          format: uuid
+        personId:
+          type: string
+          format: uuid
+        positionId:
+          type: string
+          format: uuid
         owner:
           $ref: "#/components/schemas/OwnershipAssignmentInput"
         link:
           $ref: "#/components/schemas/ActionLinkInput"
-      required: [title, owner, link]
+      required: [title]
     ActionDetailsUpdateRequest:
       type: object
       minProperties: 1
@@ -1196,6 +1259,18 @@ components:
           nullable: true
         blocked:
           type: boolean
+        assignmentId:
+          type: string
+          format: uuid
+          nullable: true
+        personId:
+          type: string
+          format: uuid
+          nullable: true
+        positionId:
+          type: string
+          format: uuid
+          nullable: true
         owner:
           $ref: "#/components/schemas/OwnershipAssignmentInput"
         link:
@@ -1214,6 +1289,20 @@ components:
           items:
             $ref: "#/components/schemas/Action"
       required: [items]
+    PositionExecutionSummary:
+      type: object
+      properties:
+        totalActions:
+          type: integer
+        openActions:
+          type: integer
+        inProgressActions:
+          type: integer
+        doneActions:
+          type: integer
+        overdueActions:
+          type: integer
+      required: [totalActions, openActions, inProgressActions, doneActions, overdueActions]
     Policy:
       type: object
       properties:

@@ -14,6 +14,9 @@ export interface ActionDetailsUpdateRequest {
   description?: string | null;
   dueDate?: Date | null;
   blocked?: boolean;
+  assignmentId?: string | null;
+  personId?: string | null;
+  positionId?: string | null;
   owner?: OwnershipAssignmentInput;
   link?: ActionLinkInput;
 }

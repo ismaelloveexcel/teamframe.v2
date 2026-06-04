@@ -44,6 +44,7 @@ import type {
   PolicyScopeUpdateRequest,
   Position,
   PositionCollection,
+  PositionExecutionSummary,
   PositionOwnership,
   PositionOwnershipCollection,
   Team,
@@ -2021,6 +2022,252 @@ export const useCreateAction = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getCreateActionMutationOptions(options));
     }
+
+export const getListPositionActionsUrl = (organizationId: string,
+    positionId: string,) => {
+
+
+
+
+  return `/api/organizations/${organizationId}/positions/${positionId}/actions`
+}
+
+/**
+ * @summary List actions for a position context
+ */
+export const listPositionActions = async (organizationId: string,
+    positionId: string, options?: RequestInit): Promise<ActionCollection> => {
+
+  return customFetch<ActionCollection>(getListPositionActionsUrl(organizationId,positionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPositionActionsQueryKey = (organizationId: string,
+    positionId: string,) => {
+    return [
+    `/api/organizations/${organizationId}/positions/${positionId}/actions`
+    ] as const;
+    }
+
+
+export const getListPositionActionsQueryOptions = <TData = Awaited<ReturnType<typeof listPositionActions>>, TError = ErrorType<unknown>>(organizationId: string,
+    positionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPositionActions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPositionActionsQueryKey(organizationId,positionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPositionActions>>> = ({ signal }) => listPositionActions(organizationId,positionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(organizationId && positionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPositionActions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPositionActionsQueryResult = NonNullable<Awaited<ReturnType<typeof listPositionActions>>>
+export type ListPositionActionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List actions for a position context
+ */
+
+export function useListPositionActions<TData = Awaited<ReturnType<typeof listPositionActions>>, TError = ErrorType<unknown>>(
+ organizationId: string,
+    positionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPositionActions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPositionActionsQueryOptions(organizationId,positionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getGetPositionExecutionSummaryUrl = (organizationId: string,
+    positionId: string,) => {
+
+
+
+
+  return `/api/organizations/${organizationId}/positions/${positionId}/execution-summary`
+}
+
+/**
+ * @summary Get execution summary for a position
+ */
+export const getPositionExecutionSummary = async (organizationId: string,
+    positionId: string, options?: RequestInit): Promise<PositionExecutionSummary> => {
+
+  return customFetch<PositionExecutionSummary>(getGetPositionExecutionSummaryUrl(organizationId,positionId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getGetPositionExecutionSummaryQueryKey = (organizationId: string,
+    positionId: string,) => {
+    return [
+    `/api/organizations/${organizationId}/positions/${positionId}/execution-summary`
+    ] as const;
+    }
+
+
+export const getGetPositionExecutionSummaryQueryOptions = <TData = Awaited<ReturnType<typeof getPositionExecutionSummary>>, TError = ErrorType<unknown>>(organizationId: string,
+    positionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPositionExecutionSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getGetPositionExecutionSummaryQueryKey(organizationId,positionId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof getPositionExecutionSummary>>> = ({ signal }) => getPositionExecutionSummary(organizationId,positionId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(organizationId && positionId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof getPositionExecutionSummary>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type GetPositionExecutionSummaryQueryResult = NonNullable<Awaited<ReturnType<typeof getPositionExecutionSummary>>>
+export type GetPositionExecutionSummaryQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary Get execution summary for a position
+ */
+
+export function useGetPositionExecutionSummary<TData = Awaited<ReturnType<typeof getPositionExecutionSummary>>, TError = ErrorType<unknown>>(
+ organizationId: string,
+    positionId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof getPositionExecutionSummary>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getGetPositionExecutionSummaryQueryOptions(organizationId,positionId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getListPersonActionsUrl = (organizationId: string,
+    personId: string,) => {
+
+
+
+
+  return `/api/organizations/${organizationId}/people/${personId}/actions`
+}
+
+/**
+ * @summary List actions for a person context
+ */
+export const listPersonActions = async (organizationId: string,
+    personId: string, options?: RequestInit): Promise<ActionCollection> => {
+
+  return customFetch<ActionCollection>(getListPersonActionsUrl(organizationId,personId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPersonActionsQueryKey = (organizationId: string,
+    personId: string,) => {
+    return [
+    `/api/organizations/${organizationId}/people/${personId}/actions`
+    ] as const;
+    }
+
+
+export const getListPersonActionsQueryOptions = <TData = Awaited<ReturnType<typeof listPersonActions>>, TError = ErrorType<unknown>>(organizationId: string,
+    personId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPersonActions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPersonActionsQueryKey(organizationId,personId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPersonActions>>> = ({ signal }) => listPersonActions(organizationId,personId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(organizationId && personId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPersonActions>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPersonActionsQueryResult = NonNullable<Awaited<ReturnType<typeof listPersonActions>>>
+export type ListPersonActionsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List actions for a person context
+ */
+
+export function useListPersonActions<TData = Awaited<ReturnType<typeof listPersonActions>>, TError = ErrorType<unknown>>(
+ organizationId: string,
+    personId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPersonActions>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPersonActionsQueryOptions(organizationId,personId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getGetActionUrl = (organizationId: string,
     actionId: string,) => {
