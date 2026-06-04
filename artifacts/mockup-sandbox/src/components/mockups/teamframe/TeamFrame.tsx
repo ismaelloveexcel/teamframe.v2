@@ -60,28 +60,30 @@ const ACTOR = {
 const STYLE = {
   page: {
     minHeight: "100vh",
-    background: "#F7F9FC",
+    background: "#EEF2F7",
     color: "#0F172A",
     fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
   } as const,
   shell: {
-    maxWidth: 1400,
+    maxWidth: 1540,
     margin: "0 auto",
     padding: 20,
     display: "grid",
-    gridTemplateColumns: "220px 1fr",
+    gridTemplateColumns: "240px 1fr",
     gap: 16,
   } as const,
   sidebar: {
-    background: "#FFFFFF",
-    border: "1px solid #E5E7EB",
-    borderRadius: 12,
+    background: "#0B1220",
+    border: "1px solid #111827",
+    borderRadius: 14,
     padding: 12,
     height: "fit-content",
+    color: "#E2E8F0",
+    boxShadow: "0 20px 40px rgba(2, 6, 23, 0.35)",
   } as const,
   panel: {
     background: "#FFFFFF",
-    border: "1px solid #E5E7EB",
+    border: "1px solid #1F2937",
     borderRadius: 12,
     padding: 14,
   } as const,
@@ -109,6 +111,16 @@ function formatDateLabel(input: string | null | undefined): string {
 
 function defaultOrgSlug(): string {
   return `teamframe-v1-${Date.now()}`;
+}
+
+function initials(fullName: string): string {
+  const parts = fullName
+    .split(" ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return "NA";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
 }
 
 const API_TIMEOUT_MS = 10_000;
@@ -877,7 +889,10 @@ export function TeamFrame() {
   function renderPositionNode(positionId: string) {
     const position = positionMap.get(positionId);
     if (!position) return <></>;
+
     const peopleInPosition = peopleByPosition.get(positionId) ?? [];
+    const primaryPerson = peopleInPosition[0] ?? null;
+    const additionalPeopleCount = Math.max(0, peopleInPosition.length - 1);
     const children = positionsByManager.get(positionId) ?? [];
     const ownership = positionOwnershipMap.get(positionId);
     const teamName = position.teamId ? teamMap.get(position.teamId)?.name ?? "Unassigned" : "Unassigned";
@@ -886,54 +901,96 @@ export function TeamFrame() {
     return (
       <div
         key={positionId}
-        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, minWidth: 230 }}
+        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, minWidth: 250 }}
       >
         <div
           style={{
             width: "100%",
-            maxWidth: 280,
-            border: "1px solid #CBD5E1",
-            borderRadius: 12,
+            maxWidth: 290,
+            border: "1px solid #D7DFEA",
+            borderRadius: 14,
             padding: 12,
             background: "#FFFFFF",
-            boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
+            boxShadow: "0 14px 28px rgba(15, 23, 42, 0.12)",
           }}
         >
-          <div style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{position.title}</div>
-          <div style={{ fontSize: 11, color: "#64748B", marginTop: 4 }}>
-            {teamName} · {statusLabel}
-          </div>
-          <div style={{ fontSize: 11, color: "#0F172A", marginTop: 4 }}>
-            Owner · {ownership ? ownerLabel(ownership.ownerPersonId, ownership.ownerPositionId) : "Unassigned"}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                letterSpacing: "0.04em",
+                color: "#334155",
+                textTransform: "uppercase",
+                border: "1px solid #CBD5E1",
+                borderRadius: 999,
+                padding: "3px 8px",
+                background: "#F8FAFC",
+              }}
+            >
+              {teamName}
+            </span>
+            <span style={{ fontSize: 10, color: "#64748B", textTransform: "capitalize" }}>{statusLabel}</span>
           </div>
 
-          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
-            {peopleInPosition.length === 0 ? (
-              <div style={{ fontSize: 11, color: "#94A3B8" }}>Vacant role</div>
-            ) : (
-              peopleInPosition.map((person) => (
-                <div
-                  key={person.id}
-                  style={{
-                    border: "1px solid #E2E8F0",
-                    borderRadius: 8,
-                    padding: "6px 8px",
-                    background: "#F8FAFC",
-                  }}
-                >
-                  <div style={{ fontSize: 12, fontWeight: 600, color: "#0F172A" }}>{person.fullName}</div>
-                  <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
-                    {person.email ?? "no-email"} · {person.phone ?? "no-phone"}
-                  </div>
-                </div>
-              ))
-            )}
+          <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
+            <div
+              style={{
+                width: 34,
+                height: 34,
+                borderRadius: "50%",
+                background: "#0F172A",
+                color: "#F8FAFC",
+                fontSize: 11,
+                fontWeight: 700,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                flexShrink: 0,
+              }}
+            >
+              {primaryPerson ? initials(primaryPerson.fullName) : "NA"}
+            </div>
+            <div style={{ minWidth: 0 }}>
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>
+                {primaryPerson?.fullName ?? "Vacant"}
+              </div>
+              <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{position.title}</div>
+              {additionalPeopleCount > 0 ? (
+                <div style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>+{additionalPeopleCount} additional occupant(s)</div>
+              ) : null}
+            </div>
+          </div>
+
+          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
+            <div style={{ fontSize: 11, color: "#334155" }}>
+              Email: {primaryPerson?.email ?? "not set"}
+            </div>
+            <div style={{ fontSize: 11, color: "#334155" }}>
+              Phone: {primaryPerson?.phone ?? "not set"}
+            </div>
+          </div>
+
+          <div
+            style={{
+              marginTop: 10,
+              borderTop: "1px solid #E2E8F0",
+              paddingTop: 8,
+              display: "grid",
+              gridTemplateColumns: "1fr",
+              gap: 3,
+            }}
+          >
+            <div style={{ fontSize: 10, color: "#475569" }}>
+              Owner: {ownership ? ownerLabel(ownership.ownerPersonId, ownership.ownerPositionId) : "Unassigned"}
+            </div>
+            <div style={{ fontSize: 10, color: "#475569" }}>Direct reports: {children.length}</div>
           </div>
         </div>
 
         {children.length > 0 ? (
           <>
-            <div style={{ width: 2, height: 12, background: "#CBD5E1" }} />
+            <div style={{ width: 2, height: 16, background: "#1E293B" }} />
             <div
               style={{
                 display: "flex",
@@ -957,6 +1014,22 @@ export function TeamFrame() {
     if (executiveTeamId) return team.parentTeamId === executiveTeamId;
     return team.parentTeamId === null;
   });
+
+  const departmentOverview = useMemo(() => {
+    return chartDepartmentTeams.map((team) => {
+      const teamPositions = positions.filter((position) => position.teamId === team.id);
+      const teamPositionIds = new Set(teamPositions.map((position) => position.id));
+      const teamPeopleCount = people.filter(
+        (person) => person.positionId && teamPositionIds.has(person.positionId),
+      ).length;
+      return {
+        teamId: team.id,
+        teamName: team.name,
+        positionCount: teamPositions.length,
+        peopleCount: teamPeopleCount,
+      };
+    });
+  }, [chartDepartmentTeams, positions, people]);
 
   async function handleCreateTeam() {
     if (!organizationId || !newTeamName.trim()) return;
@@ -1271,7 +1344,7 @@ export function TeamFrame() {
     <div style={STYLE.page}>
       <div style={STYLE.shell}>
         <aside style={STYLE.sidebar}>
-          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 10 }}>TeamFrame V1</div>
+          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: "#F8FAFC" }}>TeamFrame V1</div>
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
@@ -1279,12 +1352,12 @@ export function TeamFrame() {
               style={{
                 width: "100%",
                 textAlign: "left",
-                border: "1px solid #E5E7EB",
+                border: "1px solid #1F2937",
                 borderRadius: 8,
                 padding: "8px 10px",
                 marginBottom: 6,
-                background: activeNav === item.id ? "#EEF2FF" : "#FFFFFF",
-                color: activeNav === item.id ? "#312E81" : "#0F172A",
+                background: activeNav === item.id ? "#1E293B" : "#0F172A",
+                color: activeNav === item.id ? "#E2E8F0" : "#94A3B8",
                 fontWeight: 600,
                 cursor: "pointer",
               }}
@@ -1346,48 +1419,91 @@ export function TeamFrame() {
             <section style={STYLE.panel}>
               <div style={{ ...STYLE.title, fontSize: 17 }}>Organization Map</div>
               <div style={{ fontSize: 12, color: "#475569", marginBottom: 12 }}>
-                Hierarchy remains the primary canvas: role, owner, email, and phone are visible directly on each node.
+                The chart is the primary workspace. Contact visibility is embedded directly on nodes.
               </div>
 
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "minmax(0, 1.8fr) minmax(320px, 1fr)",
+                  gridTemplateColumns: "260px minmax(0, 1fr)",
                   gap: 12,
                   alignItems: "start",
                 }}
               >
-                <div style={{ ...STYLE.panel, background: "#F8FAFC", border: "1px solid #DDE5EF" }}>
-                  <div style={{ ...STYLE.subTitle, marginBottom: 10 }}>Org Chart (primary view)</div>
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
-                    {chartDepartmentTeams.map((team) => (
-                      <span
-                        key={team.id}
+                <div
+                  style={{
+                    ...STYLE.panel,
+                    background: "#F8FAFC",
+                    border: "1px solid #D8E0EC",
+                    padding: 12,
+                    position: "sticky",
+                    top: 12,
+                  }}
+                >
+                  <div style={{ ...STYLE.subTitle, marginBottom: 10 }}>Organization Index</div>
+                  <input
+                    placeholder="Search teams or roles"
+                    style={{ width: "100%", marginBottom: 10, background: "#FFFFFF" }}
+                    readOnly
+                  />
+                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                    {departmentOverview.map((team) => (
+                      <div
+                        key={team.teamId}
                         style={{
-                          fontSize: 11,
-                          fontWeight: 600,
-                          padding: "4px 8px",
-                          borderRadius: 999,
-                          border: "1px solid #CBD5E1",
+                          border: "1px solid #E2E8F0",
+                          borderRadius: 10,
+                          padding: "8px 10px",
                           background: "#FFFFFF",
-                          color: "#334155",
                         }}
                       >
-                        {team.name}
-                      </span>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{team.teamName}</div>
+                        <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                          {team.positionCount} positions · {team.peopleCount} people
+                        </div>
+                      </div>
                     ))}
+                    {departmentOverview.length === 0 ? (
+                      <div style={{ fontSize: 11, color: "#64748B" }}>No department structure available.</div>
+                    ) : null}
                   </div>
-
-                  {rootPositions.length === 0 ? (
-                    <div style={{ fontSize: 12, color: "#64748B" }}>No positions yet.</div>
-                  ) : (
-                    <div style={{ display: "flex", flexDirection: "column", gap: 20, alignItems: "center" }}>
-                      {rootPositions.map((position) => renderPositionNode(position.id))}
-                    </div>
-                  )}
                 </div>
 
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                <div
+                  style={{
+                    ...STYLE.panel,
+                    border: "1px solid #D8E0EC",
+                    background: "linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%)",
+                    minHeight: 520,
+                  }}
+                >
+                  <div style={{ ...STYLE.subTitle, marginBottom: 10 }}>Org Chart Canvas</div>
+                  <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", minHeight: 460 }}>
+                    {rootPositions.length === 0 ? (
+                      <div style={{ fontSize: 12, color: "#64748B" }}>No positions yet.</div>
+                    ) : (
+                      <div style={{ display: "flex", flexDirection: "column", gap: 22, alignItems: "center" }}>
+                        {rootPositions.map((position) => renderPositionNode(position.id))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+
+              <details style={{ marginTop: 12 }}>
+                <summary
+                  style={{
+                    cursor: "pointer",
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#334155",
+                    marginBottom: 10,
+                  }}
+                >
+                  Edit structure and ownership controls
+                </summary>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
                   <div style={STYLE.panel}>
                     <div style={STYLE.subTitle}>Structure Controls</div>
                     <div
@@ -1519,7 +1635,6 @@ export function TeamFrame() {
 
                   <div style={STYLE.panel}>
                     <div style={STYLE.subTitle}>Ownership Controls</div>
-
                     <div style={{ marginBottom: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
                         Assign Team Ownership
@@ -1615,7 +1730,7 @@ export function TeamFrame() {
                     </div>
                   </div>
                 </div>
-              </div>
+              </details>
             </section>
           )}
 
@@ -1655,7 +1770,7 @@ export function TeamFrame() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {actions.map((item) => (
-                  <div key={item.id} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: 10, background: "#F8FAFC" }}>
+                  <div key={item.id} style={{ border: "1px solid #1F2937", borderRadius: 8, padding: 10, background: "#F8FAFC" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
                         <div style={{ fontWeight: 700 }}>{item.title}</div>
@@ -1795,7 +1910,7 @@ export function TeamFrame() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {policies.map((policy) => (
-                  <div key={policy.id} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: 10 }}>
+                  <div key={policy.id} style={{ border: "1px solid #1F2937", borderRadius: 8, padding: 10 }}>
                     <div style={{ fontWeight: 700 }}>{policy.title}</div>
                     <div style={{ fontSize: 12, color: "#475569" }}>{policy.body}</div>
                     <div style={{ fontSize: 12, color: "#475569" }}>
