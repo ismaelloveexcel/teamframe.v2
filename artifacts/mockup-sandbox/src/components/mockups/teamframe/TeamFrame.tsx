@@ -40,17 +40,18 @@ import {
   type TeamOwnership,
 } from "@workspace/api-client-react";
 
-type NavId = "org" | "actions" | "team" | "policies" | "administration";
+type NavId = "org" | "actions" | "team" | "policies" | "templates" | "administration";
 type OwnerType = "person" | "position";
 type PositionLevel = "Executive" | "Director" | "Manager" | "IC";
 type PositionPanelTab = "position" | "assignment" | "operations";
 type AssignmentRuntimeStatus = "active" | "interim" | "ended";
 
 const NAV_ITEMS: Array<{ id: NavId; label: string }> = [
-  { id: "org", label: "Org Map" },
+  { id: "org", label: "Org Chart" },
   { id: "actions", label: "Actions" },
   { id: "team", label: "Team" },
   { id: "policies", label: "Policies" },
+  { id: "templates", label: "Templates" },
   { id: "administration", label: "Administration" },
 ];
 
@@ -176,17 +177,18 @@ type LocalDemoState = {
   positionOwnerships: PositionOwnership[];
 };
 
-type PositionBlueprint = {
-  jobDescription: string;
-  salaryBand: string;
-  requirements: string;
-};
-
 type AssignmentRuntime = {
   status: AssignmentRuntimeStatus;
   startDate: string;
   endDate: string;
   actualSalary: string;
+};
+
+type UploadedPositionDocument = {
+  fileName: string;
+  uploadedAt: string;
+  sizeLabel: string;
+  objectUrl: string;
 };
 
 type PositionNodeComputedState = "filled" | "vacant" | "interim" | "degraded" | "at-risk";
@@ -615,10 +617,14 @@ export function TeamFrame() {
   const [teamOwnerships, setTeamOwnerships] = useState<TeamOwnership[]>([]);
   const [positionOwnerships, setPositionOwnerships] = useState<PositionOwnership[]>([]);
 
-  const [positionBlueprints, setPositionBlueprints] = useState<Record<string, PositionBlueprint>>({});
   const [assignmentRuntimeByPosition, setAssignmentRuntimeByPosition] = useState<Record<string, AssignmentRuntime>>({});
+  const [positionDocuments, setPositionDocuments] = useState<Record<string, UploadedPositionDocument>>({});
   const [positionPanelTab, setPositionPanelTab] = useState<PositionPanelTab>("position");
   const [focusedSubtreeRootId, setFocusedSubtreeRootId] = useState<string | null>(null);
+
+  const [templateCompanyName, setTemplateCompanyName] = useState("Your Company");
+  const [templateLogoName, setTemplateLogoName] = useState("");
+  const [templateLogoDataUrl, setTemplateLogoDataUrl] = useState<string | null>(null);
 
   const [assignmentDraftEmployeeId, setAssignmentDraftEmployeeId] = useState<string>("");
   const [assignmentDraftStatus, setAssignmentDraftStatus] = useState<AssignmentRuntimeStatus>("active");
@@ -780,14 +786,111 @@ export function TeamFrame() {
     ? positionAssignmentById.get(selectedPositionId) ?? null
     : null;
 
-  function getPositionBlueprint(position: Position): PositionBlueprint {
-    const existing = positionBlueprints[position.id];
-    if (existing) return existing;
-    return {
-      jobDescription: `Define responsibilities and outcomes for ${position.title}.`,
-      salaryBand: "Not set",
-      requirements: "",
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    const kb = Math.round(bytes / 1024);
+    if (kb < 1024) return `${kb} KB`;
+    return `${(kb / 1024).toFixed(1)} MB`;
+  }
+
+  function handleUploadPositionDocument(positionId: string, file: File | null) {
+    if (!file) return;
+    const objectUrl = URL.createObjectURL(file);
+    setPositionDocuments((current) => {
+      const previous = current[positionId];
+      if (previous) URL.revokeObjectURL(previous.objectUrl);
+      return {
+        ...current,
+        [positionId]: {
+          fileName: file.name,
+          uploadedAt: new Date().toISOString(),
+          sizeLabel: formatFileSize(file.size),
+          objectUrl,
+        },
+      };
+    });
+  }
+
+  function handleTemplateLogoUpload(file: File | null) {
+    if (!file) return;
+    setTemplateLogoName(file.name);
+    const reader = new FileReader();
+    reader.onload = () => {
+      if (typeof reader.result === "string") {
+        setTemplateLogoDataUrl(reader.result);
+      }
     };
+    reader.readAsDataURL(file);
+  }
+
+  function downloadJobDescriptionTemplate(context?: {
+    positionName: string;
+    departmentName: string;
+    reportingLine: string;
+  }) {
+    const positionName = context?.positionName ?? "[Position Name]";
+    const departmentName = context?.departmentName ?? "[Department]";
+    const reportingLine = context?.reportingLine ?? "[Reporting Line]";
+
+    const html = `<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Job Description Template</title>
+  <style>
+    body { font-family: Arial, sans-serif; margin: 36px; color: #111827; }
+    h1 { margin: 0 0 8px 0; font-size: 24px; }
+    .meta { margin: 14px 0; border: 1px solid #D1D5DB; border-radius: 8px; padding: 14px; }
+    .meta-row { margin-bottom: 8px; }
+    .section { margin-top: 18px; }
+    .section h2 { font-size: 16px; margin: 0 0 8px 0; }
+    .box { border: 1px solid #D1D5DB; border-radius: 8px; min-height: 80px; padding: 10px; }
+    .signatures { margin-top: 24px; display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
+    .signature-box { border-top: 1px solid #111827; padding-top: 8px; min-height: 60px; }
+    .logo { max-height: 64px; margin-bottom: 10px; }
+  </style>
+</head>
+<body>
+  ${templateLogoDataUrl ? `<img class="logo" src="${templateLogoDataUrl}" alt="Company Logo" />` : ""}
+  <h1>${templateCompanyName} - Job Description</h1>
+  <div class="meta">
+    <div class="meta-row"><strong>Name of position:</strong> ${positionName}</div>
+    <div class="meta-row"><strong>Department:</strong> ${departmentName}</div>
+    <div class="meta-row"><strong>Reporting line:</strong> ${reportingLine}</div>
+    <div class="meta-row"><strong>Location:</strong> _________________________________</div>
+    <div class="meta-row"><strong>Date prepared:</strong> _____________________________</div>
+  </div>
+
+  <div class="section">
+    <h2>Objective</h2>
+    <div class="box"></div>
+  </div>
+
+  <div class="section">
+    <h2>Key responsibilities</h2>
+    <div class="box"></div>
+  </div>
+
+  <div class="section">
+    <h2>KPIs</h2>
+    <div class="box"></div>
+  </div>
+
+  <div class="signatures">
+    <div class="signature-box"><strong>Signed by MANAGER</strong></div>
+    <div class="signature-box"><strong>Acknowledged by EMPLOYEE</strong></div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    const slug = positionName.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    anchor.download = `${slug || "job-description"}-template.html`;
+    anchor.click();
+    URL.revokeObjectURL(href);
   }
 
   useEffect(() => {
@@ -798,28 +901,6 @@ export function TeamFrame() {
     setAssignmentDraftEndDate(selectedAssignment?.runtime.endDate ?? "");
     setAssignmentDraftActualSalary(selectedAssignment?.runtime.actualSalary ?? "");
   }, [positionPanelTab, selectedAssignment, selectedPositionId]);
-
-  function setPositionBlueprintField(
-    positionId: string,
-    field: keyof PositionBlueprint,
-    value: string,
-  ) {
-    setPositionBlueprints((current) => ({
-      ...current,
-      [positionId]: {
-        ...(
-          current[positionId] ?? {
-            jobDescription: `Define responsibilities and outcomes for ${
-              positionMap.get(positionId)?.title ?? "this position"
-            }.`,
-            salaryBand: "Not set",
-            requirements: "",
-          }
-        ),
-        [field]: value,
-      },
-    }));
-  }
 
   function resolvePositionNodeState(positionId: string): PositionNodeComputedState {
     const assignment = positionAssignmentById.get(positionId);
@@ -891,29 +972,6 @@ export function TeamFrame() {
 
   const blockedActions = useMemo(
     () => actions.filter((item) => item.status !== ActionStatus.done && item.blocked).length,
-    [actions],
-  );
-
-  const ownershipResolvedCount = useMemo(
-    () =>
-      actions.filter(
-        (item) => Boolean(item.assignmentId || item.ownerPersonId || item.ownerPositionId),
-      ).length,
-    [actions],
-  );
-
-  const assignmentLinkedCount = useMemo(
-    () => actions.filter((item) => Boolean(item.assignmentId)).length,
-    [actions],
-  );
-
-  const positionOwnedCount = useMemo(
-    () => actions.filter((item) => Boolean(item.ownerPositionId)).length,
-    [actions],
-  );
-
-  const personOwnedCount = useMemo(
-    () => actions.filter((item) => Boolean(item.ownerPersonId)).length,
     [actions],
   );
 
@@ -1179,13 +1237,13 @@ useEffect(() => {
             padding: 12,
             background: "#FFFFFF",
             boxShadow: isSelected
-              ? "0 0 0 2px rgba(37,99,235,0.12), 0 14px 28px rgba(15, 23, 42, 0.12)"
-              : "0 14px 28px rgba(15, 23, 42, 0.12)",
+              ? "0 0 0 2px rgba(37,99,235,0.12), 0 10px 22px rgba(15, 23, 42, 0.10)"
+              : "0 10px 22px rgba(15, 23, 42, 0.10)",
             textAlign: "left",
             cursor: "pointer",
           }}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
             <span
               style={{
                 fontSize: 10,
@@ -1236,42 +1294,19 @@ useEffect(() => {
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{position.title}</div>
               <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
-                {assignedPerson ? assignedPerson.fullName : "Vacant seat"}
+                {assignedPerson ? assignedPerson.fullName : "Vacant position"}
               </div>
             </div>
           </div>
 
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
-            <span style={{ fontSize: 10, color: "#334155", background: "#E2E8F0", borderRadius: 999, padding: "2px 7px" }}>
-              {actionStats.open} open actions
-            </span>
-            {actionStats.overdue > 0 ? (
-              <span style={{ fontSize: 10, color: "#991B1B", background: "#FEE2E2", borderRadius: 999, padding: "2px 7px" }}>
-                {actionStats.overdue} overdue
-              </span>
-            ) : null}
-            {complianceAlerts > 0 ? (
-              <span style={{ fontSize: 10, color: "#92400E", background: "#FEF3C7", borderRadius: 999, padding: "2px 7px" }}>
-                {complianceAlerts} compliance alerts
-              </span>
-            ) : null}
-            {directReports > 5 ? (
-              <span style={{ fontSize: 10, color: "#7F1D1D", background: "#FEE2E2", borderRadius: 999, padding: "2px 7px" }}>
-                overload ({directReports} reports)
-              </span>
-            ) : null}
+          <div style={{ marginTop: 8, fontSize: 11, color: "#334155" }}>
+            {actionStats.open} open · {actionStats.overdue} overdue · {complianceAlerts} compliance · {directReports} reports
+          </div>
+          <div style={{ marginTop: 3, fontSize: 10, color: "#475569" }}>
+            {assignedPerson ? `${assignedPerson.email ?? "No email"} · ${assignedPerson.phone ?? "No phone"}` : "No occupant contact"}
           </div>
 
-          <div
-            style={{
-              marginTop: 10,
-              borderTop: "1px solid #E2E8F0",
-              paddingTop: 8,
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 6,
-            }}
-          >
+          <div style={{ marginTop: 10, borderTop: "1px solid #E2E8F0", paddingTop: 8, display: "flex", gap: 6, flexWrap: "wrap" }}>
             <button
               onClick={(event) => {
                 event.stopPropagation();
@@ -1279,44 +1314,18 @@ useEffect(() => {
               }}
               style={{ fontSize: 10, padding: "3px 7px" }}
             >
-              {assignedPerson ? "Reassign" : "Assign"}
+              Manage assignment
             </button>
             <button
               onClick={(event) => {
                 event.stopPropagation();
-                setActiveNav("actions");
-                setFocusPositionId(positionId);
-                setNewActionOwnerId(positionId);
-                setNewActionLinkId(positionId);
-              }}
-              style={{ fontSize: 10, padding: "3px 7px" }}
-            >
-              Create action
-            </button>
-            <button
-              onClick={(event) => {
-                event.stopPropagation();
-                openAssignmentEditorForPosition(positionId, "interim");
-              }}
-              style={{ fontSize: 10, padding: "3px 7px" }}
-            >
-              Mark interim
-            </button>
-            <button
-              onClick={(event) => {
-                event.stopPropagation();
-                setFocusedSubtreeRootId((current) =>
-                  current === positionId ? null : positionId,
-                );
+                setFocusedSubtreeRootId((current) => (current === positionId ? null : positionId));
               }}
               style={{ fontSize: 10, padding: "3px 7px" }}
             >
               {focusedSubtreeRootId === positionId ? "Unfocus" : "Focus subtree"}
             </button>
-          </div>
-
-          {children.length > 0 ? (
-            <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+            {children.length > 0 ? (
               <button
                 onClick={(event) => {
                   event.stopPropagation();
@@ -1326,8 +1335,8 @@ useEffect(() => {
               >
                 {isCollapsed ? "Expand reports" : "Collapse reports"}
               </button>
-            </div>
-          ) : null}
+            ) : null}
+          </div>
         </button>
 
         {visibleChildren.length > 0 ? (
@@ -1357,28 +1366,6 @@ useEffect(() => {
     return focusedRoot ? [focusedRoot] : organizationRootPositions;
   }, [focusedSubtreeRootId, organizationRootPositions, positionMap]);
 
-  const chartDepartmentTeams = teams.filter((team) => {
-    const executiveTeamId = organizationRootPositions[0]?.teamId ?? null;
-    if (executiveTeamId) return team.parentTeamId === executiveTeamId;
-    return team.parentTeamId === null;
-  });
-
-  const departmentOverview = useMemo(() => {
-    return chartDepartmentTeams.map((team) => {
-      const teamPositions = positions.filter((position) => position.teamId === team.id);
-      const teamPositionIds = new Set(teamPositions.map((position) => position.id));
-      const teamPeopleCount = people.filter(
-        (person) => person.positionId && teamPositionIds.has(person.positionId),
-      ).length;
-      return {
-        teamId: team.id,
-        teamName: team.name,
-        positionCount: teamPositions.length,
-        peopleCount: teamPeopleCount,
-      };
-    });
-  }, [chartDepartmentTeams, positions, people]);
-
   const selectedActionStats = selectedPositionId
     ? positionActionStats.get(selectedPositionId) ?? { open: 0, overdue: 0, blocked: 0 }
     : { open: 0, overdue: 0, blocked: 0 };
@@ -1398,6 +1385,10 @@ useEffect(() => {
   const selectedTeamOwnership = selectedPosition?.teamId
     ? teamOwnershipMap.get(selectedPosition.teamId) ?? null
     : null;
+  const selectedPositionDocument = selectedPositionId
+    ? positionDocuments[selectedPositionId] ?? null
+    : null;
+  const uploadedPositionDocumentCount = Object.keys(positionDocuments).length;
 
 
   async function handleSaveAssignment() {
@@ -1827,19 +1818,18 @@ useEffect(() => {
 
         <main style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           <section style={STYLE.panel}>
-            <div style={STYLE.title}>Organizational Operations Workspace</div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0,1fr))", gap: 10 }}>
-              <div style={{ ...STYLE.panel, padding: 10 }}>
-                <div style={STYLE.subTitle}>Teams</div>
-                <div style={{ fontSize: 20, fontWeight: 800 }}>{teams.length}</div>
-              </div>
+            <div style={STYLE.title}>TeamFrame Workspace</div>
+            <div style={{ fontSize: 12, color: "#475569", marginBottom: 10 }}>
+              Clear, position-first operations for startup teams.
+            </div>
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 10 }}>
               <div style={{ ...STYLE.panel, padding: 10 }}>
                 <div style={STYLE.subTitle}>Positions</div>
                 <div style={{ fontSize: 20, fontWeight: 800 }}>{positions.length}</div>
               </div>
               <div style={{ ...STYLE.panel, padding: 10 }}>
-                <div style={STYLE.subTitle}>People</div>
-                <div style={{ fontSize: 20, fontWeight: 800 }}>{people.length}</div>
+                <div style={STYLE.subTitle}>Filled Seats</div>
+                <div style={{ fontSize: 20, fontWeight: 800 }}>{positionAssignmentById.size}</div>
               </div>
               <div style={{ ...STYLE.panel, padding: 10 }}>
                 <div style={STYLE.subTitle}>Open Actions</div>
@@ -1848,47 +1838,10 @@ useEffect(() => {
                 </div>
               </div>
               <div style={{ ...STYLE.panel, padding: 10 }}>
-                <div style={STYLE.subTitle}>Overdue</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: overdueActions ? "#B91C1C" : "#0F172A" }}>{overdueActions}</div>
-              </div>
-              <div style={{ ...STYLE.panel, padding: 10 }}>
-                <div style={STYLE.subTitle}>Blocked</div>
-                <div style={{ fontSize: 20, fontWeight: 800, color: blockedActions ? "#B45309" : "#0F172A" }}>{blockedActions}</div>
-              </div>
-            </div>
-            <div
-              style={{
-                marginTop: 10,
-                border: "1px solid #BFDBFE",
-                background: "#EFF6FF",
-                borderRadius: 10,
-                padding: "8px 10px",
-                display: "grid",
-                gridTemplateColumns: "repeat(5, minmax(0,1fr))",
-                gap: 8,
-              }}
-            >
-              <div>
-                <div style={{ ...STYLE.subTitle, color: "#1D4ED8" }}>Execution Layer</div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#1E3A8A" }}>V1 Active</div>
-              </div>
-              <div>
-                <div style={{ ...STYLE.subTitle, color: "#1D4ED8" }}>Ownership Resolved</div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#1E3A8A" }}>
-                  {ownershipResolvedCount}/{actions.length || 0}
+                <div style={STYLE.subTitle}>At-Risk Actions</div>
+                <div style={{ fontSize: 20, fontWeight: 800, color: overdueActions + blockedActions > 0 ? "#B91C1C" : "#0F172A" }}>
+                  {overdueActions + blockedActions}
                 </div>
-              </div>
-              <div>
-                <div style={{ ...STYLE.subTitle, color: "#1D4ED8" }}>Assignment Linked</div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#1E3A8A" }}>{assignmentLinkedCount}</div>
-              </div>
-              <div>
-                <div style={{ ...STYLE.subTitle, color: "#1D4ED8" }}>Position Owned</div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#1E3A8A" }}>{positionOwnedCount}</div>
-              </div>
-              <div>
-                <div style={{ ...STYLE.subTitle, color: "#1D4ED8" }}>Person Owned</div>
-                <div style={{ fontSize: 12, fontWeight: 800, color: "#1E3A8A" }}>{personOwnedCount}</div>
               </div>
             </div>
             {error ? (
@@ -1912,105 +1865,17 @@ useEffect(() => {
             <section style={STYLE.panel}>
               <div style={{ ...STYLE.title, fontSize: 17 }}>Organization Builder · Position Node State Machine</div>
               <div style={{ fontSize: 12, color: "#475569", marginBottom: 12 }}>
-                Position is the source of truth. Click any node to manage structure, assignment, and execution context.
+                Click a position node, then manage assignment and position documents from the right panel.
               </div>
 
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "250px minmax(0, 1fr) 350px",
+                  gridTemplateColumns: "minmax(0, 1fr) 350px",
                   gap: 12,
                   alignItems: "start",
                 }}
               >
-                <div
-                  style={{
-                    ...STYLE.panel,
-                    background: "#F8FAFC",
-                    border: "1px solid #D8E0EC",
-                    padding: 12,
-                    position: "sticky",
-                    top: 12,
-                  }}
-                >
-                  <div style={{ ...STYLE.subTitle, marginBottom: 10 }}>Organization Index</div>
-                  <div
-                    style={{
-                      border: "1px solid #DBEAFE",
-                      borderRadius: 10,
-                      padding: "8px 10px",
-                      background: "#EFF6FF",
-                      marginBottom: 10,
-                    }}
-                  >
-                    <div style={{ ...STYLE.subTitle, color: "#1D4ED8", marginBottom: 4 }}>Selected Position</div>
-                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1E3A8A" }}>
-                      {selectedPosition?.title ?? "No position selected"}
-                    </div>
-                    <div style={{ marginTop: 6 }}>
-                      <span
-                        style={{
-                          fontSize: 10,
-                          fontWeight: 700,
-                          borderRadius: 999,
-                          padding: "3px 8px",
-                          background: selectedNodeStateUi.bg,
-                          color: selectedNodeStateUi.color,
-                        }}
-                      >
-                        {selectedNodeStateUi.label}
-                      </span>
-                    </div>
-                    <div style={{ fontSize: 11, color: "#334155", marginTop: 6 }}>
-                      Open {selectedActionStats.open} · Overdue {selectedActionStats.overdue} · Compliance {selectedComplianceAlerts}
-                    </div>
-                  </div>
-
-                  <div
-                    style={{
-                      border: "1px solid #E2E8F0",
-                      borderRadius: 10,
-                      padding: "8px 10px",
-                      background: "#FFFFFF",
-                      marginBottom: 10,
-                    }}
-                  >
-                    <div style={{ fontSize: 11, fontWeight: 700, color: "#0F172A" }}>Subtree Focus</div>
-                    <div style={{ fontSize: 11, color: "#64748B", marginTop: 3 }}>
-                      {focusedSubtreeRootId
-                        ? `Focused on ${positionMap.get(focusedSubtreeRootId)?.title ?? "position"}`
-                        : "Full organization view"}
-                    </div>
-                    {focusedSubtreeRootId ? (
-                      <button style={{ marginTop: 8 }} onClick={() => setFocusedSubtreeRootId(null)}>
-                        Reset full view
-                      </button>
-                    ) : null}
-                  </div>
-
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {departmentOverview.map((team) => (
-                      <div
-                        key={team.teamId}
-                        style={{
-                          border: "1px solid #E2E8F0",
-                          borderRadius: 10,
-                          padding: "8px 10px",
-                          background: "#FFFFFF",
-                        }}
-                      >
-                        <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{team.teamName}</div>
-                        <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
-                          {team.positionCount} positions · {team.peopleCount} assigned
-                        </div>
-                      </div>
-                    ))}
-                    {departmentOverview.length === 0 ? (
-                      <div style={{ fontSize: 11, color: "#64748B" }}>No department structure available.</div>
-                    ) : null}
-                  </div>
-                </div>
-
                 <div
                   style={{
                     ...STYLE.panel,
@@ -2019,12 +1884,40 @@ useEffect(() => {
                     minHeight: 600,
                   }}
                 >
-                  <div style={{ ...STYLE.subTitle, marginBottom: 10 }}>Org Chart Canvas</div>
-                  <div style={{ fontSize: 11, color: "#64748B", marginBottom: 12 }}>
-                    {focusedSubtreeRootId
-                      ? `Focused subtree root: ${positionMap.get(focusedSubtreeRootId)?.title ?? "Unknown"}`
-                      : "Displaying full recursive position tree"}
+                  <div style={{ ...STYLE.subTitle, marginBottom: 8 }}>Org Chart</div>
+                  <div
+                    style={{
+                      marginBottom: 12,
+                      border: "1px solid #DBEAFE",
+                      borderRadius: 10,
+                      background: "#EFF6FF",
+                      padding: "8px 10px",
+                      display: "flex",
+                      flexWrap: "wrap",
+                      gap: 8,
+                      alignItems: "center",
+                      justifyContent: "space-between",
+                    }}
+                  >
+                    <div style={{ fontSize: 11, color: "#1E3A8A" }}>
+                      Selected: <strong>{selectedPosition?.title ?? "No position selected"}</strong> · {selectedNodeStateUi.label}
+                    </div>
+                    <div style={{ display: "flex", gap: 6 }}>
+                      {focusedSubtreeRootId ? (
+                        <button onClick={() => setFocusedSubtreeRootId(null)}>Reset full view</button>
+                      ) : null}
+                      <button
+                        onClick={() => {
+                          if (!selectedPositionId) return;
+                          setFocusedSubtreeRootId(selectedPositionId);
+                        }}
+                        disabled={!selectedPositionId}
+                      >
+                        Focus selected subtree
+                      </button>
+                    </div>
                   </div>
+
                   <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", minHeight: 520 }}>
                     {rootPositions.length === 0 ? (
                       <div style={{ fontSize: 12, color: "#64748B" }}>No positions yet. Create a root position to start.</div>
@@ -2037,7 +1930,7 @@ useEffect(() => {
                 </div>
 
                 <div style={{ ...STYLE.panel, border: "1px solid #D8E0EC", position: "sticky", top: 12 }}>
-                  <div style={{ ...STYLE.subTitle, marginBottom: 8 }}>Position Context Panel</div>
+                  <div style={{ ...STYLE.subTitle, marginBottom: 8 }}>Position Context</div>
                   {!selectedPosition ? (
                     <div style={{ fontSize: 12, color: "#64748B" }}>Select a position from the org chart.</div>
                   ) : (
@@ -2087,50 +1980,67 @@ useEffect(() => {
 
                       {positionPanelTab === "position" ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Job description</label>
-                          <textarea
-                            value={getPositionBlueprint(selectedPosition).jobDescription}
-                            onChange={(event) =>
-                              setPositionBlueprintField(
-                                selectedPosition.id,
-                                "jobDescription",
-                                event.target.value,
-                              )
-                            }
-                            rows={4}
-                            style={{ width: "100%", resize: "vertical" }}
-                          />
+                          <div style={{ fontSize: 11, fontWeight: 700, color: "#334155" }}>
+                            Job Description Document
+                          </div>
+                          {selectedPositionDocument ? (
+                            <div
+                              style={{
+                                border: "1px solid #CBD5E1",
+                                borderRadius: 8,
+                                background: "#F8FAFC",
+                                padding: "8px 10px",
+                              }}
+                            >
+                              <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
+                                {selectedPositionDocument.fileName}
+                              </div>
+                              <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                                Uploaded {formatDateLabel(selectedPositionDocument.uploadedAt)} · {selectedPositionDocument.sizeLabel}
+                              </div>
+                              <button
+                                style={{ marginTop: 8 }}
+                                onClick={() => window.open(selectedPositionDocument.objectUrl, "_blank", "noopener,noreferrer")}
+                              >
+                                Open document
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 11, color: "#64748B" }}>
+                              No job description uploaded for this position yet.
+                            </div>
+                          )}
 
-                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Salary band</label>
                           <input
-                            value={getPositionBlueprint(selectedPosition).salaryBand}
+                            type="file"
+                            accept=".pdf,.doc,.docx,.txt,.md,.html"
                             onChange={(event) =>
-                              setPositionBlueprintField(
+                              handleUploadPositionDocument(
                                 selectedPosition.id,
-                                "salaryBand",
-                                event.target.value,
+                                event.target.files?.[0] ?? null,
                               )
                             }
-                            placeholder="e.g. 40k-55k"
-                            style={{ width: "100%" }}
                           />
 
-                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Role requirements</label>
-                          <textarea
-                            value={getPositionBlueprint(selectedPosition).requirements}
-                            onChange={(event) =>
-                              setPositionBlueprintField(
-                                selectedPosition.id,
-                                "requirements",
-                                event.target.value,
-                              )
-                            }
-                            rows={3}
-                            style={{ width: "100%", resize: "vertical" }}
-                          />
+                          <button
+                            onClick={() => {
+                              const reportingLine = selectedPosition.reportsToPositionId
+                                ? positionMap.get(selectedPosition.reportsToPositionId)?.title ?? selectedPosition.reportsToPositionId
+                                : "N/A";
+                              downloadJobDescriptionTemplate({
+                                positionName: selectedPosition.title,
+                                departmentName: selectedPosition.teamId
+                                  ? teamMap.get(selectedPosition.teamId)?.name ?? "Unassigned"
+                                  : "Unassigned",
+                                reportingLine,
+                              });
+                            }}
+                          >
+                            Download JD template
+                          </button>
 
                           <div style={{ fontSize: 11, color: "#64748B" }}>
-                            Module 1 note: this metadata is held in local session state pending backend fields.
+                            Need branding? Use the Templates module to set company name/logo.
                           </div>
                         </div>
                       ) : null}
@@ -2212,13 +2122,10 @@ useEffect(() => {
                       {positionPanelTab === "operations" ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           <div style={{ fontSize: 11, color: "#334155" }}>
-                            Actions open: <strong>{selectedActionStats.open}</strong>
+                            Open actions: <strong>{selectedActionStats.open}</strong>
                           </div>
                           <div style={{ fontSize: 11, color: "#334155" }}>
                             Overdue actions: <strong>{selectedActionStats.overdue}</strong>
-                          </div>
-                          <div style={{ fontSize: 11, color: "#334155" }}>
-                            Blocked actions: <strong>{selectedActionStats.blocked}</strong>
                           </div>
                           <div style={{ fontSize: 11, color: "#334155" }}>
                             Compliance alerts: <strong>{selectedComplianceAlerts}</strong>
@@ -2253,9 +2160,7 @@ useEffect(() => {
                             >
                               Create linked action
                             </button>
-                            <button onClick={() => setFocusedSubtreeRootId(selectedPosition.id)}>
-                              Focus subtree
-                            </button>
+                            <button onClick={() => setActiveNav("templates")}>Open templates</button>
                           </div>
                         </div>
                       ) : null}
@@ -2412,7 +2317,7 @@ useEffect(() => {
                     </div>
 
                     <div style={{ fontSize: 11, color: "#64748B" }}>
-                      Use the node quick actions or Assignment tab for reassignments.
+                      Use the Assignment tab to reassign employees between positions.
                     </div>
                   </div>
                 </div>
@@ -2475,6 +2380,103 @@ useEffect(() => {
                   </div>
                 ))}
                 {actions.length === 0 ? <div style={{ fontSize: 12, color: "#64748B" }}>No actions yet.</div> : null}
+              </div>
+            </section>
+          )}
+
+          {activeNav === "templates" && (
+            <section style={STYLE.panel}>
+              <div style={{ ...STYLE.title, fontSize: 17 }}>Templates · Job Description</div>
+              <div style={{ fontSize: 12, color: "#475569", marginBottom: 12 }}>
+                Download the standard job description template, fill it, then upload it inside each position.
+              </div>
+
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+                <div style={STYLE.panel}>
+                  <div style={STYLE.subTitle}>Template Branding</div>
+                  <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Company name</label>
+                  <input
+                    value={templateCompanyName}
+                    onChange={(event) => setTemplateCompanyName(event.target.value)}
+                    placeholder="Company name"
+                    style={{ width: "100%", marginBottom: 8 }}
+                  />
+
+                  <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Company logo (optional)</label>
+                  <input
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    onChange={(event) => handleTemplateLogoUpload(event.target.files?.[0] ?? null)}
+                    style={{ width: "100%", marginBottom: 8 }}
+                  />
+                  {templateLogoName ? (
+                    <div style={{ fontSize: 11, color: "#475569", marginBottom: 8 }}>Loaded logo: {templateLogoName}</div>
+                  ) : null}
+
+                  <button onClick={() => downloadJobDescriptionTemplate()}>Download JD Template</button>
+                </div>
+
+                <div style={STYLE.panel}>
+                  <div style={STYLE.subTitle}>Required Fields</div>
+                  <ul style={{ margin: 0, paddingLeft: 18, fontSize: 12, color: "#334155", lineHeight: 1.7 }}>
+                    <li>Name of position</li>
+                    <li>Department</li>
+                    <li>Reporting line</li>
+                    <li>Location</li>
+                    <li>Date prepared</li>
+                    <li>Objective</li>
+                    <li>Key responsibilities</li>
+                    <li>KPIs</li>
+                    <li>Signed by MANAGER + Acknowledged by EMPLOYEE</li>
+                  </ul>
+                </div>
+              </div>
+
+              <div style={{ ...STYLE.panel, marginTop: 12 }}>
+                <div style={STYLE.subTitle}>Uploaded Position Documents</div>
+                <div style={{ fontSize: 12, color: "#475569", marginBottom: 8 }}>
+                  {uploadedPositionDocumentCount} positions currently have a job description document.
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                  {positions
+                    .filter((position) => Boolean(positionDocuments[position.id]))
+                    .map((position) => {
+                      const doc = positionDocuments[position.id];
+                      if (!doc) return null;
+                      return (
+                        <div
+                          key={position.id}
+                          style={{
+                            border: "1px solid #E5E7EB",
+                            borderRadius: 8,
+                            padding: "8px 10px",
+                            background: "#F8FAFC",
+                            display: "flex",
+                            justifyContent: "space-between",
+                            alignItems: "center",
+                            gap: 8,
+                          }}
+                        >
+                          <div>
+                            <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{position.title}</div>
+                            <div style={{ fontSize: 11, color: "#64748B" }}>
+                              {doc.fileName} · {doc.sizeLabel} · Uploaded {formatDateLabel(doc.uploadedAt)}
+                            </div>
+                          </div>
+                          <button
+                            onClick={() => window.open(doc.objectUrl, "_blank", "noopener,noreferrer")}
+                          >
+                            Open
+                          </button>
+                        </div>
+                      );
+                    })}
+                  {uploadedPositionDocumentCount === 0 ? (
+                    <div style={{ fontSize: 12, color: "#64748B" }}>
+                      No uploaded documents yet. Go to Org Chart and upload inside a position.
+                    </div>
+                  ) : null}
+                </div>
               </div>
             </section>
           )}
