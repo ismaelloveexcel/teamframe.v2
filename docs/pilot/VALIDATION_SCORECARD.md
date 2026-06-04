@@ -2,6 +2,7 @@
 
 Purpose: produce decision-grade evidence after each pilot session.  
 Rule: this is a dataset artifact, not meeting notes.
+Normalization rule: all metrics must remain comparable across pilots. Do not modify metric definitions between sessions. Any metric change requires a scorecard schema version increment.
 
 ---
 

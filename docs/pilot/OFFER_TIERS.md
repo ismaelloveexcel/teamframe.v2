@@ -69,6 +69,9 @@ Standard response when pressured outside scope:
 
 ## Selection logic
 
+Default rule:
+- Start with Tier A unless an explicit operational rollout dependency is identified.
+
 Use Tier A when:
 - client has internal operator capacity
 - needs immediate product access

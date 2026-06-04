@@ -25,6 +25,9 @@ Current symptoms observed at [company_name]:
 - [symptom_2]
 - [symptom_3]
 
+Primary pilot hypothesis:
+- organizational execution clarity is currently fragmented due to lack of explicit ownership mapping across structure nodes.
+
 ---
 
 ## Section 2 — What this system does

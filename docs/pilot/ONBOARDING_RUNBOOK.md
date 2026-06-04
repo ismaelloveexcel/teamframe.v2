@@ -61,6 +61,7 @@ Operator actions:
 2. Enforce hard constraints on every action:
    - owner assigned
    - structural link attached (team, position, or person)
+   - mapped to an owned node confirmed in Step 2 (no new ownership introduced at this stage)
 3. Ensure at least 2 actions are urgent/overdue simulated.
 
 Completion check:
