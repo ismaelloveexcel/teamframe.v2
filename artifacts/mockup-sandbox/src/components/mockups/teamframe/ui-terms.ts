@@ -1,0 +1,106 @@
+export const UI_TERMS = {
+  entities: {
+    person: "Person",
+    position: "Position",
+    assignment: "Assignment",
+    openRole: "Open role",
+    needsAttention: "Needs attention",
+  },
+  nav: {
+    orgChart: "Org Chart",
+    actions: "Actions",
+    team: "Team",
+    policies: "Policies",
+    templates: "Templates",
+    administration: "Administration",
+  },
+  panel: {
+    positionPanel: "Position panel",
+    tabs: {
+      position: "Position",
+      assignment: "Assignment",
+      documents: "Documents",
+    },
+    fields: {
+      position: "Position",
+      reportsTo: "Reports to",
+      department: "Department",
+      status: "Status",
+      notes: "Notes (optional)",
+      assignmentType: "Assignment type",
+      startDate: "Start date",
+      endDate: "End date",
+      roleDescription: "Role description",
+      keyResponsibilities: "Key responsibilities",
+      kpis: "KPIs",
+      signatureStatus: "Signature status",
+    },
+  },
+  actions: {
+    prompts: {
+      whatNeedsToBeDone: "What needs to be done?",
+      whoIsResponsible: "Who is responsible?",
+      whereDoesThisBelong: "Where does this belong?",
+    },
+    empty: "No actions yet for this position.",
+    states: {
+      open: "Open",
+      inProgress: "In progress",
+      done: "Done",
+    },
+  },
+  assignmentStates: {
+    active: "Active assignment",
+    scheduled: "Starts on date",
+    ended: "Ended assignment",
+  },
+  documents: {
+    upload: "Upload role description",
+    empty: "No role document uploaded yet.",
+    downloadTemplate: "Download Job Description (.doc)",
+    states: {
+      draft: "Draft",
+      inReview: "In review",
+      signed: "Signed",
+      outdated: "Outdated",
+    },
+  },
+  warnings: {
+    noReportingLine: "This position has no reporting line.",
+    structureUpdated: "This change will update the org structure.",
+    currentlyUnassigned: "This position is currently unassigned.",
+  },
+  errors: {
+    selectPersonToAssign: "Select a person to assign.",
+    selectResponsibleOwner: "Select a responsible person or position.",
+    actionNeedsLink: "This action must be linked to a position or assignment.",
+    actionActiveOwner: "This action already has an active owner.",
+    localDemoReadonly: "Local demo snapshot is read-only. Start API mode to persist changes.",
+    cannotUpdateStructure: "Could not update structure. Try again.",
+    changesNotSaved: "Changes not saved.",
+    connectionLostRetrying: "Connection lost. Retrying...",
+  },
+  feedback: {
+    success: {
+      positionCreated: "Position created",
+      assignmentUpdated: "Assignment updated",
+      structureUpdated: "Structure updated",
+      actionCreated: "Action created",
+      personAssigned: "Person assigned",
+      assignmentEnded: "Assignment ended",
+      positionVacated: "Position vacated",
+      reportingLineUpdated: "Reporting line updated",
+    },
+    loading: {
+      updatingStructure: "Updating structure...",
+      savingAssignment: "Saving assignment...",
+      syncingChanges: "Syncing changes...",
+    },
+    hover: {
+      viewDetails: "View details",
+      addRelatedPosition: "Add related position",
+      createAction: "Create action",
+    },
+  },
+} as const;
+

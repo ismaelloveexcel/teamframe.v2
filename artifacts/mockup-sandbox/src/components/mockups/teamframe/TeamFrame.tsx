@@ -31,6 +31,7 @@ import {
   setBaseUrl,
   transitionActionStatus,
   updatePerson,
+  updatePosition,
   type Action,
   type Person,
   type Policy,
@@ -39,6 +40,7 @@ import {
   type Team,
   type TeamOwnership,
 } from "@workspace/api-client-react";
+import { UI_TERMS } from "./ui-terms";
 
 type NavId = "org" | "actions" | "team" | "policies" | "templates" | "administration";
 type OwnerType = "person" | "position";
@@ -47,12 +49,12 @@ type PositionPanelTab = "position" | "assignment" | "documents";
 type AssignmentRuntimeStatus = "active" | "scheduled" | "ended";
 
 const NAV_ITEMS: Array<{ id: NavId; label: string }> = [
-  { id: "org", label: "Org Chart" },
-  { id: "actions", label: "Actions" },
-  { id: "team", label: "Team" },
-  { id: "policies", label: "Policies" },
-  { id: "templates", label: "Templates" },
-  { id: "administration", label: "Administration" },
+  { id: "org", label: UI_TERMS.nav.orgChart },
+  { id: "actions", label: UI_TERMS.nav.actions },
+  { id: "team", label: UI_TERMS.nav.team },
+  { id: "policies", label: UI_TERMS.nav.policies },
+  { id: "templates", label: UI_TERMS.nav.templates },
+  { id: "administration", label: UI_TERMS.nav.administration },
 ];
 
 const ACTOR = {
@@ -73,7 +75,7 @@ const STYLE = {
     margin: "0 auto",
     padding: 20,
     display: "grid",
-    gridTemplateColumns: "240px 1fr",
+    gridTemplateColumns: "192px 1fr",
     gap: 16,
   } as const,
   sidebar: {
@@ -193,6 +195,91 @@ type UploadedPositionDocument = {
 };
 
 type PositionNodeComputedState = "filled" | "vacant" | "needs_attention";
+
+type OrgCardForbiddenFields = {
+  dates?: never;
+  assignmentType?: never;
+  documents?: never;
+  notes?: never;
+  signatures?: never;
+  kpis?: never;
+};
+
+type OrgCardContract = OrgCardForbiddenFields & {
+  department: string;
+  positionTitle: string;
+  personLine: string;
+  statusLabel: string;
+  statusBg: string;
+  statusColor: string;
+  isSelected: boolean;
+  isRoot: boolean;
+  onSelect: () => void;
+};
+
+function OrgChartNodeCard(props: OrgCardContract) {
+  if (import.meta.env.DEV) {
+    const forbiddenFields = ["dates", "kpis", "documents", "notes", "signatures"] as const;
+    for (const field of forbiddenFields) {
+      if ((props as Record<string, unknown>)[field] !== undefined) {
+        console.warn(`Org card contract violation: ${field} is forbidden.`);
+      }
+    }
+  }
+
+  const {
+    department,
+    positionTitle,
+    personLine,
+    statusLabel,
+    statusBg,
+    statusColor,
+    isSelected,
+    isRoot,
+    onSelect,
+  } = props;
+
+  return (
+    <button
+      type="button"
+      title={UI_TERMS.feedback.hover.viewDetails}
+      onClick={onSelect}
+      style={{
+        width: "100%",
+        maxWidth: isRoot ? 300 : 266,
+        border: `1px solid ${isSelected ? "#2563EB" : "#D1D5DB"}`,
+        borderRadius: 12,
+        padding: isRoot ? 12 : 10,
+        background: "#FFFFFF",
+        boxShadow: isSelected ? "0 0 0 2px rgba(37,99,235,0.18), 0 8px 18px rgba(15,23,42,0.12)" : "none",
+        textAlign: "left",
+        cursor: "pointer",
+      }}
+    >
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <span style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", fontWeight: 700 }}>
+          {department}
+        </span>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            borderRadius: 999,
+            padding: "2px 7px",
+            background: statusBg,
+            color: statusColor,
+          }}
+        >
+          {statusLabel}
+        </span>
+      </div>
+      <div style={{ fontSize: isRoot ? 14 : 13, fontWeight: 700, color: "#0F172A", marginBottom: 4 }}>
+        {positionTitle}
+      </div>
+      <div style={{ fontSize: 11, color: "#475569" }}>{personLine}</div>
+    </button>
+  );
+}
 
 const LOCAL_DEMO_STATE: LocalDemoState = {
   organizationId: "00000000-0000-4000-8000-000000000111",
@@ -608,6 +695,12 @@ export function TeamFrame() {
   const [demoResetSummary, setDemoResetSummary] = useState<string>("");
   const [isLocalDemoMode, setIsLocalDemoMode] = useState(false);
   const [focusPositionId, setFocusPositionId] = useState<string | null>(null);
+  const [hoveredPositionId, setHoveredPositionId] = useState<string | null>(null);
+
+  const [mutationStatusText, setMutationStatusText] = useState<string | null>(null);
+  const [feedbackToast, setFeedbackToast] = useState<
+    { message: string; tone: "success" | "error" | "info" } | null
+  >(null);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -1082,6 +1175,14 @@ export function TeamFrame() {
   }
 
   useEffect(() => {
+    if (!feedbackToast) return;
+    const timeoutId = window.setTimeout(() => {
+      setFeedbackToast(null);
+    }, 2600);
+    return () => window.clearTimeout(timeoutId);
+  }, [feedbackToast]);
+
+  useEffect(() => {
     const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
     setBaseUrl(apiBase ? apiBase : null);
 
@@ -1110,22 +1211,184 @@ export function TeamFrame() {
     };
   }, []);
 
-  async function runMutation(task: () => Promise<void>) {
+  async function runMutation(
+    task: () => Promise<void>,
+    options?: {
+      successMessage?: string;
+      loadingMessage?: string;
+      failureMessage?: string;
+    },
+  ) {
     if (isLocalDemoMode) {
-      setError("Local demo snapshot is read-only. Start API mode to persist changes.");
+      setError(UI_TERMS.errors.localDemoReadonly);
+      setFeedbackToast({ message: UI_TERMS.errors.changesNotSaved, tone: "error" });
       return;
     }
 
     setBusy(true);
     setError(null);
+    setMutationStatusText(options?.loadingMessage ?? UI_TERMS.feedback.loading.syncingChanges);
     try {
       await task();
       await refreshState();
+      if (options?.successMessage) {
+        setFeedbackToast({ message: options.successMessage, tone: "success" });
+      }
     } catch (error) {
-      setError(error instanceof Error ? error.message : String(error));
+      const message = error instanceof Error ? error.message : String(error);
+      setError(message);
+      setFeedbackToast({
+        message: options?.failureMessage ?? UI_TERMS.errors.cannotUpdateStructure,
+        tone: "error",
+      });
     } finally {
       setBusy(false);
+      setMutationStatusText(null);
     }
+  }
+
+  async function handleQuickInsertPosition(
+    mode: "above" | "below" | "parallel",
+    targetPositionId: string,
+  ) {
+    if (!organizationId) return;
+    const target = positionMap.get(targetPositionId);
+    if (!target) return;
+
+    const suggestedTitle =
+      mode === "above"
+        ? `New ${UI_TERMS.entities.position} Above`
+        : mode === "parallel"
+          ? `New ${UI_TERMS.entities.position} Parallel`
+          : `New ${UI_TERMS.entities.position} Below`;
+
+    const title = window.prompt("Position title is required", suggestedTitle)?.trim();
+    if (!title) {
+      setError("Position title is required");
+      return;
+    }
+
+    let reportsToPositionId: string | null = null;
+    if (mode === "below") reportsToPositionId = target.id;
+    if (mode === "parallel") reportsToPositionId = target.reportsToPositionId ?? null;
+    if (mode === "above") reportsToPositionId = target.reportsToPositionId ?? null;
+
+    await runMutation(
+      async () => {
+        const inserted = await executeApiCall("Create position", (options) =>
+          createPosition(
+            organizationId,
+            {
+              title,
+              teamId: target.teamId ?? undefined,
+              reportsToPositionId: reportsToPositionId ?? undefined,
+              lifecycleStatus: PositionLifecycleStatus.vacant,
+            },
+            options,
+          ),
+        );
+
+        if (mode === "above") {
+          await executeApiCall("Rewire reporting line", (options) =>
+            updatePosition(
+              organizationId,
+              target.id,
+              {
+                reportsToPositionId: inserted.id,
+              },
+              options,
+            ),
+          );
+        }
+
+        setFocusPositionId(inserted.id);
+        setPositionPanelTab("position");
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.updatingStructure,
+        successMessage:
+          mode === "above"
+            ? "Position inserted above"
+            : mode === "parallel"
+              ? "Position inserted alongside"
+              : "Position inserted below",
+        failureMessage: UI_TERMS.errors.cannotUpdateStructure,
+      },
+    );
+  }
+
+  async function handleUpdateReportingLine(positionId: string) {
+    if (!organizationId) return;
+    const position = positionMap.get(positionId);
+    if (!position) return;
+
+    const optionsText = positions
+      .filter((candidate) => candidate.id !== positionId)
+      .map((candidate) => `${candidate.id.slice(0, 8)} — ${candidate.title}`)
+      .join("\n");
+    const promptText = `Set reports-to position ID prefix. Leave blank for root.\n\n${optionsText}`;
+    const response = window.prompt(promptText, position.reportsToPositionId ?? "");
+    if (response === null) return;
+
+    const normalized = response.trim();
+    if (!normalized) {
+      await runMutation(
+        async () => {
+          await executeApiCall("Set root reporting line", (requestOptions) =>
+            updatePosition(
+              organizationId,
+              positionId,
+              {
+                reportsToPositionId: null,
+              },
+              requestOptions,
+            ),
+          );
+        },
+        {
+          loadingMessage: UI_TERMS.feedback.loading.updatingStructure,
+          successMessage: UI_TERMS.feedback.success.reportingLineUpdated,
+          failureMessage: UI_TERMS.errors.cannotUpdateStructure,
+        },
+      );
+      return;
+    }
+
+    const nextManager = positions.find((candidate) => candidate.id.startsWith(normalized));
+    if (!nextManager || nextManager.id === positionId) {
+      setError(UI_TERMS.errors.cannotUpdateStructure);
+      return;
+    }
+
+    // Prevent loops by checking if the target manager reports into this position.
+    let cursor: Position | undefined = nextManager;
+    while (cursor?.reportsToPositionId) {
+      if (cursor.reportsToPositionId === positionId) {
+        setError(UI_TERMS.errors.cannotUpdateStructure);
+        return;
+      }
+      cursor = positionMap.get(cursor.reportsToPositionId);
+    }
+
+    await runMutation(
+      async () => {
+        await executeApiCall("Update reporting line", (requestOptions) =>
+          updatePosition(
+            organizationId,
+            positionId,
+            {
+              reportsToPositionId: nextManager.id,
+            },
+            requestOptions,
+          ),
+        );
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.updatingStructure,
+        successMessage: UI_TERMS.feedback.success.reportingLineUpdated,
+        failureMessage: UI_TERMS.errors.cannotUpdateStructure,
+      },
+    );
   }
 
   function ownerLabel(ownerPersonId?: string | null, ownerPositionId?: string | null): string {
@@ -1137,7 +1400,7 @@ export function TeamFrame() {
       const position = positionMap.get(ownerPositionId);
       return position ? position.title : ownerPositionId;
     }
-    return "Unassigned";
+    return "Not set";
   }
 
   function linkLabel(action: Action): string {
@@ -1150,17 +1413,24 @@ export function TeamFrame() {
   }
 
   function actionStatusLabel(status: ActionStatus): string {
-    if (status === ActionStatus.in_progress) return "In progress";
-    if (status === ActionStatus.done) return "Done";
-    return "Open";
+    if (status === ActionStatus.in_progress) return UI_TERMS.actions.states.inProgress;
+    if (status === ActionStatus.done) return UI_TERMS.actions.states.done;
+    return UI_TERMS.actions.states.open;
+  }
+
+  function documentStateLabel(state: UploadedPositionDocument["state"]): string {
+    if (state === "in_review") return UI_TERMS.documents.states.inReview;
+    if (state === "signed") return UI_TERMS.documents.states.signed;
+    if (state === "outdated") return UI_TERMS.documents.states.outdated;
+    return UI_TERMS.documents.states.draft;
   }
 
   function statePresentation(state: PositionNodeComputedState) {
     if (state === "vacant") {
-      return { label: "Open", bg: "#F1F5F9", color: "#334155", border: "#CBD5E1" };
+      return { label: UI_TERMS.actions.states.open, bg: "#F1F5F9", color: "#334155", border: "#CBD5E1" };
     }
     if (state === "needs_attention") {
-      return { label: "Needs attention", bg: "#FEF3C7", color: "#92400E", border: "#F59E0B" };
+      return { label: UI_TERMS.entities.needsAttention, bg: "#FEF3C7", color: "#92400E", border: "#F59E0B" };
     }
     return { label: "Active", bg: "#DCFCE7", color: "#166534", border: "#22C55E" };
   }
@@ -1172,68 +1442,113 @@ export function TeamFrame() {
     const assignment = positionAssignmentById.get(positionId);
     const assignedPerson = assignment?.person ?? null;
     const children = positionsByManager.get(positionId) ?? [];
+    const depth = positionDepthMap.get(positionId) ?? 2;
+    const isRoot = depth === 0;
     const visibleChildren = children;
-    const teamName = position.teamId ? teamMap.get(position.teamId)?.name ?? "Unassigned" : "Unassigned";
+    const teamName = position.teamId ? teamMap.get(position.teamId)?.name ?? "Not set" : "Not set";
     const nodeState = resolvePositionNodeState(positionId);
     const stateUi = statePresentation(nodeState);
     const isSelected = selectedPositionId === positionId;
+    const showHoverActions = hoveredPositionId === positionId;
+
+    const cardProps = {
+      department: teamName,
+      positionTitle: position.title,
+      personLine:
+        nodeState === "needs_attention"
+          ? UI_TERMS.entities.needsAttention
+          : assignedPerson?.fullName ?? UI_TERMS.entities.openRole,
+      statusLabel: stateUi.label,
+      statusBg: stateUi.bg,
+      statusColor: stateUi.color,
+      isSelected,
+      isRoot,
+      onSelect: () => {
+        setFocusPositionId(positionId);
+        setPositionPanelTab("position");
+      },
+    } satisfies OrgCardContract;
 
     return (
       <div
         key={positionId}
-        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, minWidth: 240 }}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: isRoot ? 24 : depth === 1 ? 20 : 16,
+          minWidth: isRoot ? 280 : 230,
+        }}
       >
-        <button
-          type="button"
-          title="View details"
-          onClick={() => {
-            setFocusPositionId(positionId);
-            setPositionPanelTab("position");
-          }}
-          style={{
-            width: "100%",
-            maxWidth: 270,
-            border: `1px solid ${isSelected ? "#2563EB" : "#D1D5DB"}`,
-            borderRadius: 12,
-            padding: 10,
-            background: "#FFFFFF",
-            boxShadow: isSelected ? "0 0 0 1px rgba(37,99,235,0.15)" : "none",
-            textAlign: "left",
-            cursor: "pointer",
-          }}
+        <div
+          style={{ position: "relative", width: "100%", maxWidth: isRoot ? 300 : 266 }}
+          onMouseEnter={() => setHoveredPositionId(positionId)}
+          onMouseLeave={() => setHoveredPositionId((current) => (current === positionId ? null : current))}
         >
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
-            <span style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", fontWeight: 700 }}>{teamName}</span>
-            <span
+          <OrgChartNodeCard {...cardProps} />
+          {showHoverActions ? (
+            <div
               style={{
-                fontSize: 10,
-                fontWeight: 700,
+                position: "absolute",
+                left: "50%",
+                transform: "translateX(-50%)",
+                top: "calc(100% + 6px)",
+                background: "#FFFFFF",
+                border: "1px solid #E2E8F0",
                 borderRadius: 999,
-                padding: "2px 7px",
-                background: stateUi.bg,
-                color: stateUi.color,
+                boxShadow: "0 6px 14px rgba(15, 23, 42, 0.12)",
+                padding: "4px 6px",
+                display: "flex",
+                gap: 4,
+                zIndex: 3,
               }}
             >
-              {stateUi.label}
-            </span>
-          </div>
-
-          <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 4 }}>{position.title}</div>
-          <div style={{ fontSize: 11, color: "#475569" }}>
-            {nodeState === "needs_attention" ? "Needs attention" : assignedPerson ? assignedPerson.fullName : "Open role"}
-          </div>
-        </button>
+              <button
+                style={{ fontSize: 10, padding: "2px 6px" }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  cardProps.onSelect();
+                }}
+                title={UI_TERMS.feedback.hover.viewDetails}
+              >
+                View details
+              </button>
+              <button
+                style={{ fontSize: 10, padding: "2px 6px" }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  void handleQuickInsertPosition("below", positionId);
+                }}
+                title={UI_TERMS.feedback.hover.addRelatedPosition}
+              >
+                Add related position
+              </button>
+              <button
+                style={{ fontSize: 10, padding: "2px 6px" }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setActiveNav("actions");
+                  setNewActionOwnerId(positionId);
+                  setNewActionLinkId(positionId);
+                }}
+                title={UI_TERMS.feedback.hover.createAction}
+              >
+                Create action
+              </button>
+            </div>
+          ) : null}
+        </div>
 
         {visibleChildren.length > 0 ? (
           <>
-            <div style={{ width: 1, height: 14, background: "#CBD5E1" }} />
+            <div style={{ width: 1, height: isRoot ? 24 : 18, background: "#CBD5E1" }} />
             <div
               style={{
                 display: "flex",
                 flexWrap: "wrap",
                 justifyContent: "center",
                 alignItems: "flex-start",
-                gap: 14,
+                gap: depth === 0 ? 18 : 14,
               }}
             >
               {visibleChildren.map((child) => renderPositionNode(child.id))}
@@ -1267,49 +1582,56 @@ export function TeamFrame() {
 
     const selectedEmployee = personMap.get(assignmentDraftEmployeeId);
     if (!selectedEmployee) {
-      setError("Select a person to assign.");
+      setError(UI_TERMS.errors.selectPersonToAssign);
       return;
     }
 
-    await runMutation(async () => {
-      const currentOccupant = positionAssignmentById.get(selectedPositionId)?.person;
-      if (currentOccupant && currentOccupant.id !== assignmentDraftEmployeeId) {
-        await executeApiCall("Unassign current occupant", (options) =>
-          updatePerson(
-            organizationId,
-            currentOccupant.id,
-            {
-              positionId: null,
-            },
-            options,
-          ),
-        );
-      }
+    await runMutation(
+      async () => {
+        const currentOccupant = positionAssignmentById.get(selectedPositionId)?.person;
+        if (currentOccupant && currentOccupant.id !== assignmentDraftEmployeeId) {
+          await executeApiCall("Unassign current occupant", (options) =>
+            updatePerson(
+              organizationId,
+              currentOccupant.id,
+              {
+                positionId: null,
+              },
+              options,
+            ),
+          );
+        }
 
-      if (selectedEmployee.positionId && selectedEmployee.positionId !== selectedPositionId) {
-        await executeApiCall("Clear person previous assignment", (options) =>
+        if (selectedEmployee.positionId && selectedEmployee.positionId !== selectedPositionId) {
+          await executeApiCall("Clear person previous assignment", (options) =>
+            updatePerson(
+              organizationId,
+              selectedEmployee.id,
+              {
+                positionId: null,
+              },
+              options,
+            ),
+          );
+        }
+
+        await executeApiCall("Assign person to position", (options) =>
           updatePerson(
             organizationId,
             selectedEmployee.id,
             {
-              positionId: null,
+              positionId: selectedPositionId,
             },
             options,
           ),
         );
-      }
-
-      await executeApiCall("Assign person to position", (options) =>
-        updatePerson(
-          organizationId,
-          selectedEmployee.id,
-          {
-            positionId: selectedPositionId,
-          },
-          options,
-        ),
-      );
-    });
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.savingAssignment,
+        successMessage: UI_TERMS.feedback.success.assignmentUpdated,
+        failureMessage: UI_TERMS.errors.changesNotSaved,
+      },
+    );
 
     setAssignmentRuntimeByPosition((current) => ({
       ...current,
@@ -1327,18 +1649,25 @@ export function TeamFrame() {
     const occupant = positionAssignmentById.get(selectedPositionId)?.person;
     if (!occupant) return;
 
-    await runMutation(async () => {
-      await executeApiCall("Vacate position", (options) =>
-        updatePerson(
-          organizationId,
-          occupant.id,
-          {
-            positionId: null,
-          },
-          options,
-        ),
-      );
-    });
+    await runMutation(
+      async () => {
+        await executeApiCall("Vacate position", (options) =>
+          updatePerson(
+            organizationId,
+            occupant.id,
+            {
+              positionId: null,
+            },
+            options,
+          ),
+        );
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.savingAssignment,
+        successMessage: UI_TERMS.feedback.success.assignmentEnded,
+        failureMessage: UI_TERMS.errors.changesNotSaved,
+      },
+    );
 
     setAssignmentRuntimeByPosition((current) => ({
       ...current,
@@ -1353,65 +1682,84 @@ export function TeamFrame() {
 
   async function handleCreateTeam() {
     if (!organizationId || !newTeamName.trim()) return;
-    await runMutation(async () => {
-      await executeApiCall("Create team", (options) =>
-        createTeam(
-          organizationId,
-          {
-            name: newTeamName.trim(),
-            parentTeamId: newTeamParentId || undefined,
-          },
-          options,
-        ),
-      );
-      setNewTeamName("");
-      setNewTeamParentId("");
-    });
+    await runMutation(
+      async () => {
+        await executeApiCall("Create team", (options) =>
+          createTeam(
+            organizationId,
+            {
+              name: newTeamName.trim(),
+              parentTeamId: newTeamParentId || undefined,
+            },
+            options,
+          ),
+        );
+        setNewTeamName("");
+        setNewTeamParentId("");
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.updatingStructure,
+        successMessage: UI_TERMS.feedback.success.structureUpdated,
+      },
+    );
   }
 
   async function handleCreatePosition() {
     if (!organizationId || !newPositionTitle.trim()) return;
-    await runMutation(async () => {
-      await executeApiCall("Create position", (options) =>
-        createPosition(
-          organizationId,
-          {
-            title: newPositionTitle.trim(),
-            teamId: newPositionTeamId || undefined,
-            reportsToPositionId: newPositionReportsToId || undefined,
-            lifecycleStatus: PositionLifecycleStatus.vacant,
-          },
-          options,
-        ),
-      );
-      setNewPositionTitle("");
-      setNewPositionTeamId("");
-      setNewPositionReportsToId("");
-    });
+    await runMutation(
+      async () => {
+        await executeApiCall("Create position", (options) =>
+          createPosition(
+            organizationId,
+            {
+              title: newPositionTitle.trim(),
+              teamId: newPositionTeamId || undefined,
+              reportsToPositionId: newPositionReportsToId || undefined,
+              lifecycleStatus: PositionLifecycleStatus.vacant,
+            },
+            options,
+          ),
+        );
+        setNewPositionTitle("");
+        setNewPositionTeamId("");
+        setNewPositionReportsToId("");
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.updatingStructure,
+        successMessage: UI_TERMS.feedback.success.positionCreated,
+        failureMessage: UI_TERMS.errors.cannotUpdateStructure,
+      },
+    );
   }
 
   async function handleCreatePerson() {
     if (!organizationId || !newPersonName.trim()) return;
-    await runMutation(async () => {
-      await executeApiCall("Create person", (options) =>
-        createPerson(
-          organizationId,
-          {
-            fullName: newPersonName.trim(),
-            email: newPersonEmail || undefined,
-            phone: newPersonPhone || undefined,
-            positionId: newPersonPositionId || undefined,
-            employmentStatus: newPersonStatus,
-          },
-          options,
-        ),
-      );
-      setNewPersonName("");
-      setNewPersonEmail("");
-      setNewPersonPhone("");
-      setNewPersonPositionId("");
-      setNewPersonStatus(EmploymentStatus.active);
-    });
+    await runMutation(
+      async () => {
+        await executeApiCall("Create person", (options) =>
+          createPerson(
+            organizationId,
+            {
+              fullName: newPersonName.trim(),
+              email: newPersonEmail || undefined,
+              phone: newPersonPhone || undefined,
+              positionId: newPersonPositionId || undefined,
+              employmentStatus: newPersonStatus,
+            },
+            options,
+          ),
+        );
+        setNewPersonName("");
+        setNewPersonEmail("");
+        setNewPersonPhone("");
+        setNewPersonPositionId("");
+        setNewPersonStatus(EmploymentStatus.active);
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.syncingChanges,
+        successMessage: UI_TERMS.feedback.success.structureUpdated,
+      },
+    );
   }
 
   async function handleAssignTeamOwnership() {
@@ -1457,43 +1805,61 @@ export function TeamFrame() {
   async function handleCreateAction() {
     if (!organizationId) return;
     if (!newActionTitle.trim()) {
-      setError("What needs to be done?");
+      setError(UI_TERMS.actions.prompts.whatNeedsToBeDone);
       return;
     }
     if (!newActionOwnerId) {
-      setError("Select a responsible person or position.");
+      setError(UI_TERMS.errors.selectResponsibleOwner);
       return;
     }
     if (!newActionLinkId) {
-      setError("This action must be linked to a position or assignment.");
+      setError(UI_TERMS.errors.actionNeedsLink);
+      return;
+    }
+    if (
+      actions.some(
+        (item) =>
+          item.ownerPositionId === newActionOwnerId &&
+          item.positionId === newActionLinkId &&
+          item.status !== ActionStatus.done,
+      )
+    ) {
+      setError(UI_TERMS.errors.actionActiveOwner);
       return;
     }
 
-    await runMutation(async () => {
-      await executeApiCall("Create action", (options) =>
-        createAction(
-          organizationId,
-          {
-            title: newActionTitle.trim(),
-            dueDate: newActionDueDate || undefined,
-            owner: {
-              ownerPersonId: null,
-              ownerPositionId: newActionOwnerId,
+    await runMutation(
+      async () => {
+        await executeApiCall("Create action", (options) =>
+          createAction(
+            organizationId,
+            {
+              title: newActionTitle.trim(),
+              dueDate: newActionDueDate || undefined,
+              owner: {
+                ownerPersonId: null,
+                ownerPositionId: newActionOwnerId,
+              },
+              link: {
+                teamId: null,
+                positionId: newActionLinkId,
+                personId: null,
+              },
             },
-            link: {
-              teamId: null,
-              positionId: newActionLinkId,
-              personId: null,
-            },
-          },
-          options,
-        ),
-      );
-      setNewActionTitle("");
-      setNewActionDueDate("");
-      setNewActionOwnerId("");
-      setNewActionLinkId("");
-    });
+            options,
+          ),
+        );
+        setNewActionTitle("");
+        setNewActionDueDate("");
+        setNewActionOwnerId("");
+        setNewActionLinkId("");
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.syncingChanges,
+        successMessage: UI_TERMS.feedback.success.actionCreated,
+        failureMessage: UI_TERMS.errors.changesNotSaved,
+      },
+    );
   }
 
   async function handleTransitionAction(action: Action) {
@@ -1506,18 +1872,24 @@ export function TeamFrame() {
           : null;
     if (!nextStatus) return;
 
-    await runMutation(async () => {
-      await executeApiCall("Transition action", (options) =>
-        transitionActionStatus(
-          organizationId,
-          action.id,
-          {
-            status: nextStatus,
-          },
-          options,
-        ),
-      );
-    });
+    await runMutation(
+      async () => {
+        await executeApiCall("Transition action", (options) =>
+          transitionActionStatus(
+            organizationId,
+            action.id,
+            {
+              status: nextStatus,
+            },
+            options,
+          ),
+        );
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.syncingChanges,
+        successMessage: UI_TERMS.feedback.success.structureUpdated,
+      },
+    );
   }
 
   async function handleCreatePolicy() {
@@ -1606,14 +1978,20 @@ export function TeamFrame() {
       return;
     }
 
-    await runMutation(async () => {
-      const result = await executeApiCall("Reset demo state", (options) =>
-        resetOrganizationDemoState(organizationId, options),
-      );
-      setDemoResetSummary(
-        `Reset complete: ${result.teams} teams, ${result.positions} positions, ${result.people} people, ${result.actions} actions, ${result.policies} policies.`,
-      );
-    });
+    await runMutation(
+      async () => {
+        const result = await executeApiCall("Reset demo state", (options) =>
+          resetOrganizationDemoState(organizationId, options),
+        );
+        setDemoResetSummary(
+          `Reset complete: ${result.teams} teams, ${result.positions} positions, ${result.people} people, ${result.actions} actions, ${result.policies} policies.`,
+        );
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.syncingChanges,
+        successMessage: UI_TERMS.feedback.success.structureUpdated,
+      },
+    );
   }
 
   async function handleInvalidOrgRecoveryCheck() {
@@ -1703,8 +2081,11 @@ export function TeamFrame() {
           <section style={STYLE.panel}>
             <div style={{ ...STYLE.title, marginBottom: 6 }}>TeamFrame Workspace</div>
             <div style={{ fontSize: 12, color: "#475569" }}>
-              Positions {positions.length} · Filled {positionAssignmentById.size} · Open actions {actions.filter((item) => item.status !== ActionStatus.done).length} · Needs attention {overdueActions + blockedActions}
+              Positions {positions.length} · Filled {positionAssignmentById.size} · Open actions {actions.filter((item) => item.status !== ActionStatus.done).length} · {UI_TERMS.entities.needsAttention} {overdueActions + blockedActions}
             </div>
+            {mutationStatusText ? (
+              <div style={{ marginTop: 8, fontSize: 12, color: "#1D4ED8" }}>{mutationStatusText}</div>
+            ) : null}
             {error ? (
               <div
                 style={{
@@ -1763,7 +2144,7 @@ export function TeamFrame() {
                 </div>
 
                 <div style={{ ...STYLE.panel, border: "1px solid #D8E0EC", position: "sticky", top: 12 }}>
-                  <div style={{ ...STYLE.subTitle, marginBottom: 8 }}>Position Inspector</div>
+                  <div style={{ ...STYLE.subTitle, marginBottom: 8 }}>{UI_TERMS.panel.positionPanel}</div>
                   {!selectedPosition ? (
                     <div style={{ fontSize: 12, color: "#64748B" }}>Select a position from the org chart.</div>
                   ) : (
@@ -1785,7 +2166,7 @@ export function TeamFrame() {
                             padding: "5px 6px",
                           }}
                         >
-                          Position
+                          {UI_TERMS.panel.tabs.position}
                         </button>
                         <button
                           onClick={() => setPositionPanelTab("assignment")}
@@ -1796,7 +2177,7 @@ export function TeamFrame() {
                             padding: "5px 6px",
                           }}
                         >
-                          Assignment
+                          {UI_TERMS.panel.tabs.assignment}
                         </button>
                         <button
                           onClick={() => setPositionPanelTab("documents")}
@@ -1807,77 +2188,57 @@ export function TeamFrame() {
                             padding: "5px 6px",
                           }}
                         >
-                          Documents
+                          {UI_TERMS.panel.tabs.documents}
                         </button>
                       </div>
 
                       {positionPanelTab === "position" ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                           <div style={{ fontSize: 11, color: "#334155" }}>
-                            <strong>Position</strong>: {selectedPosition.title}
+                            <strong>{UI_TERMS.panel.fields.position}</strong>: {selectedPosition.title}
                           </div>
                           <div style={{ fontSize: 11, color: "#334155" }}>
-                            <strong>Reports to</strong>: {selectedPosition.reportsToPositionId
+                            <strong>{UI_TERMS.panel.fields.reportsTo}</strong>: {selectedPosition.reportsToPositionId
                               ? positionMap.get(selectedPosition.reportsToPositionId)?.title ?? selectedPosition.reportsToPositionId
                               : "Not set"}
                           </div>
                           <div style={{ fontSize: 11, color: "#334155" }}>
-                            <strong>Department</strong>: {selectedPosition.teamId
+                            <strong>{UI_TERMS.panel.fields.department}</strong>: {selectedPosition.teamId
                               ? teamMap.get(selectedPosition.teamId)?.name ?? selectedPosition.teamId
                               : "Not set"}
                           </div>
                           <div style={{ fontSize: 11, color: "#334155" }}>
-                            <strong>Status</strong>: {statePresentation(resolvePositionNodeState(selectedPosition.id)).label}
+                            <strong>{UI_TERMS.panel.fields.status}</strong>: {statePresentation(resolvePositionNodeState(selectedPosition.id)).label}
                           </div>
                           {selectedHasNoReportingLine ? (
                             <div style={{ fontSize: 11, color: "#92400E" }}>
-                              This position has no reporting line.
+                              {UI_TERMS.warnings.noReportingLine}
                             </div>
                           ) : null}
                           {selectedHasStructuralIssue ? (
                             <div style={{ fontSize: 11, color: "#92400E" }}>
-                              This change will update the org structure.
+                              {UI_TERMS.warnings.structureUpdated}
                             </div>
                           ) : null}
                           {!selectedAssignment ? (
                             <div style={{ fontSize: 11, color: "#64748B" }}>
-                              This position is currently unassigned.
+                              {UI_TERMS.warnings.currentlyUnassigned}
                             </div>
                           ) : null}
-                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Notes (optional)</label>
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>{UI_TERMS.panel.fields.notes}</label>
                           <textarea placeholder="Add context" rows={2} style={{ width: "100%", resize: "vertical" }} />
 
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            <button
-                              onClick={() => {
-                                setNewPositionTeamId(selectedPosition.teamId ?? "");
-                                setNewPositionReportsToId(selectedPosition.reportsToPositionId ?? "");
-                                setError("Add above prepared in structure controls.");
-                              }}
-                            >
+                            <button onClick={() => void handleQuickInsertPosition("above", selectedPosition.id)}>
                               Add above
                             </button>
-                            <button
-                              onClick={() => {
-                                setNewPositionTeamId(selectedPosition.teamId ?? "");
-                                setNewPositionReportsToId(selectedPosition.id);
-                                setError("Add below prepared in structure controls.");
-                              }}
-                            >
+                            <button onClick={() => void handleQuickInsertPosition("below", selectedPosition.id)}>
                               Add below
                             </button>
-                            <button
-                              onClick={() => {
-                                setNewPositionTeamId(selectedPosition.teamId ?? "");
-                                setNewPositionReportsToId(selectedPosition.reportsToPositionId ?? "");
-                                setError("Add parallel prepared in structure controls.");
-                              }}
-                            >
+                            <button onClick={() => void handleQuickInsertPosition("parallel", selectedPosition.id)}>
                               Add parallel
                             </button>
-                            <button
-                              onClick={() => setError("Update reporting line in structure controls.")}
-                            >
+                            <button onClick={() => void handleUpdateReportingLine(selectedPosition.id)}>
                               Update reporting line
                             </button>
                             <button
@@ -1892,7 +2253,7 @@ export function TeamFrame() {
 
                       {positionPanelTab === "assignment" ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Person</label>
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>{UI_TERMS.entities.person}</label>
                           <select
                             value={assignmentDraftEmployeeId}
                             onChange={(event) => setAssignmentDraftEmployeeId(event.target.value)}
@@ -1906,7 +2267,7 @@ export function TeamFrame() {
                             ))}
                           </select>
 
-                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Assignment type</label>
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>{UI_TERMS.panel.fields.assignmentType}</label>
                           <select
                             value={assignmentDraftStatus}
                             onChange={(event) =>
@@ -1914,14 +2275,14 @@ export function TeamFrame() {
                             }
                             style={{ width: "100%" }}
                           >
-                            <option value="active">Active assignment</option>
-                            <option value="scheduled">Starts on date</option>
-                            <option value="ended">Ended assignment</option>
+                            <option value="active">{UI_TERMS.assignmentStates.active}</option>
+                            <option value="scheduled">{UI_TERMS.assignmentStates.scheduled}</option>
+                            <option value="ended">{UI_TERMS.assignmentStates.ended}</option>
                           </select>
 
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
                             <div>
-                              <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Start date</label>
+                              <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>{UI_TERMS.panel.fields.startDate}</label>
                               <input
                                 type="date"
                                 value={assignmentDraftStartDate}
@@ -1930,7 +2291,7 @@ export function TeamFrame() {
                               />
                             </div>
                             <div>
-                              <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>End date</label>
+                              <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>{UI_TERMS.panel.fields.endDate}</label>
                               <input
                                 type="date"
                                 value={assignmentDraftEndDate}
@@ -1989,11 +2350,11 @@ export function TeamFrame() {
 
                       {positionPanelTab === "documents" ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          <div style={{ fontSize: 11, color: "#334155" }}><strong>Role description</strong></div>
-                          <div style={{ fontSize: 11, color: "#334155" }}><strong>Key responsibilities</strong></div>
-                          <div style={{ fontSize: 11, color: "#334155" }}><strong>KPIs</strong></div>
+                          <div style={{ fontSize: 11, color: "#334155" }}><strong>{UI_TERMS.panel.fields.roleDescription}</strong></div>
+                          <div style={{ fontSize: 11, color: "#334155" }}><strong>{UI_TERMS.panel.fields.keyResponsibilities}</strong></div>
+                          <div style={{ fontSize: 11, color: "#334155" }}><strong>{UI_TERMS.panel.fields.kpis}</strong></div>
                           <div style={{ fontSize: 11, color: "#334155" }}>
-                            <strong>Signature status</strong>: {selectedPositionDocument ? selectedPositionDocument.state.replace("_", " ") : "draft"}
+                            <strong>{UI_TERMS.panel.fields.signatureStatus}</strong>: {selectedPositionDocument ? documentStateLabel(selectedPositionDocument.state) : UI_TERMS.documents.states.draft}
                           </div>
 
                           {selectedPositionDocument ? (
@@ -2012,10 +2373,10 @@ export function TeamFrame() {
                                   )
                                 }
                               >
-                                <option value="draft">Draft</option>
-                                <option value="in_review">In review</option>
-                                <option value="signed">Signed</option>
-                                <option value="outdated">Outdated</option>
+                                <option value="draft">{UI_TERMS.documents.states.draft}</option>
+                                <option value="in_review">{UI_TERMS.documents.states.inReview}</option>
+                                <option value="signed">{UI_TERMS.documents.states.signed}</option>
+                                <option value="outdated">{UI_TERMS.documents.states.outdated}</option>
                               </select>
                               <button
                                 style={{ marginTop: 8 }}
@@ -2026,12 +2387,12 @@ export function TeamFrame() {
                             </div>
                           ) : (
                             <div style={{ fontSize: 11, color: "#64748B" }}>
-                              No role document uploaded yet.
+                              {UI_TERMS.documents.empty}
                             </div>
                           )}
 
                           <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>
-                            Upload role description
+                            {UI_TERMS.documents.upload}
                           </label>
                           <input
                             type="file"
@@ -2057,7 +2418,7 @@ export function TeamFrame() {
                               });
                             }}
                           >
-                            Download Job Description (.doc)
+                            {UI_TERMS.documents.downloadTemplate}
                           </button>
                         </div>
                       ) : null}
@@ -2230,16 +2591,16 @@ export function TeamFrame() {
               <div style={{ ...STYLE.panel, marginBottom: 12 }}>
                 <div style={STYLE.subTitle}>Create Action</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 8 }}>
-                  <input value={newActionTitle} onChange={(e) => setNewActionTitle(e.target.value)} placeholder="What needs to be done?" />
+                  <input value={newActionTitle} onChange={(e) => setNewActionTitle(e.target.value)} placeholder={UI_TERMS.actions.prompts.whatNeedsToBeDone} />
                   <input type="date" value={newActionDueDate} onChange={(e) => setNewActionDueDate(e.target.value)} />
                   <select value={newActionOwnerId} onChange={(e) => setNewActionOwnerId(e.target.value)}>
-                    <option value="">Who is responsible?</option>
+                    <option value="">{UI_TERMS.actions.prompts.whoIsResponsible}</option>
                     {decisionMakerPositions.map((position) => (
                       <option key={position.id} value={position.id}>{position.title}</option>
                     ))}
                   </select>
                   <select value={newActionLinkId} onChange={(e) => setNewActionLinkId(e.target.value)}>
-                    <option value="">Where does this belong?</option>
+                    <option value="">{UI_TERMS.actions.prompts.whereDoesThisBelong}</option>
                     {decisionMakerPositions.map((position) => (
                       <option key={position.id} value={position.id}>{position.title}</option>
                     ))}
@@ -2277,7 +2638,7 @@ export function TeamFrame() {
                     </div>
                   </div>
                 ))}
-                {actions.length === 0 ? <div style={{ fontSize: 12, color: "#64748B" }}>No actions yet for this position.</div> : null}
+                {actions.length === 0 ? <div style={{ fontSize: 12, color: "#64748B" }}>{UI_TERMS.actions.empty}</div> : null}
               </div>
             </section>
           )}
@@ -2289,7 +2650,7 @@ export function TeamFrame() {
                 Download the standard Job Description Word document.
               </div>
               <button onClick={() => downloadJobDescriptionTemplate()}>
-                Download Job Description (.doc)
+                {UI_TERMS.documents.downloadTemplate}
               </button>
             </section>
           )}
@@ -2450,6 +2811,24 @@ export function TeamFrame() {
             </section>
           )}
         </main>
+        {feedbackToast ? (
+          <div
+            style={{
+              position: "fixed",
+              right: 20,
+              bottom: 20,
+              background: feedbackToast.tone === "error" ? "#7F1D1D" : "#0F172A",
+              color: "#F8FAFC",
+              borderRadius: 10,
+              padding: "10px 12px",
+              fontSize: 12,
+              boxShadow: "0 14px 28px rgba(2, 6, 23, 0.25)",
+              zIndex: 40,
+            }}
+          >
+            {feedbackToast.message}
+          </div>
+        ) : null}
       </div>
     </div>
   );
