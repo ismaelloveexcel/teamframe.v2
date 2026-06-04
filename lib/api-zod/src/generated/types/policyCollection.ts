@@ -5,7 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { Policy } from './policy';
 
-export interface HealthStatus {
-  status: string;
+export interface PolicyCollection {
+  items: Policy[];
 }

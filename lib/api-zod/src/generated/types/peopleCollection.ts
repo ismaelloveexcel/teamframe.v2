@@ -5,7 +5,8 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
+import type { Person } from './person';
 
-export interface HealthStatus {
-  status: string;
+export interface PeopleCollection {
+  items: Person[];
 }

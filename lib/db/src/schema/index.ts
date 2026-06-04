@@ -1,20 +1,358 @@
-// Export your models here. Add one export per file
-// export * from "./posts";
-//
-// Each model/table should ideally be split into different files.
-// Each model/table should define a Drizzle table, insert schema, and types:
-//
-//   import { pgTable, text, serial } from "drizzle-orm/pg-core";
-//   import { createInsertSchema } from "drizzle-zod";
-//   import { z } from "zod/v4";
-//
-//   export const postsTable = pgTable("posts", {
-//     id: serial("id").primaryKey(),
-//     title: text("title").notNull(),
-//   });
-//
-//   export const insertPostSchema = createInsertSchema(postsTable).omit({ id: true });
-//   export type InsertPost = z.infer<typeof insertPostSchema>;
-//   export type Post = typeof postsTable.$inferSelect;
+import { sql } from "drizzle-orm";
+import {
+  type AnyPgColumn,
+  boolean,
+  check,
+  date,
+  index,
+  pgEnum,
+  pgTable,
+  text,
+  timestamp,
+  unique,
+  uuid,
+} from "drizzle-orm/pg-core";
+import { createInsertSchema } from "drizzle-zod";
+import { z } from "zod/v4";
 
-export {}
+export const membershipRoleEnum = pgEnum("membership_role", [
+  "owner",
+  "admin",
+  "member",
+]);
+export const employmentStatusEnum = pgEnum("employment_status", [
+  "active",
+  "on_leave",
+  "offboarding",
+]);
+export const positionLifecycleStatusEnum = pgEnum("position_lifecycle_status", [
+  "filled",
+  "vacant",
+  "frozen",
+]);
+export const actionStatusEnum = pgEnum("action_status", [
+  "open",
+  "in_progress",
+  "done",
+]);
+export const policyScopeEnum = pgEnum("policy_scope", [
+  "organization",
+  "team",
+  "position",
+]);
+
+export const organizationsTable = pgTable("organizations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  slug: text("slug").notNull().unique(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const usersTable = pgTable("users", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  email: text("email").notNull().unique(),
+  fullName: text("full_name"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const organizationMembershipsTable = pgTable(
+  "organization_memberships",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    userId: uuid("user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    role: membershipRoleEnum("role").notNull().default("member"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("organization_memberships_org_user_unique").on(
+      table.organizationId,
+      table.userId,
+    ),
+    index("organization_memberships_org_idx").on(table.organizationId),
+    index("organization_memberships_user_idx").on(table.userId),
+  ],
+);
+
+export const teamsTable = pgTable(
+  "teams",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    name: text("name").notNull(),
+    code: text("code"),
+    parentTeamId: uuid("parent_team_id").references((): AnyPgColumn => teamsTable.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("teams_org_name_unique").on(table.organizationId, table.name),
+    index("teams_org_idx").on(table.organizationId),
+    index("teams_parent_idx").on(table.parentTeamId),
+  ],
+);
+
+export const positionsTable = pgTable(
+  "positions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    teamId: uuid("team_id").references(() => teamsTable.id, { onDelete: "set null" }),
+    title: text("title").notNull(),
+    reportsToPositionId: uuid("reports_to_position_id").references(
+      (): AnyPgColumn => positionsTable.id,
+      { onDelete: "set null" },
+    ),
+    lifecycleStatus: positionLifecycleStatusEnum("lifecycle_status")
+      .notNull()
+      .default("vacant"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("positions_org_idx").on(table.organizationId),
+    index("positions_team_idx").on(table.teamId),
+    index("positions_reports_to_idx").on(table.reportsToPositionId),
+  ],
+);
+
+export const peopleTable = pgTable(
+  "people",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    fullName: text("full_name").notNull(),
+    email: text("email"),
+    phone: text("phone"),
+    positionId: uuid("position_id").references(() => positionsTable.id, {
+      onDelete: "set null",
+    }),
+    employmentStatus: employmentStatusEnum("employment_status").notNull().default("active"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("people_org_idx").on(table.organizationId),
+    unique("people_position_unique").on(table.positionId),
+  ],
+);
+
+export const teamOwnershipsTable = pgTable(
+  "team_ownerships",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    teamId: uuid("team_id")
+      .notNull()
+      .references(() => teamsTable.id, { onDelete: "cascade" }),
+    ownerPersonId: uuid("owner_person_id").references(() => peopleTable.id, {
+      onDelete: "set null",
+    }),
+    ownerPositionId: uuid("owner_position_id").references(() => positionsTable.id, {
+      onDelete: "set null",
+    }),
+    responsibilityContext: text("responsibility_context").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("team_ownerships_team_unique").on(table.teamId),
+    index("team_ownerships_org_idx").on(table.organizationId),
+    check(
+      "team_ownerships_owner_required",
+      sql`${table.ownerPersonId} IS NOT NULL OR ${table.ownerPositionId} IS NOT NULL`,
+    ),
+  ],
+);
+
+export const positionOwnershipsTable = pgTable(
+  "position_ownerships",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    positionId: uuid("position_id")
+      .notNull()
+      .references(() => positionsTable.id, { onDelete: "cascade" }),
+    ownerPersonId: uuid("owner_person_id").references(() => peopleTable.id, {
+      onDelete: "set null",
+    }),
+    ownerPositionId: uuid("owner_position_id").references(() => positionsTable.id, {
+      onDelete: "set null",
+    }),
+    responsibilityContext: text("responsibility_context").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("position_ownerships_position_unique").on(table.positionId),
+    index("position_ownerships_org_idx").on(table.organizationId),
+    check(
+      "position_ownerships_owner_required",
+      sql`${table.ownerPersonId} IS NOT NULL OR ${table.ownerPositionId} IS NOT NULL`,
+    ),
+  ],
+);
+
+export const actionsTable = pgTable(
+  "actions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    description: text("description"),
+    status: actionStatusEnum("status").notNull().default("open"),
+    dueDate: date("due_date"),
+    blocked: boolean("blocked").notNull().default(false),
+    ownerPersonId: uuid("owner_person_id").references(() => peopleTable.id, {
+      onDelete: "set null",
+    }),
+    ownerPositionId: uuid("owner_position_id").references(() => positionsTable.id, {
+      onDelete: "set null",
+    }),
+    teamId: uuid("team_id").references(() => teamsTable.id, { onDelete: "set null" }),
+    positionId: uuid("position_id").references(() => positionsTable.id, {
+      onDelete: "set null",
+    }),
+    personId: uuid("person_id").references(() => peopleTable.id, { onDelete: "set null" }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("actions_org_idx").on(table.organizationId),
+    index("actions_status_idx").on(table.status),
+    check(
+      "actions_owner_required",
+      sql`${table.ownerPersonId} IS NOT NULL OR ${table.ownerPositionId} IS NOT NULL`,
+    ),
+    check(
+      "actions_structural_link_required",
+      sql`${table.teamId} IS NOT NULL OR ${table.positionId} IS NOT NULL OR ${table.personId} IS NOT NULL`,
+    ),
+  ],
+);
+
+export const policiesTable = pgTable(
+  "policies",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    title: text("title").notNull(),
+    body: text("body").notNull(),
+    scope: policyScopeEnum("scope").notNull(),
+    teamId: uuid("team_id").references(() => teamsTable.id, { onDelete: "set null" }),
+    positionId: uuid("position_id").references(() => positionsTable.id, {
+      onDelete: "set null",
+    }),
+    ownerPersonId: uuid("owner_person_id").references(() => peopleTable.id, {
+      onDelete: "set null",
+    }),
+    ownerPositionId: uuid("owner_position_id").references(() => positionsTable.id, {
+      onDelete: "set null",
+    }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("policies_org_idx").on(table.organizationId),
+    check(
+      "policies_owner_required",
+      sql`${table.ownerPersonId} IS NOT NULL OR ${table.ownerPositionId} IS NOT NULL`,
+    ),
+    check(
+      "policies_scope_target_valid",
+      sql`(
+        (${table.scope} = 'organization' AND ${table.teamId} IS NULL AND ${table.positionId} IS NULL)
+        OR
+        (${table.scope} = 'team' AND ${table.teamId} IS NOT NULL AND ${table.positionId} IS NULL)
+        OR
+        (${table.scope} = 'position' AND ${table.teamId} IS NULL AND ${table.positionId} IS NOT NULL)
+      )`,
+    ),
+  ],
+);
+
+export const createOrganizationSchema = createInsertSchema(organizationsTable).pick({
+  name: true,
+  slug: true,
+});
+export const createTeamSchema = createInsertSchema(teamsTable).pick({
+  organizationId: true,
+  name: true,
+  code: true,
+  parentTeamId: true,
+});
+export const createPositionSchema = createInsertSchema(positionsTable).pick({
+  organizationId: true,
+  teamId: true,
+  title: true,
+  reportsToPositionId: true,
+  lifecycleStatus: true,
+});
+export const createPersonSchema = createInsertSchema(peopleTable).pick({
+  organizationId: true,
+  fullName: true,
+  email: true,
+  phone: true,
+  positionId: true,
+  employmentStatus: true,
+});
+export const createActionSchema = createInsertSchema(actionsTable).pick({
+  organizationId: true,
+  title: true,
+  description: true,
+  dueDate: true,
+  blocked: true,
+  ownerPersonId: true,
+  ownerPositionId: true,
+  teamId: true,
+  positionId: true,
+  personId: true,
+});
+export const createPolicySchema = createInsertSchema(policiesTable).pick({
+  organizationId: true,
+  title: true,
+  body: true,
+  scope: true,
+  teamId: true,
+  positionId: true,
+  ownerPersonId: true,
+  ownerPositionId: true,
+});
+
+export type Organization = typeof organizationsTable.$inferSelect;
+export type Team = typeof teamsTable.$inferSelect;
+export type Position = typeof positionsTable.$inferSelect;
+export type Person = typeof peopleTable.$inferSelect;
+export type Action = typeof actionsTable.$inferSelect;
+export type Policy = typeof policiesTable.$inferSelect;
+export type TeamOwnership = typeof teamOwnershipsTable.$inferSelect;
+export type PositionOwnership = typeof positionOwnershipsTable.$inferSelect;
+
+export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
+export type CreateTeamInput = z.infer<typeof createTeamSchema>;
+export type CreatePositionInput = z.infer<typeof createPositionSchema>;
+export type CreatePersonInput = z.infer<typeof createPersonSchema>;
+export type CreateActionInput = z.infer<typeof createActionSchema>;
+export type CreatePolicyInput = z.infer<typeof createPolicySchema>;
