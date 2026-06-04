@@ -5,9 +5,11 @@ import {
   check,
   date,
   index,
+  integer,
   jsonb,
   pgEnum,
   pgTable,
+  primaryKey,
   text,
   timestamp,
   unique,
@@ -439,3 +441,171 @@ export type CreatePositionInput = z.infer<typeof createPositionSchema>;
 export type CreatePersonInput = z.infer<typeof createPersonSchema>;
 export type CreateActionInput = z.infer<typeof createActionSchema>;
 export type CreatePolicyInput = z.infer<typeof createPolicySchema>;
+
+export const eventAggregateTypeEnum = pgEnum("event_aggregate_type", [
+  "position",
+  "assignment",
+  "document",
+  "compensation",
+  "offboarding",
+  "employee",
+  "system",
+]);
+
+export const quarantineStateEnum = pgEnum("quarantine_state", [
+  "active",
+  "quarantined",
+  "restored",
+  "archived",
+]);
+
+export const phaseRunStatusEnum = pgEnum("phase_run_status", [
+  "started",
+  "succeeded",
+  "failed",
+  "rolled_back",
+]);
+
+export const orgEventsTable = pgTable(
+  "org_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    aggregateType: eventAggregateTypeEnum("aggregate_type").notNull(),
+    aggregateId: text("aggregate_id").notNull(),
+    eventType: text("event_type").notNull(),
+    version: integer("version").notNull(),
+    occurredAt: timestamp("occurred_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    actorUserId: uuid("actor_user_id").references(() => usersTable.id, { onDelete: "set null" }),
+    correlationId: uuid("correlation_id"),
+    causationId: uuid("causation_id"),
+    idempotencyKey: text("idempotency_key").notNull(),
+    schemaVersion: integer("schema_version").notNull().default(1),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    payloadHash: text("payload_hash"),
+  },
+  (table) => [
+    uniqueIndex("org_events_org_id_idempotency_key_unique").on(
+      table.orgId,
+      table.idempotencyKey,
+    ),
+    uniqueIndex("org_events_org_aggregate_version_unique").on(
+      table.orgId,
+      table.aggregateType,
+      table.aggregateId,
+      table.version,
+    ),
+  ],
+);
+
+export const outboxEventsTable = pgTable(
+  "outbox_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => orgEventsTable.id, { onDelete: "cascade" }),
+    type: text("type").notNull(),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    processed: boolean("processed").notNull().default(false),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    attempts: integer("attempts").notNull().default(0),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("outbox_events_org_event_unique").on(table.orgId, table.eventId),
+  ],
+);
+
+export const aggregateVersionsTable = pgTable(
+  "aggregate_versions",
+  {
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    aggregateType: eventAggregateTypeEnum("aggregate_type").notNull(),
+    aggregateId: text("aggregate_id").notNull(),
+    version: integer("version").notNull().default(0),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    primaryKey({
+      name: "aggregate_versions_pk",
+      columns: [table.orgId, table.aggregateType, table.aggregateId],
+    }),
+    check(
+      "aggregate_versions_version_non_negative",
+      sql`${table.version} >= 0`,
+    ),
+  ],
+);
+
+export const idempotencyRecordsTable = pgTable(
+  "idempotency_records",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    idempotencyKey: text("idempotency_key").notNull(),
+    requestHash: text("request_hash").notNull(),
+    responseBlob: jsonb("response_blob")
+      .$type<Record<string, unknown>>()
+      .notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("idempotency_records_org_key_unique").on(
+      table.orgId,
+      table.idempotencyKey,
+    ),
+  ],
+);
+
+export const streamQuarantinesTable = pgTable(
+  "stream_quarantines",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    aggregateType: eventAggregateTypeEnum("aggregate_type").notNull(),
+    aggregateId: text("aggregate_id").notNull(),
+    state: quarantineStateEnum("state").notNull().default("active"),
+    reason: text("reason"),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("stream_quarantines_org_aggregate_unique").on(
+      table.orgId,
+      table.aggregateType,
+      table.aggregateId,
+    ),
+  ],
+);
+
+export const phaseRunsTable = pgTable("phase_runs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  orgId: uuid("org_id")
+    .notNull()
+    .references(() => organizationsTable.id, { onDelete: "cascade" }),
+  phaseId: text("phase_id").notNull(),
+  status: phaseRunStatusEnum("status").notNull(),
+  details: jsonb("details").$type<Record<string, unknown>>().default({}).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+export const createOrgEventSchema = createInsertSchema(orgEventsTable);
+export const createIdempotencyRecordSchema = createInsertSchema(idempotencyRecordsTable);
+
+export type OrgEvent = typeof orgEventsTable.$inferSelect;
+export type IdempotencyRecord = typeof idempotencyRecordsTable.$inferSelect;
+
