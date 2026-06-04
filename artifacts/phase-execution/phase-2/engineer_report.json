@@ -1,16 +1,18 @@
 {
   "phase_id": "phase-2-domain-model",
-  "commit_hash": "f763bf9f20e3f18204ac177611b226df4a65f691",
+  "commit_hash": "7a15ee0bcd1cebda417662ec8edcdbb8a49460c8",
   "status": "PASS",
   "scope_completed": [
-    "Added position aggregate graph/invariant helpers with acyclic reparent validation",
-    "Added assignment aggregate lifecycle derivation and active-state rule",
-    "Added overlap/occupancy invariants for position and employee",
-    "Added deterministic transfer helper emitting end+start events",
-    "Added phase2 invariant/replay tests under domain aggregates"
+    "Position aggregate helpers with acyclic reparent invariant",
+    "Assignment lifecycle derivation from events (start/end/transfer)",
+    "Single-active-position and employee-overlap invariants",
+    "Deterministic replay tie-order handling and regression tests"
+  ],
+  "fixes_from_reviewer": [
+    "Added explicit tie-order replay regression test",
+    "Added negative overlap invariant test path"
   ],
   "known_limits": [
-    "Handlers are pure-domain helpers; API endpoint wiring deferred to later phase integration",
-    "Cross-aggregate DB transactional orchestration remains in phase 3/4 implementation"
+    "Phase 3/4 projection workers and replay/quarantine orchestration remain pending"
   ]
 }
