@@ -41,7 +41,7 @@ import {
 
 type NavId = "org" | "actions" | "team" | "policies" | "administration";
 type OwnerType = "person" | "position";
-type LinkType = "team" | "position" | "person";
+type PositionLevel = "Executive" | "Director" | "Manager" | "IC";
 
 const NAV_ITEMS: Array<{ id: NavId; label: string }> = [
   { id: "org", label: "Org Map" },
@@ -83,7 +83,7 @@ const STYLE = {
   } as const,
   panel: {
     background: "#FFFFFF",
-    border: "1px solid #1F2937",
+    border: "1px solid #E5E7EB",
     borderRadius: 12,
     padding: 14,
   } as const,
@@ -586,6 +586,7 @@ export function TeamFrame() {
   const [error, setError] = useState<string | null>(null);
   const [demoResetSummary, setDemoResetSummary] = useState<string>("");
   const [isLocalDemoMode, setIsLocalDemoMode] = useState(false);
+  const [expandedPositionIds, setExpandedPositionIds] = useState<Set<string>>(new Set());
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -622,9 +623,7 @@ export function TeamFrame() {
 
   const [newActionTitle, setNewActionTitle] = useState("");
   const [newActionDueDate, setNewActionDueDate] = useState("");
-  const [newActionOwnerType, setNewActionOwnerType] = useState<OwnerType>("person");
   const [newActionOwnerId, setNewActionOwnerId] = useState<string>("");
-  const [newActionLinkType, setNewActionLinkType] = useState<LinkType>("team");
   const [newActionLinkId, setNewActionLinkId] = useState<string>("");
 
   const [newPolicyTitle, setNewPolicyTitle] = useState("");
@@ -683,6 +682,39 @@ export function TeamFrame() {
     }
     return map;
   }, [people]);
+
+  const positionDepthMap = useMemo(() => {
+    const depth = new Map<string, number>();
+    const roots = positionsByManager.get("root") ?? [];
+    const queue = roots.map((position) => ({ id: position.id, depth: 0 }));
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current) continue;
+      if (depth.has(current.id)) continue;
+
+      depth.set(current.id, current.depth);
+      const children = positionsByManager.get(current.id) ?? [];
+      for (const child of children) {
+        queue.push({ id: child.id, depth: current.depth + 1 });
+      }
+    }
+
+    return depth;
+  }, [positionsByManager]);
+
+  function resolvePositionLevel(positionId: string): PositionLevel {
+    const depth = positionDepthMap.get(positionId);
+    if (depth === 0) return "Executive";
+    if (depth === 1) return "Director";
+    if (depth === 2) return "Manager";
+    return "IC";
+  }
+
+  const decisionMakerPositions = useMemo(
+    () => positions.filter((position) => resolvePositionLevel(position.id) !== "IC"),
+    [positions, positionDepthMap],
+  );
 
   const overdueActions = useMemo(
     () =>
@@ -818,6 +850,10 @@ export function TeamFrame() {
     }
   }
 
+useEffect(() => {
+    setExpandedPositionIds(new Set());
+  }, [positions]);
+
   useEffect(() => {
     const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
     setBaseUrl(apiBase ? apiBase : null);
@@ -865,6 +901,15 @@ export function TeamFrame() {
     }
   }
 
+  function togglePositionExpansion(positionId: string) {
+    setExpandedPositionIds((current) => {
+      const next = new Set(current);
+      if (next.has(positionId)) next.delete(positionId);
+      else next.add(positionId);
+      return next;
+    });
+  }
+
   function ownerLabel(ownerPersonId?: string | null, ownerPositionId?: string | null): string {
     if (ownerPersonId) {
       const person = personMap.get(ownerPersonId);
@@ -892,8 +937,15 @@ export function TeamFrame() {
 
     const peopleInPosition = peopleByPosition.get(positionId) ?? [];
     const primaryPerson = peopleInPosition[0] ?? null;
-    const additionalPeopleCount = Math.max(0, peopleInPosition.length - 1);
     const children = positionsByManager.get(positionId) ?? [];
+    const level = resolvePositionLevel(positionId);
+    const isExpanded = expandedPositionIds.has(positionId);
+    const visibleChildren = children.filter((child) => {
+      const childLevel = resolvePositionLevel(child.id);
+      if (childLevel !== "IC") return true;
+      return isExpanded;
+    });
+
     const ownership = positionOwnershipMap.get(positionId);
     const teamName = position.teamId ? teamMap.get(position.teamId)?.name ?? "Unassigned" : "Unassigned";
     const statusLabel = position.lifecycleStatus.replace("_", " ");
@@ -903,7 +955,9 @@ export function TeamFrame() {
         key={positionId}
         style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, minWidth: 250 }}
       >
-        <div
+        <button
+          type="button"
+          onClick={() => togglePositionExpansion(positionId)}
           style={{
             width: "100%",
             maxWidth: 290,
@@ -912,6 +966,8 @@ export function TeamFrame() {
             padding: 12,
             background: "#FFFFFF",
             boxShadow: "0 14px 28px rgba(15, 23, 42, 0.12)",
+            textAlign: "left",
+            cursor: "pointer",
           }}
         >
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
@@ -930,7 +986,9 @@ export function TeamFrame() {
             >
               {teamName}
             </span>
-            <span style={{ fontSize: 10, color: "#64748B", textTransform: "capitalize" }}>{statusLabel}</span>
+            <span style={{ fontSize: 10, color: "#64748B", textTransform: "capitalize" }}>
+              {level} · {statusLabel}
+            </span>
           </div>
 
           <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
@@ -952,23 +1010,16 @@ export function TeamFrame() {
               {primaryPerson ? initials(primaryPerson.fullName) : "NA"}
             </div>
             <div style={{ minWidth: 0 }}>
-              <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>
-                {primaryPerson?.fullName ?? "Vacant"}
+              <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{position.title}</div>
+              <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                {primaryPerson ? primaryPerson.fullName : "Unfilled position"}
               </div>
-              <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>{position.title}</div>
-              {additionalPeopleCount > 0 ? (
-                <div style={{ fontSize: 10, color: "#64748B", marginTop: 2 }}>+{additionalPeopleCount} additional occupant(s)</div>
-              ) : null}
             </div>
           </div>
 
           <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontSize: 11, color: "#334155" }}>
-              Email: {primaryPerson?.email ?? "not set"}
-            </div>
-            <div style={{ fontSize: 11, color: "#334155" }}>
-              Phone: {primaryPerson?.phone ?? "not set"}
-            </div>
+            <div style={{ fontSize: 11, color: "#334155" }}>Email: {primaryPerson?.email ?? "not set"}</div>
+            <div style={{ fontSize: 11, color: "#334155" }}>Phone: {primaryPerson?.phone ?? "not set"}</div>
           </div>
 
           <div
@@ -977,18 +1028,37 @@ export function TeamFrame() {
               borderTop: "1px solid #E2E8F0",
               paddingTop: 8,
               display: "grid",
-              gridTemplateColumns: "1fr",
-              gap: 3,
+              gridTemplateColumns: "1fr auto",
+              gap: 6,
+              alignItems: "center",
             }}
           >
             <div style={{ fontSize: 10, color: "#475569" }}>
               Owner: {ownership ? ownerLabel(ownership.ownerPersonId, ownership.ownerPositionId) : "Unassigned"}
             </div>
-            <div style={{ fontSize: 10, color: "#475569" }}>Direct reports: {children.length}</div>
+            <div style={{ fontSize: 10, color: "#475569", fontWeight: 700 }}>
+              {children.length} reports {visibleChildren.length > 0 ? (isExpanded ? "▾" : "▸") : ""}
+            </div>
           </div>
-        </div>
 
-        {children.length > 0 ? (
+          {isExpanded ? (
+            <div style={{ marginTop: 10, borderTop: "1px dashed #CBD5E1", paddingTop: 8 }}>
+              <div style={{ fontSize: 10, color: "#64748B", marginBottom: 4 }}>
+                Job Description: role responsibilities for {position.title}.
+              </div>
+              <div style={{ fontSize: 10, color: "#64748B" }}>
+                Assigned employees: {peopleInPosition.length || 0}
+              </div>
+              {children.length > 0 ? (
+                <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>
+                  Direct child positions: {children.map((child) => child.title).join(", ")}
+                </div>
+              ) : null}
+            </div>
+          ) : null}
+        </button>
+
+        {visibleChildren.length > 0 ? (
           <>
             <div style={{ width: 2, height: 16, background: "#1E293B" }} />
             <div
@@ -1000,10 +1070,11 @@ export function TeamFrame() {
                 gap: 16,
               }}
             >
-              {children.map((child) => renderPositionNode(child.id))}
+              {visibleChildren.map((child) => renderPositionNode(child.id))}
             </div>
           </>
         ) : null}
+
       </div>
     );
   }
@@ -1145,13 +1216,13 @@ export function TeamFrame() {
             title: newActionTitle.trim(),
             dueDate: newActionDueDate || undefined,
             owner: {
-              ownerPersonId: newActionOwnerType === "person" ? newActionOwnerId : null,
-              ownerPositionId: newActionOwnerType === "position" ? newActionOwnerId : null,
+              ownerPersonId: null,
+              ownerPositionId: newActionOwnerId,
             },
             link: {
-              teamId: newActionLinkType === "team" ? newActionLinkId : null,
-              positionId: newActionLinkType === "position" ? newActionLinkId : null,
-              personId: newActionLinkType === "person" ? newActionLinkId : null,
+              teamId: null,
+              positionId: newActionLinkId,
+              personId: null,
             },
           },
           options,
@@ -1740,28 +1811,19 @@ export function TeamFrame() {
 
               <div style={{ ...STYLE.panel, marginBottom: 12 }}>
                 <div style={STYLE.subTitle}>Create Action</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0,1fr))", gap: 8 }}>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 8 }}>
                   <input value={newActionTitle} onChange={(e) => setNewActionTitle(e.target.value)} placeholder="Action title" />
                   <input type="date" value={newActionDueDate} onChange={(e) => setNewActionDueDate(e.target.value)} />
-                  <select value={newActionOwnerType} onChange={(e) => setNewActionOwnerType(e.target.value as OwnerType)}>
-                    <option value="person">Owner person</option>
-                    <option value="position">Owner position</option>
-                  </select>
                   <select value={newActionOwnerId} onChange={(e) => setNewActionOwnerId(e.target.value)}>
-                    <option value="">Select owner</option>
-                    {(newActionOwnerType === "person" ? people : positions).map((item) => (
-                      <option key={item.id} value={item.id}>{"fullName" in item ? item.fullName : item.title}</option>
+                    <option value="">Decision owner position</option>
+                    {decisionMakerPositions.map((position) => (
+                      <option key={position.id} value={position.id}>{position.title}</option>
                     ))}
                   </select>
-                  <select value={newActionLinkType} onChange={(e) => setNewActionLinkType(e.target.value as LinkType)}>
-                    <option value="team">Link team</option>
-                    <option value="position">Link position</option>
-                    <option value="person">Link person</option>
-                  </select>
                   <select value={newActionLinkId} onChange={(e) => setNewActionLinkId(e.target.value)}>
-                    <option value="">Select link target</option>
-                    {(newActionLinkType === "team" ? teams : newActionLinkType === "position" ? positions : people).map((item) => (
-                      <option key={item.id} value={item.id}>{"fullName" in item ? item.fullName : "title" in item ? item.title : item.name}</option>
+                    <option value="">Linked position</option>
+                    {decisionMakerPositions.map((position) => (
+                      <option key={position.id} value={position.id}>{position.title}</option>
                     ))}
                   </select>
                 </div>
@@ -1770,7 +1832,7 @@ export function TeamFrame() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {actions.map((item) => (
-                  <div key={item.id} style={{ border: "1px solid #1F2937", borderRadius: 8, padding: 10, background: "#F8FAFC" }}>
+                  <div key={item.id} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: 10, background: "#F8FAFC" }}>
                     <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
                       <div>
                         <div style={{ fontWeight: 700 }}>{item.title}</div>
@@ -1910,7 +1972,7 @@ export function TeamFrame() {
 
               <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                 {policies.map((policy) => (
-                  <div key={policy.id} style={{ border: "1px solid #1F2937", borderRadius: 8, padding: 10 }}>
+                  <div key={policy.id} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: 10 }}>
                     <div style={{ fontWeight: 700 }}>{policy.title}</div>
                     <div style={{ fontSize: 12, color: "#475569" }}>{policy.body}</div>
                     <div style={{ fontSize: 12, color: "#475569" }}>
