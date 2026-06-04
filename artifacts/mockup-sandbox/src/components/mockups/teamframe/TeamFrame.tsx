@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import {
+  ApiError,
   ActionStatus,
   EmploymentStatus,
   PolicyScope,
@@ -26,6 +27,7 @@ import {
   listPositions,
   listTeamOwnerships,
   listTeams,
+  resetOrganizationDemoState,
   setBaseUrl,
   transitionActionStatus,
   type Action,
@@ -109,6 +111,9 @@ function defaultOrgSlug(): string {
   return `teamframe-v1-${Date.now()}`;
 }
 
+const API_TIMEOUT_MS = 10_000;
+const API_MAX_RETRIES = 1;
+
 function requestOptions(): RequestInit {
   return {
     headers: {
@@ -119,6 +124,32 @@ function requestOptions(): RequestInit {
   };
 }
 
+function isRetryableError(error: unknown): boolean {
+  if (error instanceof ApiError) return error.status >= 500;
+  return error instanceof DOMException && error.name === "AbortError";
+}
+
+function errorStatus(error: unknown): number | null {
+  if (error instanceof ApiError) return error.status;
+  if (error && typeof error === "object" && "cause" in error) {
+    return errorStatus((error as { cause?: unknown }).cause);
+  }
+  return null;
+}
+
+function describeError(label: string, error: unknown): string {
+  if (error instanceof ApiError) {
+    return `${label} failed (${error.status}): ${error.message}`;
+  }
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return `${label} timed out after ${API_TIMEOUT_MS / 1000}s`;
+  }
+  if (error instanceof Error) {
+    return `${label} failed: ${error.message}`;
+  }
+  return `${label} failed`;
+}
+
 export function TeamFrame() {
   const [activeNav, setActiveNav] = useState<NavId>("org");
   const [organizationId, setOrganizationId] = useState<string | null>(null);
@@ -126,6 +157,7 @@ export function TeamFrame() {
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [demoResetSummary, setDemoResetSummary] = useState<string>("");
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -240,17 +272,67 @@ export function TeamFrame() {
     [actions],
   );
 
+  async function executeApiCall<T>(
+    label: string,
+    operation: (options: RequestInit) => Promise<T>,
+    retries = API_MAX_RETRIES,
+  ): Promise<T> {
+    let attempt = 0;
+    let lastError: unknown;
+
+    while (attempt <= retries) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+      try {
+        return await operation({ ...requestOptions(), signal: controller.signal });
+      } catch (error) {
+        lastError = error;
+        if (attempt >= retries || !isRetryableError(error)) {
+          break;
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+      attempt += 1;
+    }
+
+    throw new Error(describeError(label, lastError), { cause: lastError });
+  }
+
+  async function bootstrapOrganizationContext(): Promise<string> {
+    const orgs = await executeApiCall("Load organizations", (options) => listOrganizations(options));
+    let orgId = orgs.items[0]?.id ?? null;
+
+    if (!orgId) {
+      const created = await executeApiCall("Create organization", (options) =>
+        createOrganization(
+          {
+            name: "TeamFrame Workspace",
+            slug: defaultOrgSlug(),
+          },
+          options,
+        ),
+      );
+      orgId = created.id;
+    }
+
+    return orgId;
+  }
+
   async function loadOrganizationState(targetOrganizationId: string) {
-    const opts = requestOptions();
     const [teamData, positionData, peopleData, actionData, policyData, teamOwnerData, positionOwnerData] =
       await Promise.all([
-        listTeams(targetOrganizationId, opts),
-        listPositions(targetOrganizationId, opts),
-        listPeople(targetOrganizationId, opts),
-        listActions(targetOrganizationId, opts),
-        listPolicies(targetOrganizationId, opts),
-        listTeamOwnerships(targetOrganizationId, opts),
-        listPositionOwnerships(targetOrganizationId, opts),
+        executeApiCall("Load teams", (options) => listTeams(targetOrganizationId, options)),
+        executeApiCall("Load positions", (options) => listPositions(targetOrganizationId, options)),
+        executeApiCall("Load people", (options) => listPeople(targetOrganizationId, options)),
+        executeApiCall("Load actions", (options) => listActions(targetOrganizationId, options)),
+        executeApiCall("Load policies", (options) => listPolicies(targetOrganizationId, options)),
+        executeApiCall("Load team ownership", (options) =>
+          listTeamOwnerships(targetOrganizationId, options),
+        ),
+        executeApiCall("Load position ownership", (options) =>
+          listPositionOwnerships(targetOrganizationId, options),
+        ),
       ]);
 
     setTeams(teamData.items);
@@ -262,9 +344,26 @@ export function TeamFrame() {
     setPositionOwnerships(positionOwnerData.items);
   }
 
+  async function recoverOrganizationContext(reason: string) {
+    const recoveredOrganizationId = await bootstrapOrganizationContext();
+    setOrganizationId(recoveredOrganizationId);
+    await loadOrganizationState(recoveredOrganizationId);
+    setError(`${reason} Recovery complete. Re-synced organization context.`);
+  }
+
   async function refreshState() {
     if (!organizationId) return;
-    await loadOrganizationState(organizationId);
+
+    try {
+      await loadOrganizationState(organizationId);
+    } catch (error) {
+      const status = errorStatus(error);
+      if (status === 403 || status === 404) {
+        await recoverOrganizationContext("Organization context became invalid.");
+        return;
+      }
+      throw error;
+    }
   }
 
   useEffect(() => {
@@ -277,27 +376,13 @@ export function TeamFrame() {
       setLoading(true);
       setError(null);
       try {
-        const opts = requestOptions();
-        const orgs = await listOrganizations(opts);
-        let orgId = orgs.items[0]?.id ?? null;
-
-        if (!orgId) {
-          const created = await createOrganization(
-            {
-              name: "TeamFrame Workspace",
-              slug: defaultOrgSlug(),
-            },
-            opts,
-          );
-          orgId = created.id;
-        }
-
-        if (cancelled || !orgId) return;
+        const orgId = await bootstrapOrganizationContext();
+        if (cancelled) return;
         setOrganizationId(orgId);
         await loadOrganizationState(orgId);
-      } catch (err) {
+      } catch (error) {
         if (!cancelled) {
-          setError(err instanceof Error ? err.message : String(err));
+          setError(error instanceof Error ? error.message : String(error));
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -316,8 +401,8 @@ export function TeamFrame() {
     try {
       await task();
       await refreshState();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : String(err));
+    } catch (error) {
+      setError(error instanceof Error ? error.message : String(error));
     } finally {
       setBusy(false);
     }
@@ -375,13 +460,15 @@ export function TeamFrame() {
   async function handleCreateTeam() {
     if (!organizationId || !newTeamName.trim()) return;
     await runMutation(async () => {
-      await createTeam(
-        organizationId,
-        {
-          name: newTeamName.trim(),
-          parentTeamId: newTeamParentId || undefined,
-        },
-        requestOptions(),
+      await executeApiCall("Create team", (options) =>
+        createTeam(
+          organizationId,
+          {
+            name: newTeamName.trim(),
+            parentTeamId: newTeamParentId || undefined,
+          },
+          options,
+        ),
       );
       setNewTeamName("");
       setNewTeamParentId("");
@@ -391,15 +478,17 @@ export function TeamFrame() {
   async function handleCreatePosition() {
     if (!organizationId || !newPositionTitle.trim()) return;
     await runMutation(async () => {
-      await createPosition(
-        organizationId,
-        {
-          title: newPositionTitle.trim(),
-          teamId: newPositionTeamId || undefined,
-          reportsToPositionId: newPositionReportsToId || undefined,
-          lifecycleStatus: PositionLifecycleStatus.vacant,
-        },
-        requestOptions(),
+      await executeApiCall("Create position", (options) =>
+        createPosition(
+          organizationId,
+          {
+            title: newPositionTitle.trim(),
+            teamId: newPositionTeamId || undefined,
+            reportsToPositionId: newPositionReportsToId || undefined,
+            lifecycleStatus: PositionLifecycleStatus.vacant,
+          },
+          options,
+        ),
       );
       setNewPositionTitle("");
       setNewPositionTeamId("");
@@ -410,16 +499,18 @@ export function TeamFrame() {
   async function handleCreatePerson() {
     if (!organizationId || !newPersonName.trim()) return;
     await runMutation(async () => {
-      await createPerson(
-        organizationId,
-        {
-          fullName: newPersonName.trim(),
-          email: newPersonEmail || undefined,
-          phone: newPersonPhone || undefined,
-          positionId: newPersonPositionId || undefined,
-          employmentStatus: newPersonStatus,
-        },
-        requestOptions(),
+      await executeApiCall("Create person", (options) =>
+        createPerson(
+          organizationId,
+          {
+            fullName: newPersonName.trim(),
+            email: newPersonEmail || undefined,
+            phone: newPersonPhone || undefined,
+            positionId: newPersonPositionId || undefined,
+            employmentStatus: newPersonStatus,
+          },
+          options,
+        ),
       );
       setNewPersonName("");
       setNewPersonEmail("");
@@ -432,15 +523,17 @@ export function TeamFrame() {
   async function handleAssignTeamOwnership() {
     if (!organizationId || !teamOwnershipTargetId || !teamOwnershipOwnerId) return;
     await runMutation(async () => {
-      await assignTeamOwnership(
-        organizationId,
-        teamOwnershipTargetId,
-        {
-          ownerPersonId: teamOwnershipOwnerType === "person" ? teamOwnershipOwnerId : null,
-          ownerPositionId: teamOwnershipOwnerType === "position" ? teamOwnershipOwnerId : null,
-          responsibilityContext: teamOwnershipContext,
-        },
-        requestOptions(),
+      await executeApiCall("Assign team ownership", (options) =>
+        assignTeamOwnership(
+          organizationId,
+          teamOwnershipTargetId,
+          {
+            ownerPersonId: teamOwnershipOwnerType === "person" ? teamOwnershipOwnerId : null,
+            ownerPositionId: teamOwnershipOwnerType === "position" ? teamOwnershipOwnerId : null,
+            responsibilityContext: teamOwnershipContext,
+          },
+          options,
+        ),
       );
       setTeamOwnershipContext("");
     });
@@ -449,17 +542,19 @@ export function TeamFrame() {
   async function handleAssignPositionOwnership() {
     if (!organizationId || !positionOwnershipTargetId || !positionOwnershipOwnerId) return;
     await runMutation(async () => {
-      await assignPositionOwnership(
-        organizationId,
-        positionOwnershipTargetId,
-        {
-          ownerPersonId:
-            positionOwnershipOwnerType === "person" ? positionOwnershipOwnerId : null,
-          ownerPositionId:
-            positionOwnershipOwnerType === "position" ? positionOwnershipOwnerId : null,
-          responsibilityContext: positionOwnershipContext,
-        },
-        requestOptions(),
+      await executeApiCall("Assign position ownership", (options) =>
+        assignPositionOwnership(
+          organizationId,
+          positionOwnershipTargetId,
+          {
+            ownerPersonId:
+              positionOwnershipOwnerType === "person" ? positionOwnershipOwnerId : null,
+            ownerPositionId:
+              positionOwnershipOwnerType === "position" ? positionOwnershipOwnerId : null,
+            responsibilityContext: positionOwnershipContext,
+          },
+          options,
+        ),
       );
       setPositionOwnershipContext("");
     });
@@ -469,22 +564,24 @@ export function TeamFrame() {
     if (!organizationId || !newActionTitle.trim() || !newActionOwnerId || !newActionLinkId) return;
 
     await runMutation(async () => {
-      await createAction(
-        organizationId,
-        {
-          title: newActionTitle.trim(),
-          dueDate: newActionDueDate || undefined,
-          owner: {
-            ownerPersonId: newActionOwnerType === "person" ? newActionOwnerId : null,
-            ownerPositionId: newActionOwnerType === "position" ? newActionOwnerId : null,
+      await executeApiCall("Create action", (options) =>
+        createAction(
+          organizationId,
+          {
+            title: newActionTitle.trim(),
+            dueDate: newActionDueDate || undefined,
+            owner: {
+              ownerPersonId: newActionOwnerType === "person" ? newActionOwnerId : null,
+              ownerPositionId: newActionOwnerType === "position" ? newActionOwnerId : null,
+            },
+            link: {
+              teamId: newActionLinkType === "team" ? newActionLinkId : null,
+              positionId: newActionLinkType === "position" ? newActionLinkId : null,
+              personId: newActionLinkType === "person" ? newActionLinkId : null,
+            },
           },
-          link: {
-            teamId: newActionLinkType === "team" ? newActionLinkId : null,
-            positionId: newActionLinkType === "position" ? newActionLinkId : null,
-            personId: newActionLinkType === "person" ? newActionLinkId : null,
-          },
-        },
-        requestOptions(),
+          options,
+        ),
       );
       setNewActionTitle("");
       setNewActionDueDate("");
@@ -499,18 +596,20 @@ export function TeamFrame() {
       action.status === ActionStatus.open
         ? ActionStatus.in_progress
         : action.status === ActionStatus.in_progress
-        ? ActionStatus.done
-        : null;
+          ? ActionStatus.done
+          : null;
     if (!nextStatus) return;
 
     await runMutation(async () => {
-      await transitionActionStatus(
-        organizationId,
-        action.id,
-        {
-          status: nextStatus,
-        },
-        requestOptions(),
+      await executeApiCall("Transition action", (options) =>
+        transitionActionStatus(
+          organizationId,
+          action.id,
+          {
+            status: nextStatus,
+          },
+          options,
+        ),
       );
     });
   }
@@ -519,21 +618,23 @@ export function TeamFrame() {
     if (!organizationId || !newPolicyTitle.trim() || !newPolicyBody.trim() || !newPolicyOwnerId) return;
 
     await runMutation(async () => {
-      await createPolicy(
-        organizationId,
-        {
-          title: newPolicyTitle.trim(),
-          body: newPolicyBody.trim(),
-          scope: newPolicyScope,
-          teamId: newPolicyScope === PolicyScope.team ? newPolicyTeamId || undefined : undefined,
-          positionId:
-            newPolicyScope === PolicyScope.position ? newPolicyPositionId || undefined : undefined,
-          owner: {
-            ownerPersonId: newPolicyOwnerType === "person" ? newPolicyOwnerId : null,
-            ownerPositionId: newPolicyOwnerType === "position" ? newPolicyOwnerId : null,
+      await executeApiCall("Create policy", (options) =>
+        createPolicy(
+          organizationId,
+          {
+            title: newPolicyTitle.trim(),
+            body: newPolicyBody.trim(),
+            scope: newPolicyScope,
+            teamId: newPolicyScope === PolicyScope.team ? newPolicyTeamId || undefined : undefined,
+            positionId:
+              newPolicyScope === PolicyScope.position ? newPolicyPositionId || undefined : undefined,
+            owner: {
+              ownerPersonId: newPolicyOwnerType === "person" ? newPolicyOwnerId : null,
+              ownerPositionId: newPolicyOwnerType === "position" ? newPolicyOwnerId : null,
+            },
           },
-        },
-        requestOptions(),
+          options,
+        ),
       );
 
       setNewPolicyTitle("");
@@ -547,32 +648,73 @@ export function TeamFrame() {
   async function handleAttachPolicyScope() {
     if (!organizationId || !policyRetargetPolicyId) return;
     await runMutation(async () => {
-      await attachPolicyScope(
-        organizationId,
-        policyRetargetPolicyId,
-        {
-          scope: policyRetargetScope,
-          teamId: policyRetargetScope === PolicyScope.team ? policyRetargetTeamId || null : null,
-          positionId:
-            policyRetargetScope === PolicyScope.position
-              ? policyRetargetPositionId || null
-              : null,
-        },
-        requestOptions(),
+      await executeApiCall("Attach policy scope", (options) =>
+        attachPolicyScope(
+          organizationId,
+          policyRetargetPolicyId,
+          {
+            scope: policyRetargetScope,
+            teamId: policyRetargetScope === PolicyScope.team ? policyRetargetTeamId || null : null,
+            positionId:
+              policyRetargetScope === PolicyScope.position
+                ? policyRetargetPositionId || null
+                : null,
+          },
+          options,
+        ),
       );
     });
   }
 
-  async function handleDeleteEntity(type: "team" | "position" | "person" | "action" | "policy", id: string) {
+  async function handleDeleteEntity(
+    type: "team" | "position" | "person" | "action" | "policy",
+    id: string,
+  ) {
     if (!organizationId) return;
     await runMutation(async () => {
-      const opts = requestOptions();
-      if (type === "team") await deleteTeam(organizationId, id, opts);
-      if (type === "position") await deletePosition(organizationId, id, opts);
-      if (type === "person") await deletePerson(organizationId, id, opts);
-      if (type === "action") await deleteAction(organizationId, id, opts);
-      if (type === "policy") await deletePolicy(organizationId, id, opts);
+      if (type === "team") {
+        await executeApiCall("Delete team", (options) => deleteTeam(organizationId, id, options));
+      }
+      if (type === "position") {
+        await executeApiCall("Delete position", (options) =>
+          deletePosition(organizationId, id, options),
+        );
+      }
+      if (type === "person") {
+        await executeApiCall("Delete person", (options) => deletePerson(organizationId, id, options));
+      }
+      if (type === "action") {
+        await executeApiCall("Delete action", (options) => deleteAction(organizationId, id, options));
+      }
+      if (type === "policy") {
+        await executeApiCall("Delete policy", (options) => deletePolicy(organizationId, id, options));
+      }
     });
+  }
+
+  async function handleResetDemoState() {
+    if (!organizationId) return;
+    await runMutation(async () => {
+      const result = await executeApiCall("Reset demo state", (options) =>
+        resetOrganizationDemoState(organizationId, options),
+      );
+      setDemoResetSummary(
+        `Reset complete: ${result.teams} teams, ${result.positions} positions, ${result.people} people, ${result.actions} actions, ${result.policies} policies.`,
+      );
+    });
+  }
+
+  async function handleInvalidOrgRecoveryCheck() {
+    setBusy(true);
+    setError(null);
+    try {
+      await loadOrganizationState("00000000-0000-4000-8000-000000000000");
+      setError("Recovery check did not trigger as expected.");
+    } catch (_error) {
+      await recoverOrganizationContext("Invalid organization context detected.");
+    } finally {
+      setBusy(false);
+    }
   }
 
   function downloadPayrollCsv() {
@@ -992,7 +1134,21 @@ export function TeamFrame() {
               <div style={{ fontSize: 12, color: "#475569", marginBottom: 10 }}>
                 Organization ID: {organizationId ?? "-"}
               </div>
-              <button onClick={downloadPayrollCsv}>Download Payroll Export (utility)</button>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                <button onClick={downloadPayrollCsv}>Download Payroll Export (utility)</button>
+                <button onClick={() => void handleResetDemoState()} disabled={busy}>
+                  Reset Deterministic Demo
+                </button>
+                <button onClick={() => void handleInvalidOrgRecoveryCheck()} disabled={busy}>
+                  Run Invalid-Org Recovery Check
+                </button>
+              </div>
+              {demoResetSummary ? (
+                <div style={{ fontSize: 12, color: "#0F172A", marginBottom: 6 }}>{demoResetSummary}</div>
+              ) : null}
+              <div style={{ fontSize: 11, color: "#64748B" }}>
+                COO walkthrough baseline: Org Map to Teams to Owners to Actions to Policies.
+              </div>
             </section>
           )}
         </main>

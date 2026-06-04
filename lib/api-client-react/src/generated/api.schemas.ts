@@ -9,6 +9,15 @@ export interface ErrorResponse {
   message: string;
 }
 
+export interface DemoResetResponse {
+  organizationId: string;
+  teams: number;
+  positions: number;
+  people: number;
+  actions: number;
+  policies: number;
+}
+
 export interface HealthStatus {
   status: string;
 }

@@ -39,6 +39,8 @@ import {
   ListPositionOwnershipsResponse,
   ListTeamOwnershipsParams,
   ListTeamOwnershipsResponse,
+  ResetOrganizationDemoStateParams,
+  ResetOrganizationDemoStateResponse,
   ListPeopleParams,
   ListPeopleResponse,
   ListPoliciesParams,
@@ -76,6 +78,7 @@ import { buildPeopleService } from "../services/people-service";
 import { buildActionService } from "../services/action-service";
 import { buildPolicyService } from "../services/policy-service";
 import { buildOwnershipService } from "../services/ownership-service";
+import { buildDemoService } from "../services/demo-service";
 
 const organizations = buildOrganizationService();
 const teams = buildTeamService();
@@ -84,6 +87,7 @@ const people = buildPeopleService();
 const actions = buildActionService();
 const policies = buildPolicyService();
 const ownership = buildOwnershipService();
+const demo = buildDemoService();
 
 function actorFromReq(req: { actor?: ActorContext }): ActorContext {
   if (!req.actor) {
@@ -117,6 +121,15 @@ router.get(
     const params = GetOrganizationParams.parse(req.params);
     const organization = await organizations.get(actorFromReq(req), params.organizationId);
     res.json(GetOrganizationResponse.parse(organization));
+  }),
+);
+
+router.post(
+  "/organizations/:organizationId/demo/reset",
+  asyncHandler(async (req, res) => {
+    const params = ResetOrganizationDemoStateParams.parse(req.params);
+    const result = await demo.resetOrganization(actorFromReq(req), params.organizationId);
+    res.json(ResetOrganizationDemoStateResponse.parse(result));
   }),
 );
 

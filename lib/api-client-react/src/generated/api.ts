@@ -31,6 +31,7 @@ import type {
   CreatePolicyRequest,
   CreatePositionRequest,
   CreateTeamRequest,
+  DemoResetResponse,
   ErrorResponse,
   HealthStatus,
   Organization,
@@ -368,6 +369,76 @@ export function useGetOrganization<TData = Awaited<ReturnType<typeof getOrganiza
 
 
 
+
+export const getResetOrganizationDemoStateUrl = (organizationId: string,) => {
+
+
+
+
+  return `/api/organizations/${organizationId}/demo/reset`
+}
+
+/**
+ * @summary Reset organization to deterministic demo state
+ */
+export const resetOrganizationDemoState = async (organizationId: string, options?: RequestInit): Promise<DemoResetResponse> => {
+
+  return customFetch<DemoResetResponse>(getResetOrganizationDemoStateUrl(organizationId),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+
+export const getResetOrganizationDemoStateMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetOrganizationDemoState>>, TError,{organizationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof resetOrganizationDemoState>>, TError,{organizationId: string}, TContext> => {
+
+const mutationKey = ['resetOrganizationDemoState'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof resetOrganizationDemoState>>, {organizationId: string}> = (props) => {
+          const {organizationId} = props ?? {};
+
+          return  resetOrganizationDemoState(organizationId,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type ResetOrganizationDemoStateMutationResult = NonNullable<Awaited<ReturnType<typeof resetOrganizationDemoState>>>
+
+    export type ResetOrganizationDemoStateMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reset organization to deterministic demo state
+ */
+export const useResetOrganizationDemoState = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof resetOrganizationDemoState>>, TError,{organizationId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof resetOrganizationDemoState>>,
+        TError,
+        {organizationId: string},
+        TContext
+      > => {
+      return useMutation(getResetOrganizationDemoStateMutationOptions(options));
+    }
 
 export const getListTeamsUrl = (organizationId: string,) => {
 

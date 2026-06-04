@@ -19,6 +19,7 @@ export * from './createPersonRequest';
 export * from './createPolicyRequest';
 export * from './createPositionRequest';
 export * from './createTeamRequest';
+export * from './demoResetResponse';
 export * from './employmentStatus';
 export * from './errorResponse';
 export * from './healthStatus';

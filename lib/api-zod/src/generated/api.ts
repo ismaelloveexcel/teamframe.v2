@@ -61,6 +61,23 @@ export const GetOrganizationResponse = zod.object({
 
 
 /**
+ * @summary Reset organization to deterministic demo state
+ */
+export const ResetOrganizationDemoStateParams = zod.object({
+  "organizationId": zod.coerce.string().uuid()
+})
+
+export const ResetOrganizationDemoStateResponse = zod.object({
+  "organizationId": zod.string().uuid(),
+  "teams": zod.number(),
+  "positions": zod.number(),
+  "people": zod.number(),
+  "actions": zod.number(),
+  "policies": zod.number()
+})
+
+
+/**
  * @summary List teams for an organization
  */
 export const ListTeamsParams = zod.object({

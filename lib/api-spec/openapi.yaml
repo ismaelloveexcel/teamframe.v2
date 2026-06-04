@@ -24,6 +24,8 @@ tags:
     description: Org-linked execution actions
   - name: policies
     description: Team and position policy context
+  - name: demo
+    description: Deterministic demo-state operations
 paths:
   /healthz:
     get:
@@ -88,6 +90,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/ErrorResponse"
+
+
+
+  /organizations/{organizationId}/demo/reset:
+    post:
+      operationId: resetOrganizationDemoState
+      tags: [demo]
+      summary: Reset organization to deterministic demo state
+      parameters:
+        - $ref: "#/components/parameters/OrganizationIdParam"
+      responses:
+        "200":
+          description: Demo state reset summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DemoResetResponse"
 
   /organizations/{organizationId}/teams:
     get:
@@ -665,6 +684,24 @@ components:
         message:
           type: string
       required: [message]
+    DemoResetResponse:
+      type: object
+      properties:
+        organizationId:
+          type: string
+          format: uuid
+        teams:
+          type: integer
+        positions:
+          type: integer
+        people:
+          type: integer
+        actions:
+          type: integer
+        policies:
+          type: integer
+      required: [organizationId, teams, positions, people, actions, policies]
+
     HealthStatus:
       type: object
       properties:
