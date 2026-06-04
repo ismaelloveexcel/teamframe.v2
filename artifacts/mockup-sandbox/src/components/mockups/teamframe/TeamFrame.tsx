@@ -30,6 +30,7 @@ import {
   resetOrganizationDemoState,
   setBaseUrl,
   transitionActionStatus,
+  updatePerson,
   type Action,
   type Person,
   type Policy,
@@ -42,6 +43,8 @@ import {
 type NavId = "org" | "actions" | "team" | "policies" | "administration";
 type OwnerType = "person" | "position";
 type PositionLevel = "Executive" | "Director" | "Manager" | "IC";
+type PositionPanelTab = "position" | "assignment" | "operations";
+type AssignmentRuntimeStatus = "active" | "interim" | "ended";
 
 const NAV_ITEMS: Array<{ id: NavId; label: string }> = [
   { id: "org", label: "Org Map" },
@@ -172,6 +175,21 @@ type LocalDemoState = {
   teamOwnerships: TeamOwnership[];
   positionOwnerships: PositionOwnership[];
 };
+
+type PositionBlueprint = {
+  jobDescription: string;
+  salaryBand: string;
+  requirements: string;
+};
+
+type AssignmentRuntime = {
+  status: AssignmentRuntimeStatus;
+  startDate: string;
+  endDate: string;
+  actualSalary: string;
+};
+
+type PositionNodeComputedState = "filled" | "vacant" | "interim" | "degraded" | "at-risk";
 
 const LOCAL_DEMO_STATE: LocalDemoState = {
   organizationId: "00000000-0000-4000-8000-000000000111",
@@ -597,6 +615,17 @@ export function TeamFrame() {
   const [teamOwnerships, setTeamOwnerships] = useState<TeamOwnership[]>([]);
   const [positionOwnerships, setPositionOwnerships] = useState<PositionOwnership[]>([]);
 
+  const [positionBlueprints, setPositionBlueprints] = useState<Record<string, PositionBlueprint>>({});
+  const [assignmentRuntimeByPosition, setAssignmentRuntimeByPosition] = useState<Record<string, AssignmentRuntime>>({});
+  const [positionPanelTab, setPositionPanelTab] = useState<PositionPanelTab>("position");
+  const [focusedSubtreeRootId, setFocusedSubtreeRootId] = useState<string | null>(null);
+
+  const [assignmentDraftEmployeeId, setAssignmentDraftEmployeeId] = useState<string>("");
+  const [assignmentDraftStatus, setAssignmentDraftStatus] = useState<AssignmentRuntimeStatus>("active");
+  const [assignmentDraftStartDate, setAssignmentDraftStartDate] = useState("");
+  const [assignmentDraftEndDate, setAssignmentDraftEndDate] = useState("");
+  const [assignmentDraftActualSalary, setAssignmentDraftActualSalary] = useState("");
+
   const [newTeamName, setNewTeamName] = useState("");
   const [newTeamParentId, setNewTeamParentId] = useState<string>("");
 
@@ -683,6 +712,138 @@ export function TeamFrame() {
     }
     return map;
   }, [people]);
+
+  const positionAssignmentById = useMemo(() => {
+    const map = new Map<string, { person: Person; runtime: AssignmentRuntime }>();
+    for (const [positionId, assignedPeople] of peopleByPosition.entries()) {
+      const person = assignedPeople[0];
+      if (!person) continue;
+      const runtime = assignmentRuntimeByPosition[positionId] ?? {
+        status: "active",
+        startDate: formatDateLabel(person.createdAt),
+        endDate: "",
+        actualSalary: "",
+      };
+      map.set(positionId, { person, runtime });
+    }
+    return map;
+  }, [assignmentRuntimeByPosition, peopleByPosition]);
+
+  const positionActionStats = useMemo(() => {
+    const map = new Map<string, { open: number; overdue: number; blocked: number }>();
+    for (const position of positions) {
+      const scopedActions = actions.filter(
+        (item) => item.positionId === position.id || item.ownerPositionId === position.id,
+      );
+      map.set(position.id, {
+        open: scopedActions.filter((item) => item.status !== ActionStatus.done).length,
+        overdue: scopedActions.filter((item) => {
+          if (item.status === ActionStatus.done || !item.dueDate) return false;
+          const due = new Date(item.dueDate).getTime();
+          return !Number.isNaN(due) && due < Date.now();
+        }).length,
+        blocked: scopedActions.filter(
+          (item) => item.status !== ActionStatus.done && item.blocked,
+        ).length,
+      });
+    }
+    return map;
+  }, [actions, positions]);
+
+  const positionComplianceAlerts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const position of positions) {
+      const assignment = positionAssignmentById.get(position.id);
+      if (!assignment) {
+        map.set(position.id, 0);
+        continue;
+      }
+      let alerts = 0;
+      if (!assignment.person.email) alerts += 1;
+      if (!assignment.person.phone) alerts += 1;
+      map.set(position.id, alerts);
+    }
+    return map;
+  }, [positionAssignmentById, positions]);
+
+  const positionDirectReportCount = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const position of positions) {
+      map.set(position.id, (positionsByManager.get(position.id) ?? []).length);
+    }
+    return map;
+  }, [positions, positionsByManager]);
+
+  const selectedPositionId = focusPositionId ?? positionsByManager.get("root")?.[0]?.id ?? null;
+  const selectedPosition = selectedPositionId ? positionMap.get(selectedPositionId) ?? null : null;
+  const selectedAssignment = selectedPositionId
+    ? positionAssignmentById.get(selectedPositionId) ?? null
+    : null;
+
+  function getPositionBlueprint(position: Position): PositionBlueprint {
+    const existing = positionBlueprints[position.id];
+    if (existing) return existing;
+    return {
+      jobDescription: `Define responsibilities and outcomes for ${position.title}.`,
+      salaryBand: "Not set",
+      requirements: "",
+    };
+  }
+
+  useEffect(() => {
+    if (positionPanelTab !== "assignment" || !selectedPositionId) return;
+    setAssignmentDraftEmployeeId(selectedAssignment?.person.id ?? "");
+    setAssignmentDraftStatus(selectedAssignment?.runtime.status ?? "active");
+    setAssignmentDraftStartDate(selectedAssignment?.runtime.startDate ?? "");
+    setAssignmentDraftEndDate(selectedAssignment?.runtime.endDate ?? "");
+    setAssignmentDraftActualSalary(selectedAssignment?.runtime.actualSalary ?? "");
+  }, [positionPanelTab, selectedAssignment, selectedPositionId]);
+
+  function setPositionBlueprintField(
+    positionId: string,
+    field: keyof PositionBlueprint,
+    value: string,
+  ) {
+    setPositionBlueprints((current) => ({
+      ...current,
+      [positionId]: {
+        ...(
+          current[positionId] ?? {
+            jobDescription: `Define responsibilities and outcomes for ${
+              positionMap.get(positionId)?.title ?? "this position"
+            }.`,
+            salaryBand: "Not set",
+            requirements: "",
+          }
+        ),
+        [field]: value,
+      },
+    }));
+  }
+
+  function resolvePositionNodeState(positionId: string): PositionNodeComputedState {
+    const assignment = positionAssignmentById.get(positionId);
+    if (!assignment) return "vacant";
+    if (assignment.runtime.status === "interim") return "interim";
+
+    const actionStats = positionActionStats.get(positionId) ?? { open: 0, overdue: 0, blocked: 0 };
+    const complianceAlerts = positionComplianceAlerts.get(positionId) ?? 0;
+
+    if (assignment.person.employmentStatus === EmploymentStatus.on_leave) {
+      return "degraded";
+    }
+
+    if (
+      assignment.person.employmentStatus === EmploymentStatus.offboarding ||
+      actionStats.overdue > 0 ||
+      actionStats.blocked > 0 ||
+      complianceAlerts > 0
+    ) {
+      return "at-risk";
+    }
+
+    return "filled";
+  }
 
   const positionDepthMap = useMemo(() => {
     const depth = new Map<string, number>();
@@ -955,44 +1116,71 @@ useEffect(() => {
     return "Unknown link";
   }
 
+  function openAssignmentEditorForPosition(positionId: string, status?: AssignmentRuntimeStatus) {
+    const assignment = positionAssignmentById.get(positionId);
+    setFocusPositionId(positionId);
+    setPositionPanelTab("assignment");
+    setAssignmentDraftEmployeeId(assignment?.person.id ?? "");
+    setAssignmentDraftStatus(status ?? assignment?.runtime.status ?? "active");
+    setAssignmentDraftStartDate(assignment?.runtime.startDate ?? "");
+    setAssignmentDraftEndDate(assignment?.runtime.endDate ?? "");
+    setAssignmentDraftActualSalary(assignment?.runtime.actualSalary ?? "");
+  }
+
+  function statePresentation(state: PositionNodeComputedState) {
+    if (state === "vacant") {
+      return { label: "Vacant", bg: "#FEE2E2", color: "#B91C1C", border: "#FCA5A5" };
+    }
+    if (state === "interim") {
+      return { label: "Interim", bg: "#FEF3C7", color: "#92400E", border: "#FCD34D" };
+    }
+    if (state === "degraded") {
+      return { label: "Degraded", bg: "#FEF3C7", color: "#92400E", border: "#F59E0B" };
+    }
+    if (state === "at-risk") {
+      return { label: "At-risk", bg: "#FEE2E2", color: "#991B1B", border: "#EF4444" };
+    }
+    return { label: "Filled", bg: "#DCFCE7", color: "#166534", border: "#22C55E" };
+  }
+
   function renderPositionNode(positionId: string) {
     const position = positionMap.get(positionId);
     if (!position) return <></>;
 
-    const peopleInPosition = peopleByPosition.get(positionId) ?? [];
-    const primaryPerson = peopleInPosition[0] ?? null;
+    const assignment = positionAssignmentById.get(positionId);
+    const assignedPerson = assignment?.person ?? null;
     const children = positionsByManager.get(positionId) ?? [];
-    const level = resolvePositionLevel(positionId);
-    const isExpanded = expandedPositionIds.has(positionId);
-    const visibleChildren = children.filter((child) => {
-      const childLevel = resolvePositionLevel(child.id);
-      if (childLevel !== "IC") return true;
-      return isExpanded;
-    });
-
-    const ownership = positionOwnershipMap.get(positionId);
+    const isCollapsed = expandedPositionIds.has(positionId);
+    const visibleChildren = isCollapsed ? [] : children;
     const teamName = position.teamId ? teamMap.get(position.teamId)?.name ?? "Unassigned" : "Unassigned";
-    const statusLabel = position.lifecycleStatus.replace("_", " ");
+    const actionStats = positionActionStats.get(positionId) ?? { open: 0, overdue: 0, blocked: 0 };
+    const complianceAlerts = positionComplianceAlerts.get(positionId) ?? 0;
+    const directReports = positionDirectReportCount.get(positionId) ?? 0;
+    const nodeState = resolvePositionNodeState(positionId);
+    const stateUi = statePresentation(nodeState);
+    const isSelected = selectedPositionId === positionId;
 
     return (
       <div
         key={positionId}
-        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, minWidth: 250 }}
+        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 14, minWidth: 260 }}
       >
         <button
           type="button"
           onClick={() => {
             setFocusPositionId(positionId);
-            togglePositionExpansion(positionId);
+            setPositionPanelTab("position");
           }}
           style={{
             width: "100%",
-            maxWidth: 290,
-            border: "1px solid #D7DFEA",
+            maxWidth: 300,
+            border: `1px solid ${isSelected ? "#2563EB" : stateUi.border}`,
             borderRadius: 14,
             padding: 12,
             background: "#FFFFFF",
-            boxShadow: "0 14px 28px rgba(15, 23, 42, 0.12)",
+            boxShadow: isSelected
+              ? "0 0 0 2px rgba(37,99,235,0.12), 0 14px 28px rgba(15, 23, 42, 0.12)"
+              : "0 14px 28px rgba(15, 23, 42, 0.12)",
             textAlign: "left",
             cursor: "pointer",
           }}
@@ -1013,8 +1201,17 @@ useEffect(() => {
             >
               {teamName}
             </span>
-            <span style={{ fontSize: 10, color: "#64748B", textTransform: "capitalize" }}>
-              {level} · {statusLabel}
+            <span
+              style={{
+                fontSize: 10,
+                fontWeight: 700,
+                borderRadius: 999,
+                padding: "3px 8px",
+                background: stateUi.bg,
+                color: stateUi.color,
+              }}
+            >
+              {stateUi.label}
             </span>
           </div>
 
@@ -1034,19 +1231,35 @@ useEffect(() => {
                 flexShrink: 0,
               }}
             >
-              {primaryPerson ? initials(primaryPerson.fullName) : "NA"}
+              {assignedPerson ? initials(assignedPerson.fullName) : "NA"}
             </div>
             <div style={{ minWidth: 0 }}>
               <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A" }}>{position.title}</div>
               <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
-                {primaryPerson ? primaryPerson.fullName : "Unfilled position"}
+                {assignedPerson ? assignedPerson.fullName : "Vacant seat"}
               </div>
             </div>
           </div>
 
-          <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 4 }}>
-            <div style={{ fontSize: 11, color: "#334155" }}>Email: {primaryPerson?.email ?? "not set"}</div>
-            <div style={{ fontSize: 11, color: "#334155" }}>Phone: {primaryPerson?.phone ?? "not set"}</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 6, marginTop: 10 }}>
+            <span style={{ fontSize: 10, color: "#334155", background: "#E2E8F0", borderRadius: 999, padding: "2px 7px" }}>
+              {actionStats.open} open actions
+            </span>
+            {actionStats.overdue > 0 ? (
+              <span style={{ fontSize: 10, color: "#991B1B", background: "#FEE2E2", borderRadius: 999, padding: "2px 7px" }}>
+                {actionStats.overdue} overdue
+              </span>
+            ) : null}
+            {complianceAlerts > 0 ? (
+              <span style={{ fontSize: 10, color: "#92400E", background: "#FEF3C7", borderRadius: 999, padding: "2px 7px" }}>
+                {complianceAlerts} compliance alerts
+              </span>
+            ) : null}
+            {directReports > 5 ? (
+              <span style={{ fontSize: 10, color: "#7F1D1D", background: "#FEE2E2", borderRadius: 999, padding: "2px 7px" }}>
+                overload ({directReports} reports)
+              </span>
+            ) : null}
           </div>
 
           <div
@@ -1054,33 +1267,65 @@ useEffect(() => {
               marginTop: 10,
               borderTop: "1px solid #E2E8F0",
               paddingTop: 8,
-              display: "grid",
-              gridTemplateColumns: "1fr auto",
+              display: "flex",
+              flexWrap: "wrap",
               gap: 6,
-              alignItems: "center",
             }}
           >
-            <div style={{ fontSize: 10, color: "#475569" }}>
-              Owner: {ownership ? ownerLabel(ownership.ownerPersonId, ownership.ownerPositionId) : "Unassigned"}
-            </div>
-            <div style={{ fontSize: 10, color: "#475569", fontWeight: 700 }}>
-              {children.length} reports {visibleChildren.length > 0 ? (isExpanded ? "▾" : "▸") : ""}
-            </div>
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                openAssignmentEditorForPosition(positionId);
+              }}
+              style={{ fontSize: 10, padding: "3px 7px" }}
+            >
+              {assignedPerson ? "Reassign" : "Assign"}
+            </button>
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                setActiveNav("actions");
+                setFocusPositionId(positionId);
+                setNewActionOwnerId(positionId);
+                setNewActionLinkId(positionId);
+              }}
+              style={{ fontSize: 10, padding: "3px 7px" }}
+            >
+              Create action
+            </button>
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                openAssignmentEditorForPosition(positionId, "interim");
+              }}
+              style={{ fontSize: 10, padding: "3px 7px" }}
+            >
+              Mark interim
+            </button>
+            <button
+              onClick={(event) => {
+                event.stopPropagation();
+                setFocusedSubtreeRootId((current) =>
+                  current === positionId ? null : positionId,
+                );
+              }}
+              style={{ fontSize: 10, padding: "3px 7px" }}
+            >
+              {focusedSubtreeRootId === positionId ? "Unfocus" : "Focus subtree"}
+            </button>
           </div>
 
-          {isExpanded ? (
-            <div style={{ marginTop: 10, borderTop: "1px dashed #CBD5E1", paddingTop: 8 }}>
-              <div style={{ fontSize: 10, color: "#64748B", marginBottom: 4 }}>
-                Job Description: role responsibilities for {position.title}.
-              </div>
-              <div style={{ fontSize: 10, color: "#64748B" }}>
-                Assigned employees: {peopleInPosition.length || 0}
-              </div>
-              {children.length > 0 ? (
-                <div style={{ fontSize: 10, color: "#64748B", marginTop: 4 }}>
-                  Direct child positions: {children.map((child) => child.title).join(", ")}
-                </div>
-              ) : null}
+          {children.length > 0 ? (
+            <div style={{ marginTop: 8, display: "flex", justifyContent: "flex-end" }}>
+              <button
+                onClick={(event) => {
+                  event.stopPropagation();
+                  togglePositionExpansion(positionId);
+                }}
+                style={{ fontSize: 10, padding: "3px 7px" }}
+              >
+                {isCollapsed ? "Expand reports" : "Collapse reports"}
+              </button>
             </div>
           ) : null}
         </button>
@@ -1101,14 +1346,19 @@ useEffect(() => {
             </div>
           </>
         ) : null}
-
       </div>
     );
   }
 
-  const rootPositions = positionsByManager.get("root") ?? [];
+  const organizationRootPositions = positionsByManager.get("root") ?? [];
+  const rootPositions = useMemo(() => {
+    if (!focusedSubtreeRootId) return organizationRootPositions;
+    const focusedRoot = positionMap.get(focusedSubtreeRootId);
+    return focusedRoot ? [focusedRoot] : organizationRootPositions;
+  }, [focusedSubtreeRootId, organizationRootPositions, positionMap]);
+
   const chartDepartmentTeams = teams.filter((team) => {
-    const executiveTeamId = rootPositions[0]?.teamId ?? null;
+    const executiveTeamId = organizationRootPositions[0]?.teamId ?? null;
     if (executiveTeamId) return team.parentTeamId === executiveTeamId;
     return team.parentTeamId === null;
   });
@@ -1129,26 +1379,115 @@ useEffect(() => {
     });
   }, [chartDepartmentTeams, positions, people]);
 
-  const effectiveFocusPositionId = focusPositionId ?? rootPositions[0]?.id ?? null;
-  const focusedPosition = effectiveFocusPositionId
-    ? positionMap.get(effectiveFocusPositionId) ?? null
+  const selectedActionStats = selectedPositionId
+    ? positionActionStats.get(selectedPositionId) ?? { open: 0, overdue: 0, blocked: 0 }
+    : { open: 0, overdue: 0, blocked: 0 };
+
+  const selectedComplianceAlerts = selectedPositionId
+    ? positionComplianceAlerts.get(selectedPositionId) ?? 0
+    : 0;
+
+  const selectedNodeState: PositionNodeComputedState = selectedPositionId
+    ? resolvePositionNodeState(selectedPositionId)
+    : "vacant";
+  const selectedNodeStateUi = statePresentation(selectedNodeState);
+
+  const selectedPositionOwnership = selectedPositionId
+    ? positionOwnershipMap.get(selectedPositionId) ?? null
     : null;
-  const focusedExecutionSummary = useMemo(() => {
-    if (!effectiveFocusPositionId) {
-      return { total: 0, open: 0, inProgress: 0, done: 0 };
+  const selectedTeamOwnership = selectedPosition?.teamId
+    ? teamOwnershipMap.get(selectedPosition.teamId) ?? null
+    : null;
+
+
+  async function handleSaveAssignment() {
+    if (!organizationId || !selectedPositionId || !assignmentDraftEmployeeId) return;
+
+    const selectedEmployee = personMap.get(assignmentDraftEmployeeId);
+    if (!selectedEmployee) {
+      setError("Selected employee could not be found.");
+      return;
     }
-    const scoped = actions.filter(
-      (item) =>
-        item.positionId === effectiveFocusPositionId ||
-        item.ownerPositionId === effectiveFocusPositionId,
-    );
-    return {
-      total: scoped.length,
-      open: scoped.filter((item) => item.status === ActionStatus.open).length,
-      inProgress: scoped.filter((item) => item.status === ActionStatus.in_progress).length,
-      done: scoped.filter((item) => item.status === ActionStatus.done).length,
-    };
-  }, [actions, effectiveFocusPositionId]);
+
+    await runMutation(async () => {
+      const currentOccupant = positionAssignmentById.get(selectedPositionId)?.person;
+      if (currentOccupant && currentOccupant.id !== assignmentDraftEmployeeId) {
+        await executeApiCall("Unassign current occupant", (options) =>
+          updatePerson(
+            organizationId,
+            currentOccupant.id,
+            {
+              positionId: null,
+            },
+            options,
+          ),
+        );
+      }
+
+      if (selectedEmployee.positionId && selectedEmployee.positionId !== selectedPositionId) {
+        await executeApiCall("Clear employee previous assignment", (options) =>
+          updatePerson(
+            organizationId,
+            selectedEmployee.id,
+            {
+              positionId: null,
+            },
+            options,
+          ),
+        );
+      }
+
+      await executeApiCall("Assign employee to position", (options) =>
+        updatePerson(
+          organizationId,
+          selectedEmployee.id,
+          {
+            positionId: selectedPositionId,
+          },
+          options,
+        ),
+      );
+    });
+
+    setAssignmentRuntimeByPosition((current) => ({
+      ...current,
+      [selectedPositionId]: {
+        status: assignmentDraftStatus,
+        startDate: assignmentDraftStartDate || new Date().toISOString().slice(0, 10),
+        endDate: assignmentDraftEndDate,
+        actualSalary: assignmentDraftActualSalary,
+      },
+    }));
+  }
+
+  async function handleVacateSelectedPosition() {
+    if (!organizationId || !selectedPositionId) return;
+    const occupant = positionAssignmentById.get(selectedPositionId)?.person;
+    if (!occupant) return;
+
+    await runMutation(async () => {
+      await executeApiCall("Vacate position", (options) =>
+        updatePerson(
+          organizationId,
+          occupant.id,
+          {
+            positionId: null,
+          },
+          options,
+        ),
+      );
+    });
+
+    setAssignmentRuntimeByPosition((current) => ({
+      ...current,
+      [selectedPositionId]: {
+        status: "ended",
+        startDate: current[selectedPositionId]?.startDate ?? "",
+        endDate: new Date().toISOString().slice(0, 10),
+        actualSalary: current[selectedPositionId]?.actualSalary ?? "",
+      },
+    }));
+  }
 
   async function handleCreateTeam() {
     if (!organizationId || !newTeamName.trim()) return;
@@ -1571,15 +1910,15 @@ useEffect(() => {
 
           {activeNav === "org" && (
             <section style={STYLE.panel}>
-              <div style={{ ...STYLE.title, fontSize: 17 }}>Organization Map</div>
+              <div style={{ ...STYLE.title, fontSize: 17 }}>Organization Builder · Position Node State Machine</div>
               <div style={{ fontSize: 12, color: "#475569", marginBottom: 12 }}>
-                The chart is the primary workspace. Contact visibility is embedded directly on nodes.
+                Position is the source of truth. Click any node to manage structure, assignment, and execution context.
               </div>
 
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "260px minmax(0, 1fr)",
+                  gridTemplateColumns: "250px minmax(0, 1fr) 350px",
                   gap: 12,
                   alignItems: "start",
                 }}
@@ -1595,27 +1934,58 @@ useEffect(() => {
                   }}
                 >
                   <div style={{ ...STYLE.subTitle, marginBottom: 10 }}>Organization Index</div>
-                  <input
-                    placeholder="Search teams or roles"
-                    style={{ width: "100%", marginBottom: 10, background: "#FFFFFF" }}
-                    readOnly
-                  />
                   <div
                     style={{
                       border: "1px solid #DBEAFE",
                       borderRadius: 10,
                       padding: "8px 10px",
                       background: "#EFF6FF",
-                      marginBottom: 8,
+                      marginBottom: 10,
                     }}
                   >
-                    <div style={{ ...STYLE.subTitle, color: "#1D4ED8", marginBottom: 4 }}>Focused Position Execution</div>
+                    <div style={{ ...STYLE.subTitle, color: "#1D4ED8", marginBottom: 4 }}>Selected Position</div>
                     <div style={{ fontSize: 12, fontWeight: 700, color: "#1E3A8A" }}>
-                      {focusedPosition?.title ?? "No focus"}
+                      {selectedPosition?.title ?? "No position selected"}
                     </div>
-                    <div style={{ fontSize: 11, color: "#334155", marginTop: 4 }}>
-                      Total {focusedExecutionSummary.total} · Open {focusedExecutionSummary.open} · In-progress {focusedExecutionSummary.inProgress} · Done {focusedExecutionSummary.done}
+                    <div style={{ marginTop: 6 }}>
+                      <span
+                        style={{
+                          fontSize: 10,
+                          fontWeight: 700,
+                          borderRadius: 999,
+                          padding: "3px 8px",
+                          background: selectedNodeStateUi.bg,
+                          color: selectedNodeStateUi.color,
+                        }}
+                      >
+                        {selectedNodeStateUi.label}
+                      </span>
                     </div>
+                    <div style={{ fontSize: 11, color: "#334155", marginTop: 6 }}>
+                      Open {selectedActionStats.open} · Overdue {selectedActionStats.overdue} · Compliance {selectedComplianceAlerts}
+                    </div>
+                  </div>
+
+                  <div
+                    style={{
+                      border: "1px solid #E2E8F0",
+                      borderRadius: 10,
+                      padding: "8px 10px",
+                      background: "#FFFFFF",
+                      marginBottom: 10,
+                    }}
+                  >
+                    <div style={{ fontSize: 11, fontWeight: 700, color: "#0F172A" }}>Subtree Focus</div>
+                    <div style={{ fontSize: 11, color: "#64748B", marginTop: 3 }}>
+                      {focusedSubtreeRootId
+                        ? `Focused on ${positionMap.get(focusedSubtreeRootId)?.title ?? "position"}`
+                        : "Full organization view"}
+                    </div>
+                    {focusedSubtreeRootId ? (
+                      <button style={{ marginTop: 8 }} onClick={() => setFocusedSubtreeRootId(null)}>
+                        Reset full view
+                      </button>
+                    ) : null}
                   </div>
 
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
@@ -1631,7 +2001,7 @@ useEffect(() => {
                       >
                         <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{team.teamName}</div>
                         <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
-                          {team.positionCount} positions · {team.peopleCount} people
+                          {team.positionCount} positions · {team.peopleCount} assigned
                         </div>
                       </div>
                     ))}
@@ -1646,19 +2016,251 @@ useEffect(() => {
                     ...STYLE.panel,
                     border: "1px solid #D8E0EC",
                     background: "linear-gradient(180deg, #F8FAFC 0%, #F1F5F9 100%)",
-                    minHeight: 520,
+                    minHeight: 600,
                   }}
                 >
                   <div style={{ ...STYLE.subTitle, marginBottom: 10 }}>Org Chart Canvas</div>
-                  <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", minHeight: 460 }}>
+                  <div style={{ fontSize: 11, color: "#64748B", marginBottom: 12 }}>
+                    {focusedSubtreeRootId
+                      ? `Focused subtree root: ${positionMap.get(focusedSubtreeRootId)?.title ?? "Unknown"}`
+                      : "Displaying full recursive position tree"}
+                  </div>
+                  <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", minHeight: 520 }}>
                     {rootPositions.length === 0 ? (
-                      <div style={{ fontSize: 12, color: "#64748B" }}>No positions yet.</div>
+                      <div style={{ fontSize: 12, color: "#64748B" }}>No positions yet. Create a root position to start.</div>
                     ) : (
                       <div style={{ display: "flex", flexDirection: "column", gap: 22, alignItems: "center" }}>
                         {rootPositions.map((position) => renderPositionNode(position.id))}
                       </div>
                     )}
                   </div>
+                </div>
+
+                <div style={{ ...STYLE.panel, border: "1px solid #D8E0EC", position: "sticky", top: 12 }}>
+                  <div style={{ ...STYLE.subTitle, marginBottom: 8 }}>Position Context Panel</div>
+                  {!selectedPosition ? (
+                    <div style={{ fontSize: 12, color: "#64748B" }}>Select a position from the org chart.</div>
+                  ) : (
+                    <>
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>{selectedPosition.title}</div>
+                        <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                          Department: {selectedPosition.teamId ? teamMap.get(selectedPosition.teamId)?.name ?? "Unassigned" : "Unassigned"}
+                        </div>
+                      </div>
+
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 6, marginBottom: 10 }}>
+                        <button
+                          onClick={() => setPositionPanelTab("position")}
+                          style={{
+                            fontSize: 11,
+                            background: positionPanelTab === "position" ? "#E2E8F0" : "#FFFFFF",
+                            border: "1px solid #CBD5E1",
+                            padding: "5px 6px",
+                          }}
+                        >
+                          Position
+                        </button>
+                        <button
+                          onClick={() => setPositionPanelTab("assignment")}
+                          style={{
+                            fontSize: 11,
+                            background: positionPanelTab === "assignment" ? "#E2E8F0" : "#FFFFFF",
+                            border: "1px solid #CBD5E1",
+                            padding: "5px 6px",
+                          }}
+                        >
+                          Assignment
+                        </button>
+                        <button
+                          onClick={() => setPositionPanelTab("operations")}
+                          style={{
+                            fontSize: 11,
+                            background: positionPanelTab === "operations" ? "#E2E8F0" : "#FFFFFF",
+                            border: "1px solid #CBD5E1",
+                            padding: "5px 6px",
+                          }}
+                        >
+                          Operations
+                        </button>
+                      </div>
+
+                      {positionPanelTab === "position" ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Job description</label>
+                          <textarea
+                            value={getPositionBlueprint(selectedPosition).jobDescription}
+                            onChange={(event) =>
+                              setPositionBlueprintField(
+                                selectedPosition.id,
+                                "jobDescription",
+                                event.target.value,
+                              )
+                            }
+                            rows={4}
+                            style={{ width: "100%", resize: "vertical" }}
+                          />
+
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Salary band</label>
+                          <input
+                            value={getPositionBlueprint(selectedPosition).salaryBand}
+                            onChange={(event) =>
+                              setPositionBlueprintField(
+                                selectedPosition.id,
+                                "salaryBand",
+                                event.target.value,
+                              )
+                            }
+                            placeholder="e.g. 40k-55k"
+                            style={{ width: "100%" }}
+                          />
+
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Role requirements</label>
+                          <textarea
+                            value={getPositionBlueprint(selectedPosition).requirements}
+                            onChange={(event) =>
+                              setPositionBlueprintField(
+                                selectedPosition.id,
+                                "requirements",
+                                event.target.value,
+                              )
+                            }
+                            rows={3}
+                            style={{ width: "100%", resize: "vertical" }}
+                          />
+
+                          <div style={{ fontSize: 11, color: "#64748B" }}>
+                            Module 1 note: this metadata is held in local session state pending backend fields.
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {positionPanelTab === "assignment" ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Assigned employee</label>
+                          <select
+                            value={assignmentDraftEmployeeId}
+                            onChange={(event) => setAssignmentDraftEmployeeId(event.target.value)}
+                            style={{ width: "100%" }}
+                          >
+                            <option value="">Select employee</option>
+                            {people.map((person) => (
+                              <option key={person.id} value={person.id}>
+                                {person.fullName}
+                              </option>
+                            ))}
+                          </select>
+
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Assignment status</label>
+                          <select
+                            value={assignmentDraftStatus}
+                            onChange={(event) =>
+                              setAssignmentDraftStatus(event.target.value as AssignmentRuntimeStatus)
+                            }
+                            style={{ width: "100%" }}
+                          >
+                            <option value="active">Active</option>
+                            <option value="interim">Interim</option>
+                          </select>
+
+                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                            <div>
+                              <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Start date</label>
+                              <input
+                                type="date"
+                                value={assignmentDraftStartDate}
+                                onChange={(event) => setAssignmentDraftStartDate(event.target.value)}
+                                style={{ width: "100%" }}
+                              />
+                            </div>
+                            <div>
+                              <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>End date</label>
+                              <input
+                                type="date"
+                                value={assignmentDraftEndDate}
+                                onChange={(event) => setAssignmentDraftEndDate(event.target.value)}
+                                style={{ width: "100%" }}
+                              />
+                            </div>
+                          </div>
+
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Actual salary (optional)</label>
+                          <input
+                            value={assignmentDraftActualSalary}
+                            onChange={(event) => setAssignmentDraftActualSalary(event.target.value)}
+                            placeholder="e.g. 52,000"
+                            style={{ width: "100%" }}
+                          />
+
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                            <button
+                              onClick={() => void handleSaveAssignment()}
+                              disabled={isLocalDemoMode || !assignmentDraftEmployeeId}
+                            >
+                              Save assignment
+                            </button>
+                            <button
+                              onClick={() => void handleVacateSelectedPosition()}
+                              disabled={isLocalDemoMode || !selectedAssignment}
+                            >
+                              Mark vacant
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+
+                      {positionPanelTab === "operations" ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            Actions open: <strong>{selectedActionStats.open}</strong>
+                          </div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            Overdue actions: <strong>{selectedActionStats.overdue}</strong>
+                          </div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            Blocked actions: <strong>{selectedActionStats.blocked}</strong>
+                          </div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            Compliance alerts: <strong>{selectedComplianceAlerts}</strong>
+                          </div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            Position owner: {selectedPositionOwnership
+                              ? ownerLabel(
+                                  selectedPositionOwnership.ownerPersonId,
+                                  selectedPositionOwnership.ownerPositionId,
+                                )
+                              : "Unassigned"}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            Team owner: {selectedTeamOwnership
+                              ? ownerLabel(
+                                  selectedTeamOwnership.ownerPersonId,
+                                  selectedTeamOwnership.ownerPositionId,
+                                )
+                              : "Unassigned"}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            Direct contact: {selectedAssignment?.person.email ?? "No email"} · {selectedAssignment?.person.phone ?? "No phone"}
+                          </div>
+
+                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 4 }}>
+                            <button
+                              onClick={() => {
+                                setActiveNav("actions");
+                                setNewActionOwnerId(selectedPosition.id);
+                                setNewActionLinkId(selectedPosition.id);
+                              }}
+                            >
+                              Create linked action
+                            </button>
+                            <button onClick={() => setFocusedSubtreeRootId(selectedPosition.id)}>
+                              Focus subtree
+                            </button>
+                          </div>
+                        </div>
+                      ) : null}
+                    </>
+                  )}
                 </div>
               </div>
 
@@ -1672,12 +2274,12 @@ useEffect(() => {
                     marginBottom: 10,
                   }}
                 >
-                  Edit structure and ownership controls
+                  Organization Builder controls
                 </summary>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
                   <div style={STYLE.panel}>
-                    <div style={STYLE.subTitle}>Structure Controls</div>
+                    <div style={STYLE.subTitle}>Department + Position Setup</div>
                     <div
                       style={{
                         fontSize: 11,
@@ -1687,25 +2289,25 @@ useEffect(() => {
                     >
                       {isLocalDemoMode
                         ? "Local demo mode is read-only. Connect API mode to persist changes."
-                        : "Edits here update live structure state."}
+                        : "Use this to build department hierarchy and reporting lines."}
                     </div>
 
                     <div style={{ marginBottom: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                        Create Team
+                        Create Department
                       </div>
                       <input
                         value={newTeamName}
-                        onChange={(e) => setNewTeamName(e.target.value)}
-                        placeholder="Team name"
+                        onChange={(event) => setNewTeamName(event.target.value)}
+                        placeholder="Department name"
                         style={{ width: "100%", marginBottom: 6 }}
                       />
                       <select
                         value={newTeamParentId}
-                        onChange={(e) => setNewTeamParentId(e.target.value)}
+                        onChange={(event) => setNewTeamParentId(event.target.value)}
                         style={{ width: "100%", marginBottom: 6 }}
                       >
-                        <option value="">No parent</option>
+                        <option value="">No parent department</option>
                         {teams.map((team) => (
                           <option key={team.id} value={team.id}>
                             {team.name}
@@ -1713,26 +2315,26 @@ useEffect(() => {
                         ))}
                       </select>
                       <button onClick={() => void handleCreateTeam()} disabled={isLocalDemoMode}>
-                        Add Team
+                        Add Department
                       </button>
                     </div>
 
-                    <div style={{ marginBottom: 10 }}>
+                    <div>
                       <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
                         Create Position
                       </div>
                       <input
                         value={newPositionTitle}
-                        onChange={(e) => setNewPositionTitle(e.target.value)}
+                        onChange={(event) => setNewPositionTitle(event.target.value)}
                         placeholder="Position title"
                         style={{ width: "100%", marginBottom: 6 }}
                       />
                       <select
                         value={newPositionTeamId}
-                        onChange={(e) => setNewPositionTeamId(e.target.value)}
+                        onChange={(event) => setNewPositionTeamId(event.target.value)}
                         style={{ width: "100%", marginBottom: 6 }}
                       >
-                        <option value="">No team</option>
+                        <option value="">No department</option>
                         {teams.map((team) => (
                           <option key={team.id} value={team.id}>
                             {team.name}
@@ -1741,10 +2343,10 @@ useEffect(() => {
                       </select>
                       <select
                         value={newPositionReportsToId}
-                        onChange={(e) => setNewPositionReportsToId(e.target.value)}
+                        onChange={(event) => setNewPositionReportsToId(event.target.value)}
                         style={{ width: "100%", marginBottom: 6 }}
                       >
-                        <option value="">No manager</option>
+                        <option value="">No manager (root position)</option>
                         {positions.map((position) => (
                           <option key={position.id} value={position.id}>
                             {position.title}
@@ -1755,35 +2357,38 @@ useEffect(() => {
                         Add Position
                       </button>
                     </div>
+                  </div>
 
-                    <div>
+                  <div style={STYLE.panel}>
+                    <div style={STYLE.subTitle}>Employee Setup</div>
+                    <div style={{ marginBottom: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                        Create Person
+                        Create Employee
                       </div>
                       <input
                         value={newPersonName}
-                        onChange={(e) => setNewPersonName(e.target.value)}
+                        onChange={(event) => setNewPersonName(event.target.value)}
                         placeholder="Full name"
                         style={{ width: "100%", marginBottom: 6 }}
                       />
                       <input
                         value={newPersonEmail}
-                        onChange={(e) => setNewPersonEmail(e.target.value)}
+                        onChange={(event) => setNewPersonEmail(event.target.value)}
                         placeholder="Email"
                         style={{ width: "100%", marginBottom: 6 }}
                       />
                       <input
                         value={newPersonPhone}
-                        onChange={(e) => setNewPersonPhone(e.target.value)}
+                        onChange={(event) => setNewPersonPhone(event.target.value)}
                         placeholder="Phone"
                         style={{ width: "100%", marginBottom: 6 }}
                       />
                       <select
                         value={newPersonPositionId}
-                        onChange={(e) => setNewPersonPositionId(e.target.value)}
+                        onChange={(event) => setNewPersonPositionId(event.target.value)}
                         style={{ width: "100%", marginBottom: 6 }}
                       >
-                        <option value="">No position</option>
+                        <option value="">No initial position</option>
                         {positions.map((position) => (
                           <option key={position.id} value={position.id}>
                             {position.title}
@@ -1792,7 +2397,9 @@ useEffect(() => {
                       </select>
                       <select
                         value={newPersonStatus}
-                        onChange={(e) => setNewPersonStatus(e.target.value as typeof newPersonStatus)}
+                        onChange={(event) =>
+                          setNewPersonStatus(event.target.value as typeof newPersonStatus)
+                        }
                         style={{ width: "100%", marginBottom: 6 }}
                       >
                         <option value={EmploymentStatus.active}>Active</option>
@@ -1800,105 +2407,12 @@ useEffect(() => {
                         <option value={EmploymentStatus.offboarding}>Offboarding</option>
                       </select>
                       <button onClick={() => void handleCreatePerson()} disabled={isLocalDemoMode}>
-                        Add Person
-                      </button>
-                    </div>
-                  </div>
-
-                  <div style={STYLE.panel}>
-                    <div style={STYLE.subTitle}>Ownership Controls</div>
-                    <div style={{ marginBottom: 10 }}>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                        Assign Team Ownership
-                      </div>
-                      <select
-                        value={teamOwnershipTargetId}
-                        onChange={(e) => setTeamOwnershipTargetId(e.target.value)}
-                        style={{ width: "100%", marginBottom: 6 }}
-                      >
-                        <option value="">Select team</option>
-                        {teams.map((team) => (
-                          <option key={team.id} value={team.id}>
-                            {team.name}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={teamOwnershipOwnerType}
-                        onChange={(e) => setTeamOwnershipOwnerType(e.target.value as OwnerType)}
-                        style={{ width: "100%", marginBottom: 6 }}
-                      >
-                        <option value="person">Owner by person</option>
-                        <option value="position">Owner by position</option>
-                      </select>
-                      <select
-                        value={teamOwnershipOwnerId}
-                        onChange={(e) => setTeamOwnershipOwnerId(e.target.value)}
-                        style={{ width: "100%", marginBottom: 6 }}
-                      >
-                        <option value="">Select owner</option>
-                        {(teamOwnershipOwnerType === "person" ? people : positions).map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {"fullName" in item ? item.fullName : item.title}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        value={teamOwnershipContext}
-                        onChange={(e) => setTeamOwnershipContext(e.target.value)}
-                        placeholder="Responsibility context"
-                        style={{ width: "100%", marginBottom: 6 }}
-                      />
-                      <button onClick={() => void handleAssignTeamOwnership()} disabled={isLocalDemoMode}>
-                        Assign Team Owner
+                        Add Employee
                       </button>
                     </div>
 
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                        Assign Position Ownership
-                      </div>
-                      <select
-                        value={positionOwnershipTargetId}
-                        onChange={(e) => setPositionOwnershipTargetId(e.target.value)}
-                        style={{ width: "100%", marginBottom: 6 }}
-                      >
-                        <option value="">Select position</option>
-                        {positions.map((position) => (
-                          <option key={position.id} value={position.id}>
-                            {position.title}
-                          </option>
-                        ))}
-                      </select>
-                      <select
-                        value={positionOwnershipOwnerType}
-                        onChange={(e) => setPositionOwnershipOwnerType(e.target.value as OwnerType)}
-                        style={{ width: "100%", marginBottom: 6 }}
-                      >
-                        <option value="person">Owner by person</option>
-                        <option value="position">Owner by position</option>
-                      </select>
-                      <select
-                        value={positionOwnershipOwnerId}
-                        onChange={(e) => setPositionOwnershipOwnerId(e.target.value)}
-                        style={{ width: "100%", marginBottom: 6 }}
-                      >
-                        <option value="">Select owner</option>
-                        {(positionOwnershipOwnerType === "person" ? people : positions).map((item) => (
-                          <option key={item.id} value={item.id}>
-                            {"fullName" in item ? item.fullName : item.title}
-                          </option>
-                        ))}
-                      </select>
-                      <input
-                        value={positionOwnershipContext}
-                        onChange={(e) => setPositionOwnershipContext(e.target.value)}
-                        placeholder="Responsibility context"
-                        style={{ width: "100%", marginBottom: 6 }}
-                      />
-                      <button onClick={() => void handleAssignPositionOwnership()} disabled={isLocalDemoMode}>
-                        Assign Position Owner
-                      </button>
+                    <div style={{ fontSize: 11, color: "#64748B" }}>
+                      Use the node quick actions or Assignment tab for reassignments.
                     </div>
                   </div>
                 </div>
