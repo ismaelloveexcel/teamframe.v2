@@ -75,8 +75,8 @@ const STYLE = {
     margin: "0 auto",
     padding: 20,
     display: "grid",
-    gridTemplateColumns: "192px 1fr",
-    gap: 16,
+    gridTemplateColumns: "176px 1fr",
+    gap: 14,
   } as const,
   sidebar: {
     background: "#0B1220",
@@ -91,7 +91,7 @@ const STYLE = {
     background: "#FFFFFF",
     border: "1px solid #E5E7EB",
     borderRadius: 12,
-    padding: 14,
+    padding: 12,
   } as const,
   title: {
     fontSize: 20,
@@ -246,12 +246,14 @@ function OrgChartNodeCard(props: OrgCardContract) {
       onClick={onSelect}
       style={{
         width: "100%",
-        maxWidth: isRoot ? 300 : 266,
-        border: `1px solid ${isSelected ? "#2563EB" : "#D1D5DB"}`,
+        maxWidth: isRoot ? 316 : 276,
+        border: `${isSelected ? 2 : 1}px solid ${isSelected ? "#2563EB" : "#D1D5DB"}`,
         borderRadius: 12,
-        padding: isRoot ? 12 : 10,
+        padding: isRoot ? 14 : 12,
         background: "#FFFFFF",
-        boxShadow: isSelected ? "0 0 0 2px rgba(37,99,235,0.18), 0 8px 18px rgba(15,23,42,0.12)" : "none",
+        boxShadow: isSelected
+          ? "0 0 0 3px rgba(37,99,235,0.2), 0 14px 26px rgba(15,23,42,0.16)"
+          : "0 4px 10px rgba(15,23,42,0.05)",
         textAlign: "left",
         cursor: "pointer",
       }}
@@ -273,10 +275,18 @@ function OrgChartNodeCard(props: OrgCardContract) {
           {statusLabel}
         </span>
       </div>
-      <div style={{ fontSize: isRoot ? 14 : 13, fontWeight: 700, color: "#0F172A", marginBottom: 4 }}>
+      <div
+        style={{
+          fontSize: isRoot ? 16 : 14,
+          fontWeight: 800,
+          color: "#0F172A",
+          marginBottom: 6,
+          lineHeight: 1.25,
+        }}
+      >
         {positionTitle}
       </div>
-      <div style={{ fontSize: 11, color: "#475569" }}>{personLine}</div>
+      <div style={{ fontSize: 11, color: "#334155", fontWeight: 500 }}>{personLine}</div>
     </button>
   );
 }
@@ -1476,12 +1486,12 @@ export function TeamFrame() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          gap: isRoot ? 24 : depth === 1 ? 20 : 16,
-          minWidth: isRoot ? 280 : 230,
+          gap: isRoot ? 30 : depth === 1 ? 24 : 20,
+          minWidth: isRoot ? 310 : 248,
         }}
       >
         <div
-          style={{ position: "relative", width: "100%", maxWidth: isRoot ? 300 : 266 }}
+          style={{ position: "relative", width: "100%", maxWidth: isRoot ? 316 : 276 }}
           onMouseEnter={() => setHoveredPositionId(positionId)}
           onMouseLeave={() => setHoveredPositionId((current) => (current === positionId ? null : current))}
         >
@@ -1496,15 +1506,22 @@ export function TeamFrame() {
                 background: "#FFFFFF",
                 border: "1px solid #E2E8F0",
                 borderRadius: 999,
-                boxShadow: "0 6px 14px rgba(15, 23, 42, 0.12)",
-                padding: "4px 6px",
+                boxShadow: "0 8px 18px rgba(15, 23, 42, 0.14)",
+                padding: "5px 8px",
                 display: "flex",
-                gap: 4,
+                gap: 6,
                 zIndex: 3,
               }}
             >
               <button
-                style={{ fontSize: 10, padding: "2px 6px" }}
+                style={{
+                  fontSize: 10,
+                  padding: "3px 7px",
+                  borderRadius: 999,
+                  border: "1px solid #CBD5E1",
+                  background: "#F8FAFC",
+                  fontWeight: 600,
+                }}
                 onClick={(event) => {
                   event.stopPropagation();
                   cardProps.onSelect();
@@ -1514,7 +1531,14 @@ export function TeamFrame() {
                 View details
               </button>
               <button
-                style={{ fontSize: 10, padding: "2px 6px" }}
+                style={{
+                  fontSize: 10,
+                  padding: "3px 7px",
+                  borderRadius: 999,
+                  border: "1px solid #CBD5E1",
+                  background: "#F8FAFC",
+                  fontWeight: 600,
+                }}
                 onClick={(event) => {
                   event.stopPropagation();
                   void handleQuickInsertPosition("below", positionId);
@@ -1524,7 +1548,14 @@ export function TeamFrame() {
                 Add related position
               </button>
               <button
-                style={{ fontSize: 10, padding: "2px 6px" }}
+                style={{
+                  fontSize: 10,
+                  padding: "3px 7px",
+                  borderRadius: 999,
+                  border: "1px solid #CBD5E1",
+                  background: "#F8FAFC",
+                  fontWeight: 600,
+                }}
                 onClick={(event) => {
                   event.stopPropagation();
                   setActiveNav("actions");
@@ -1541,14 +1572,14 @@ export function TeamFrame() {
 
         {visibleChildren.length > 0 ? (
           <>
-            <div style={{ width: 1, height: isRoot ? 24 : 18, background: "#CBD5E1" }} />
+            <div style={{ width: 1, height: isRoot ? 26 : 20, background: "#CBD5E1" }} />
             <div
               style={{
                 display: "flex",
                 flexWrap: "wrap",
                 justifyContent: "center",
                 alignItems: "flex-start",
-                gap: depth === 0 ? 18 : 14,
+                gap: depth === 0 ? 26 : 18,
               }}
             >
               {visibleChildren.map((child) => renderPositionNode(child.id))}
@@ -2077,21 +2108,32 @@ export function TeamFrame() {
           ))}
         </aside>
 
-        <main style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-          <section style={STYLE.panel}>
-            <div style={{ ...STYLE.title, marginBottom: 6 }}>TeamFrame Workspace</div>
-            <div style={{ fontSize: 12, color: "#475569" }}>
-              Positions {positions.length} · Filled {positionAssignmentById.size} · Open actions {actions.filter((item) => item.status !== ActionStatus.done).length} · {UI_TERMS.entities.needsAttention} {overdueActions + blockedActions}
+        <main style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+          <section style={{ ...STYLE.panel, padding: "8px 10px" }}>
+            <div style={{ fontSize: 11, color: "#334155", display: "flex", flexWrap: "wrap", gap: 12 }}>
+              <span>
+                Positions <strong>{positions.length}</strong>
+              </span>
+              <span>
+                Filled <strong>{positionAssignmentById.size}</strong>
+              </span>
+              <span>
+                Open actions{" "}
+                <strong>{actions.filter((item) => item.status !== ActionStatus.done).length}</strong>
+              </span>
+              <span>
+                {UI_TERMS.entities.needsAttention} <strong>{overdueActions + blockedActions}</strong>
+              </span>
             </div>
             {mutationStatusText ? (
-              <div style={{ marginTop: 8, fontSize: 12, color: "#1D4ED8" }}>{mutationStatusText}</div>
+              <div style={{ marginTop: 6, fontSize: 11, color: "#1D4ED8" }}>{mutationStatusText}</div>
             ) : null}
             {error ? (
               <div
                 style={{
-                  marginTop: 8,
+                  marginTop: 6,
                   color: isLocalDemoMode ? "#92400E" : "#B91C1C",
-                  fontSize: 12,
+                  fontSize: 11,
                 }}
               >
                 {error}
@@ -2109,7 +2151,7 @@ export function TeamFrame() {
               <div
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "minmax(0, 1fr) 320px",
+                  gridTemplateColumns: "minmax(0, 1fr) 304px",
                   gap: 12,
                   alignItems: "start",
                 }}
@@ -2119,7 +2161,7 @@ export function TeamFrame() {
                     ...STYLE.panel,
                     border: "1px solid #D8E0EC",
                     background: "#FFFFFF",
-                    minHeight: 560,
+                    minHeight: 620,
                   }}
                 >
                   <div style={{ ...STYLE.subTitle, marginBottom: 8 }}>Org Chart</div>
@@ -2132,11 +2174,30 @@ export function TeamFrame() {
                     ) : null}
                   </div>
 
-                  <div style={{ display: "flex", justifyContent: "center", alignItems: "flex-start", minHeight: 520 }}>
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "flex-start",
+                      alignItems: "flex-start",
+                      minHeight: 560,
+                      maxHeight: "70vh",
+                      overflow: "auto",
+                      padding: "8px 4px",
+                    }}
+                  >
                     {rootPositions.length === 0 ? (
                       <div style={{ fontSize: 12, color: "#64748B" }}>No positions yet. Create a root position to start.</div>
                     ) : (
-                      <div style={{ display: "flex", flexDirection: "column", gap: 22, alignItems: "center" }}>
+                      <div
+                        style={{
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 30,
+                          alignItems: "center",
+                          minWidth: "max-content",
+                          margin: "0 auto",
+                        }}
+                      >
                         {rootPositions.map((position) => renderPositionNode(position.id))}
                       </div>
                     )}
