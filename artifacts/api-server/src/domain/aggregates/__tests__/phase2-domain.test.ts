@@ -180,6 +180,52 @@ test("Phase 2 gate: employee overlap invariant rejects concurrent active seats",
   );
 });
 
+test("Phase 2 gate: replay determinism holds for tie-order inputs", () => {
+  const tieA = [
+    {
+      orgId: "org-1",
+      aggregateType: "assignment",
+      aggregateId: "asg-a",
+      eventType: "assignment.started",
+      version: 1,
+      occurredAt: "2026-01-01T00:00:00.000Z",
+      actorId: "actor-1",
+      idempotencyKey: "tie-1",
+      schemaVersion: 1,
+      payload: {
+        assignmentId: "asg-a",
+        positionId: "pos-a",
+        employeeId: "emp-a",
+        effectiveFrom: "2026-01-01T00:00:00.000Z",
+      },
+      payloadHash: "",
+    },
+    {
+      orgId: "org-1",
+      aggregateType: "assignment",
+      aggregateId: "asg-b",
+      eventType: "assignment.started",
+      version: 1,
+      occurredAt: "2026-01-01T00:00:00.000Z",
+      actorId: "actor-1",
+      idempotencyKey: "tie-2",
+      schemaVersion: 1,
+      payload: {
+        assignmentId: "asg-b",
+        positionId: "pos-b",
+        employeeId: "emp-b",
+        effectiveFrom: "2026-01-01T00:00:00.000Z",
+      },
+      payloadHash: "",
+    },
+  ] as EventEnvelope[];
+
+  const tieB = [tieA[1]!, tieA[0]!];
+  const resultA = deriveAssignments(tieA.map((event) => ({ ...event, payloadHash: stableHash(event.payload) })));
+  const resultB = deriveAssignments(tieB.map((event) => ({ ...event, payloadHash: stableHash(event.payload) })));
+  assert.deepEqual(resultA, resultB);
+});
+
 test("Phase 2 gate: replay ordering remains deterministic", () => {
   const seededEvents = withVersion([
     {
