@@ -3,6 +3,7 @@ import { useEffect, useState, type ComponentType } from "react";
 import { modules as discoveredModules } from "./.generated/mockup-components";
 
 type ModuleMap = Record<string, () => Promise<Record<string, unknown>>>;
+const DEFAULT_PREVIEW_PATH = "teamframe/TeamFrame";
 
 function _resolveComponent(
   mod: Record<string, unknown>,
@@ -130,11 +131,21 @@ function getPreviewPath(): string | null {
 
 function App() {
   const previewPath = getPreviewPath();
+  const defaultPreviewModuleKey = `./components/mockups/${DEFAULT_PREVIEW_PATH}.tsx`;
 
   if (previewPath) {
     return (
       <PreviewRenderer
         componentPath={previewPath}
+        modules={discoveredModules}
+      />
+    );
+  }
+
+  if (discoveredModules[defaultPreviewModuleKey]) {
+    return (
+      <PreviewRenderer
+        componentPath={DEFAULT_PREVIEW_PATH}
         modules={discoveredModules}
       />
     );
