@@ -822,10 +822,7 @@ export function TeamFrame() {
         await loadOrganizationState(orgId);
       } catch (error) {
         if (!cancelled) {
-          const reason = error instanceof Error ? error.message : String(error);
-          loadLocalDemoSnapshot(
-            `API unavailable. Loaded local demo snapshot for visual review. (${reason})`,
-          );
+          loadLocalDemoSnapshot("API unavailable. Loaded local demo snapshot for visual review.");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -877,33 +874,89 @@ export function TeamFrame() {
     return "Unknown link";
   }
 
-  function renderPositionTree(positionId: string, depth: number) {
+  function renderPositionNode(positionId: string) {
     const position = positionMap.get(positionId);
     if (!position) return <></>;
     const peopleInPosition = peopleByPosition.get(positionId) ?? [];
     const children = positionsByManager.get(positionId) ?? [];
     const ownership = positionOwnershipMap.get(positionId);
+    const teamName = position.teamId ? teamMap.get(position.teamId)?.name ?? "Unassigned" : "Unassigned";
+    const statusLabel = position.lifecycleStatus.replace("_", " ");
 
     return (
-      <div key={positionId} style={{ marginLeft: depth * 20, marginBottom: 8 }}>
-        <div style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: 8, background: "#F8FAFC" }}>
-          <div style={{ fontWeight: 700, fontSize: 13 }}>{position.title}</div>
-          <div style={{ fontSize: 11, color: "#475569" }}>
-            Team: {position.teamId ? teamMap.get(position.teamId)?.name ?? position.teamId : "Unassigned"} · Status: {position.lifecycleStatus}
+      <div
+        key={positionId}
+        style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 12, minWidth: 230 }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 280,
+            border: "1px solid #CBD5E1",
+            borderRadius: 12,
+            padding: 12,
+            background: "#FFFFFF",
+            boxShadow: "0 8px 20px rgba(15, 23, 42, 0.06)",
+          }}
+        >
+          <div style={{ fontWeight: 700, fontSize: 14, color: "#0F172A" }}>{position.title}</div>
+          <div style={{ fontSize: 11, color: "#64748B", marginTop: 4 }}>
+            {teamName} · {statusLabel}
           </div>
-          <div style={{ fontSize: 11, color: "#475569" }}>
-            People: {peopleInPosition.length ? peopleInPosition.map((person) => person.fullName).join(", ") : "Vacant"}
+          <div style={{ fontSize: 11, color: "#0F172A", marginTop: 4 }}>
+            Owner · {ownership ? ownerLabel(ownership.ownerPersonId, ownership.ownerPositionId) : "Unassigned"}
           </div>
-          <div style={{ fontSize: 11, color: "#0F172A" }}>
-            Owner: {ownership ? ownerLabel(ownership.ownerPersonId, ownership.ownerPositionId) : "Unassigned"}
+
+          <div style={{ marginTop: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+            {peopleInPosition.length === 0 ? (
+              <div style={{ fontSize: 11, color: "#94A3B8" }}>Vacant role</div>
+            ) : (
+              peopleInPosition.map((person) => (
+                <div
+                  key={person.id}
+                  style={{
+                    border: "1px solid #E2E8F0",
+                    borderRadius: 8,
+                    padding: "6px 8px",
+                    background: "#F8FAFC",
+                  }}
+                >
+                  <div style={{ fontSize: 12, fontWeight: 600, color: "#0F172A" }}>{person.fullName}</div>
+                  <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                    {person.email ?? "no-email"} · {person.phone ?? "no-phone"}
+                  </div>
+                </div>
+              ))
+            )}
           </div>
         </div>
-        {children.map((child) => renderPositionTree(child.id, depth + 1))}
+
+        {children.length > 0 ? (
+          <>
+            <div style={{ width: 2, height: 12, background: "#CBD5E1" }} />
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "center",
+                alignItems: "flex-start",
+                gap: 16,
+              }}
+            >
+              {children.map((child) => renderPositionNode(child.id))}
+            </div>
+          </>
+        ) : null}
       </div>
     );
   }
 
   const rootPositions = positionsByManager.get("root") ?? [];
+  const chartDepartmentTeams = teams.filter((team) => {
+    const executiveTeamId = rootPositions[0]?.teamId ?? null;
+    if (executiveTeamId) return team.parentTeamId === executiveTeamId;
+    return team.parentTeamId === null;
+  });
 
   async function handleCreateTeam() {
     if (!organizationId || !newTeamName.trim()) return;
@@ -1273,7 +1326,15 @@ export function TeamFrame() {
               </div>
             </div>
             {error ? (
-              <div style={{ marginTop: 10, color: "#B91C1C", fontSize: 12 }}>{error}</div>
+              <div
+                style={{
+                  marginTop: 10,
+                  color: isLocalDemoMode ? "#92400E" : "#B91C1C",
+                  fontSize: 12,
+                }}
+              >
+                {error}
+              </div>
             ) : null}
             {busy ? <div style={{ marginTop: 10, color: "#475569", fontSize: 12 }}>Saving…</div> : null}
             <div style={{ marginTop: 8, fontSize: 11, color: isLocalDemoMode ? "#92400E" : "#0F766E" }}>
@@ -1283,114 +1344,277 @@ export function TeamFrame() {
 
           {activeNav === "org" && (
             <section style={STYLE.panel}>
-              <div style={{ ...STYLE.title, fontSize: 17 }}>Org Map to Teams to Owners to Actions</div>
-
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                <div style={STYLE.panel}>
-                  <div style={STYLE.subTitle}>Create Team</div>
-                  <input value={newTeamName} onChange={(e) => setNewTeamName(e.target.value)} placeholder="Team name" style={{ width: "100%", marginBottom: 6 }} />
-                  <select value={newTeamParentId} onChange={(e) => setNewTeamParentId(e.target.value)} style={{ width: "100%", marginBottom: 6 }}>
-                    <option value="">No parent</option>
-                    {teams.map((team) => (
-                      <option key={team.id} value={team.id}>{team.name}</option>
-                    ))}
-                  </select>
-                  <button onClick={() => void handleCreateTeam()}>Add Team</button>
-                </div>
-
-                <div style={STYLE.panel}>
-                  <div style={STYLE.subTitle}>Create Position</div>
-                  <input value={newPositionTitle} onChange={(e) => setNewPositionTitle(e.target.value)} placeholder="Position title" style={{ width: "100%", marginBottom: 6 }} />
-                  <select value={newPositionTeamId} onChange={(e) => setNewPositionTeamId(e.target.value)} style={{ width: "100%", marginBottom: 6 }}>
-                    <option value="">No team</option>
-                    {teams.map((team) => (
-                      <option key={team.id} value={team.id}>{team.name}</option>
-                    ))}
-                  </select>
-                  <select value={newPositionReportsToId} onChange={(e) => setNewPositionReportsToId(e.target.value)} style={{ width: "100%", marginBottom: 6 }}>
-                    <option value="">No manager</option>
-                    {positions.map((position) => (
-                      <option key={position.id} value={position.id}>{position.title}</option>
-                    ))}
-                  </select>
-                  <button onClick={() => void handleCreatePosition()}>Add Position</button>
-                </div>
+              <div style={{ ...STYLE.title, fontSize: 17 }}>Organization Map</div>
+              <div style={{ fontSize: 12, color: "#475569", marginBottom: 12 }}>
+                Hierarchy remains the primary canvas: role, owner, email, and phone are visible directly on each node.
               </div>
 
-              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginBottom: 12 }}>
-                <div style={STYLE.panel}>
-                  <div style={STYLE.subTitle}>Create Person</div>
-                  <input value={newPersonName} onChange={(e) => setNewPersonName(e.target.value)} placeholder="Full name" style={{ width: "100%", marginBottom: 6 }} />
-                  <input value={newPersonEmail} onChange={(e) => setNewPersonEmail(e.target.value)} placeholder="Email" style={{ width: "100%", marginBottom: 6 }} />
-                  <input value={newPersonPhone} onChange={(e) => setNewPersonPhone(e.target.value)} placeholder="Phone" style={{ width: "100%", marginBottom: 6 }} />
-                  <select value={newPersonPositionId} onChange={(e) => setNewPersonPositionId(e.target.value)} style={{ width: "100%", marginBottom: 6 }}>
-                    <option value="">No position</option>
-                    {positions.map((position) => (
-                      <option key={position.id} value={position.id}>{position.title}</option>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1.8fr) minmax(320px, 1fr)",
+                  gap: 12,
+                  alignItems: "start",
+                }}
+              >
+                <div style={{ ...STYLE.panel, background: "#F8FAFC", border: "1px solid #DDE5EF" }}>
+                  <div style={{ ...STYLE.subTitle, marginBottom: 10 }}>Org Chart (primary view)</div>
+                  <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 12 }}>
+                    {chartDepartmentTeams.map((team) => (
+                      <span
+                        key={team.id}
+                        style={{
+                          fontSize: 11,
+                          fontWeight: 600,
+                          padding: "4px 8px",
+                          borderRadius: 999,
+                          border: "1px solid #CBD5E1",
+                          background: "#FFFFFF",
+                          color: "#334155",
+                        }}
+                      >
+                        {team.name}
+                      </span>
                     ))}
-                  </select>
-                  <select value={newPersonStatus} onChange={(e) => setNewPersonStatus(e.target.value as typeof newPersonStatus)} style={{ width: "100%", marginBottom: 6 }}>
-                    <option value={EmploymentStatus.active}>Active</option>
-                    <option value={EmploymentStatus.on_leave}>On leave</option>
-                    <option value={EmploymentStatus.offboarding}>Offboarding</option>
-                  </select>
-                  <button onClick={() => void handleCreatePerson()}>Add Person</button>
+                  </div>
+
+                  {rootPositions.length === 0 ? (
+                    <div style={{ fontSize: 12, color: "#64748B" }}>No positions yet.</div>
+                  ) : (
+                    <div style={{ display: "flex", flexDirection: "column", gap: 20, alignItems: "center" }}>
+                      {rootPositions.map((position) => renderPositionNode(position.id))}
+                    </div>
+                  )}
                 </div>
 
-                <div style={STYLE.panel}>
-                  <div style={STYLE.subTitle}>Assign Team Ownership</div>
-                  <select value={teamOwnershipTargetId} onChange={(e) => setTeamOwnershipTargetId(e.target.value)} style={{ width: "100%", marginBottom: 6 }}>
-                    <option value="">Select team</option>
-                    {teams.map((team) => (
-                      <option key={team.id} value={team.id}>{team.name}</option>
-                    ))}
-                  </select>
-                  <select value={teamOwnershipOwnerType} onChange={(e) => setTeamOwnershipOwnerType(e.target.value as OwnerType)} style={{ width: "100%", marginBottom: 6 }}>
-                    <option value="person">Owner by person</option>
-                    <option value="position">Owner by position</option>
-                  </select>
-                  <select value={teamOwnershipOwnerId} onChange={(e) => setTeamOwnershipOwnerId(e.target.value)} style={{ width: "100%", marginBottom: 6 }}>
-                    <option value="">Select owner</option>
-                    {(teamOwnershipOwnerType === "person" ? people : positions).map((item) => (
-                      <option key={item.id} value={item.id}>{"fullName" in item ? item.fullName : item.title}</option>
-                    ))}
-                  </select>
-                  <input value={teamOwnershipContext} onChange={(e) => setTeamOwnershipContext(e.target.value)} placeholder="Responsibility context" style={{ width: "100%", marginBottom: 6 }} />
-                  <button onClick={() => void handleAssignTeamOwnership()}>Assign Team Owner</button>
-                </div>
-              </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                  <div style={STYLE.panel}>
+                    <div style={STYLE.subTitle}>Structure Controls</div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: isLocalDemoMode ? "#92400E" : "#64748B",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {isLocalDemoMode
+                        ? "Local demo mode is read-only. Connect API mode to persist changes."
+                        : "Edits here update live structure state."}
+                    </div>
 
-              <div style={{ ...STYLE.panel, marginBottom: 12 }}>
-                <div style={STYLE.subTitle}>Assign Position Ownership</div>
-                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 8 }}>
-                  <select value={positionOwnershipTargetId} onChange={(e) => setPositionOwnershipTargetId(e.target.value)}>
-                    <option value="">Select position</option>
-                    {positions.map((position) => (
-                      <option key={position.id} value={position.id}>{position.title}</option>
-                    ))}
-                  </select>
-                  <select value={positionOwnershipOwnerType} onChange={(e) => setPositionOwnershipOwnerType(e.target.value as OwnerType)}>
-                    <option value="person">Owner by person</option>
-                    <option value="position">Owner by position</option>
-                  </select>
-                  <select value={positionOwnershipOwnerId} onChange={(e) => setPositionOwnershipOwnerId(e.target.value)}>
-                    <option value="">Select owner</option>
-                    {(positionOwnershipOwnerType === "person" ? people : positions).map((item) => (
-                      <option key={item.id} value={item.id}>{"fullName" in item ? item.fullName : item.title}</option>
-                    ))}
-                  </select>
-                  <input value={positionOwnershipContext} onChange={(e) => setPositionOwnershipContext(e.target.value)} placeholder="Responsibility context" />
-                </div>
-                <button style={{ marginTop: 8 }} onClick={() => void handleAssignPositionOwnership()}>Assign Position Owner</button>
-              </div>
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                        Create Team
+                      </div>
+                      <input
+                        value={newTeamName}
+                        onChange={(e) => setNewTeamName(e.target.value)}
+                        placeholder="Team name"
+                        style={{ width: "100%", marginBottom: 6 }}
+                      />
+                      <select
+                        value={newTeamParentId}
+                        onChange={(e) => setNewTeamParentId(e.target.value)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="">No parent</option>
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button onClick={() => void handleCreateTeam()} disabled={isLocalDemoMode}>
+                        Add Team
+                      </button>
+                    </div>
 
-              <div style={STYLE.panel}>
-                <div style={STYLE.subTitle}>Org Structure</div>
-                {rootPositions.length === 0 ? (
-                  <div style={{ fontSize: 12, color: "#64748B" }}>No positions yet.</div>
-                ) : (
-                  rootPositions.map((position) => renderPositionTree(position.id, 0))
-                )}
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                        Create Position
+                      </div>
+                      <input
+                        value={newPositionTitle}
+                        onChange={(e) => setNewPositionTitle(e.target.value)}
+                        placeholder="Position title"
+                        style={{ width: "100%", marginBottom: 6 }}
+                      />
+                      <select
+                        value={newPositionTeamId}
+                        onChange={(e) => setNewPositionTeamId(e.target.value)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="">No team</option>
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={newPositionReportsToId}
+                        onChange={(e) => setNewPositionReportsToId(e.target.value)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="">No manager</option>
+                        {positions.map((position) => (
+                          <option key={position.id} value={position.id}>
+                            {position.title}
+                          </option>
+                        ))}
+                      </select>
+                      <button onClick={() => void handleCreatePosition()} disabled={isLocalDemoMode}>
+                        Add Position
+                      </button>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                        Create Person
+                      </div>
+                      <input
+                        value={newPersonName}
+                        onChange={(e) => setNewPersonName(e.target.value)}
+                        placeholder="Full name"
+                        style={{ width: "100%", marginBottom: 6 }}
+                      />
+                      <input
+                        value={newPersonEmail}
+                        onChange={(e) => setNewPersonEmail(e.target.value)}
+                        placeholder="Email"
+                        style={{ width: "100%", marginBottom: 6 }}
+                      />
+                      <input
+                        value={newPersonPhone}
+                        onChange={(e) => setNewPersonPhone(e.target.value)}
+                        placeholder="Phone"
+                        style={{ width: "100%", marginBottom: 6 }}
+                      />
+                      <select
+                        value={newPersonPositionId}
+                        onChange={(e) => setNewPersonPositionId(e.target.value)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="">No position</option>
+                        {positions.map((position) => (
+                          <option key={position.id} value={position.id}>
+                            {position.title}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={newPersonStatus}
+                        onChange={(e) => setNewPersonStatus(e.target.value as typeof newPersonStatus)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value={EmploymentStatus.active}>Active</option>
+                        <option value={EmploymentStatus.on_leave}>On leave</option>
+                        <option value={EmploymentStatus.offboarding}>Offboarding</option>
+                      </select>
+                      <button onClick={() => void handleCreatePerson()} disabled={isLocalDemoMode}>
+                        Add Person
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={STYLE.panel}>
+                    <div style={STYLE.subTitle}>Ownership Controls</div>
+
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                        Assign Team Ownership
+                      </div>
+                      <select
+                        value={teamOwnershipTargetId}
+                        onChange={(e) => setTeamOwnershipTargetId(e.target.value)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="">Select team</option>
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={teamOwnershipOwnerType}
+                        onChange={(e) => setTeamOwnershipOwnerType(e.target.value as OwnerType)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="person">Owner by person</option>
+                        <option value="position">Owner by position</option>
+                      </select>
+                      <select
+                        value={teamOwnershipOwnerId}
+                        onChange={(e) => setTeamOwnershipOwnerId(e.target.value)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="">Select owner</option>
+                        {(teamOwnershipOwnerType === "person" ? people : positions).map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {"fullName" in item ? item.fullName : item.title}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        value={teamOwnershipContext}
+                        onChange={(e) => setTeamOwnershipContext(e.target.value)}
+                        placeholder="Responsibility context"
+                        style={{ width: "100%", marginBottom: 6 }}
+                      />
+                      <button onClick={() => void handleAssignTeamOwnership()} disabled={isLocalDemoMode}>
+                        Assign Team Owner
+                      </button>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                        Assign Position Ownership
+                      </div>
+                      <select
+                        value={positionOwnershipTargetId}
+                        onChange={(e) => setPositionOwnershipTargetId(e.target.value)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="">Select position</option>
+                        {positions.map((position) => (
+                          <option key={position.id} value={position.id}>
+                            {position.title}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={positionOwnershipOwnerType}
+                        onChange={(e) => setPositionOwnershipOwnerType(e.target.value as OwnerType)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="person">Owner by person</option>
+                        <option value="position">Owner by position</option>
+                      </select>
+                      <select
+                        value={positionOwnershipOwnerId}
+                        onChange={(e) => setPositionOwnershipOwnerId(e.target.value)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="">Select owner</option>
+                        {(positionOwnershipOwnerType === "person" ? people : positions).map((item) => (
+                          <option key={item.id} value={item.id}>
+                            {"fullName" in item ? item.fullName : item.title}
+                          </option>
+                        ))}
+                      </select>
+                      <input
+                        value={positionOwnershipContext}
+                        onChange={(e) => setPositionOwnershipContext(e.target.value)}
+                        placeholder="Responsibility context"
+                        style={{ width: "100%", marginBottom: 6 }}
+                      />
+                      <button onClick={() => void handleAssignPositionOwnership()} disabled={isLocalDemoMode}>
+                        Assign Position Owner
+                      </button>
+                    </div>
+                  </div>
+                </div>
               </div>
             </section>
           )}
