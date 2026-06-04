@@ -26,7 +26,7 @@ Legend:
 | Assumption | Evidence type | Confidence | Decision |
 |---|---|---|---|
 | Actions linked to ownership improve visibility | Partial + inferred implementation fit | Medium-High | Keep and validate |
-| Team Directory improves organizational legibility | Partial | Medium-Low | Keep as supporting surface |
+| Team Directory is structurally required for legibility but not a standalone buying wedge | Partial | Medium | Keep as structural capability |
 | Team-linked policies improve operational context | Partial | Medium | Keep minimal and validate |
 | Employee-size complexity inflection is around 35-120 | Partial | Medium | Use as working hypothesis |
 
@@ -34,7 +34,7 @@ Legend:
 
 | Assumption | Evidence type | Confidence | Decision |
 |---|---|---|---|
-| Standalone Ownership Registry module is required | Inferred | Low | Defer |
+| Standalone Ownership Registry module is required | Inferred | Low | Defer (treat as architectural pattern, not module) |
 | Organizational change tracking should be a core module | Inferred | Low | Defer |
 | Approval routing workflows are a near-term must-have | Inferred | Low | Defer |
 | Dashboard-heavy reporting drives adoption | Inferred | Low | Defer |

@@ -27,20 +27,22 @@ TeamFrame is not:
 
 Administration and payroll export are supporting capabilities, not strategic product wedges.
 
-## Current module posture
+## Current module and capability posture
 
 Build with confidence:
 - Org Map
 - Actions
-- Team Directory
 - Team-linked policies
+
+Structural capability (not a standalone wedge module):
+- Team Directory (generated from Org Map -> Teams -> People)
 
 Keep minimal:
 - Administration
 - Payroll export
 
 Do not build yet:
-- Standalone Ownership Registry module
+- Standalone Ownership Registry module (ownership should emerge across teams, roles, actions, and policies)
 - Organizational change tracking module
 - Approval workflows
 - Hiring overlays
