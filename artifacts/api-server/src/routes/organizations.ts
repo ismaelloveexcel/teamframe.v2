@@ -35,6 +35,10 @@ import {
   ListActionsParams,
   ListActionsResponse,
   ListOrganizationsResponse,
+  ListPositionOwnershipsParams,
+  ListPositionOwnershipsResponse,
+  ListTeamOwnershipsParams,
+  ListTeamOwnershipsResponse,
   ListPeopleParams,
   ListPeopleResponse,
   ListPoliciesParams,
@@ -71,6 +75,7 @@ import { buildPositionService } from "../services/position-service";
 import { buildPeopleService } from "../services/people-service";
 import { buildActionService } from "../services/action-service";
 import { buildPolicyService } from "../services/policy-service";
+import { buildOwnershipService } from "../services/ownership-service";
 
 const organizations = buildOrganizationService();
 const teams = buildTeamService();
@@ -78,6 +83,7 @@ const positions = buildPositionService();
 const people = buildPeopleService();
 const actions = buildActionService();
 const policies = buildPolicyService();
+const ownership = buildOwnershipService();
 
 function actorFromReq(req: { actor?: ActorContext }): ActorContext {
   if (!req.actor) {
@@ -248,6 +254,24 @@ router.put(
       },
     );
     res.json(AssignPositionOwnershipResponse.parse(ownership));
+  }),
+);
+
+router.get(
+  "/organizations/:organizationId/ownership/teams",
+  asyncHandler(async (req, res) => {
+    const params = ListTeamOwnershipsParams.parse(req.params);
+    const items = await ownership.listTeamOwnerships(actorFromReq(req), params.organizationId);
+    res.json(ListTeamOwnershipsResponse.parse({ items }));
+  }),
+);
+
+router.get(
+  "/organizations/:organizationId/ownership/positions",
+  asyncHandler(async (req, res) => {
+    const params = ListPositionOwnershipsParams.parse(req.params);
+    const items = await ownership.listPositionOwnerships(actorFromReq(req), params.organizationId);
+    res.json(ListPositionOwnershipsResponse.parse({ items }));
   }),
 );
 

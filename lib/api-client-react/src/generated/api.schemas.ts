@@ -181,6 +181,10 @@ export interface TeamOwnership {
   updatedAt: string;
 }
 
+export interface TeamOwnershipCollection {
+  items: TeamOwnership[];
+}
+
 export interface PositionOwnership {
   id: string;
   organizationId: string;
@@ -190,6 +194,10 @@ export interface PositionOwnership {
   responsibilityContext: string;
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PositionOwnershipCollection {
+  items: PositionOwnership[];
 }
 
 export type ActionLinkInput = (unknown & {

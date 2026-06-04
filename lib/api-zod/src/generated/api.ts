@@ -183,6 +183,27 @@ export const AssignTeamOwnershipResponse = zod.object({
 
 
 /**
+ * @summary List team ownership assignments
+ */
+export const ListTeamOwnershipsParams = zod.object({
+  "organizationId": zod.coerce.string().uuid()
+})
+
+export const ListTeamOwnershipsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "organizationId": zod.string().uuid(),
+  "teamId": zod.string().uuid(),
+  "ownerPersonId": zod.string().uuid().nullish(),
+  "ownerPositionId": zod.string().uuid().nullish(),
+  "responsibilityContext": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}))
+})
+
+
+/**
  * @summary List positions for an organization
  */
 export const ListPositionsParams = zod.object({
@@ -306,6 +327,27 @@ export const AssignPositionOwnershipResponse = zod.object({
   "responsibilityContext": zod.string(),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
+})
+
+
+/**
+ * @summary List position ownership assignments
+ */
+export const ListPositionOwnershipsParams = zod.object({
+  "organizationId": zod.coerce.string().uuid()
+})
+
+export const ListPositionOwnershipsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "organizationId": zod.string().uuid(),
+  "positionId": zod.string().uuid(),
+  "ownerPersonId": zod.string().uuid().nullish(),
+  "ownerPositionId": zod.string().uuid().nullish(),
+  "responsibilityContext": zod.string(),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}))
 })
 
 

@@ -420,6 +420,20 @@ export class PeopleRepository {
 }
 
 export class OwnershipRepository {
+  async listTeamOwnerships(organizationId: string) {
+    return db
+      .select()
+      .from(teamOwnershipsTable)
+      .where(eq(teamOwnershipsTable.organizationId, organizationId));
+  }
+
+  async listPositionOwnerships(organizationId: string) {
+    return db
+      .select()
+      .from(positionOwnershipsTable)
+      .where(eq(positionOwnershipsTable.organizationId, organizationId));
+  }
+
   async assignTeamOwnership(
     organizationId: string,
     teamId: string,

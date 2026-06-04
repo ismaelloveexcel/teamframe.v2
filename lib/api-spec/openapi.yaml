@@ -191,6 +191,23 @@ paths:
               schema:
                 $ref: "#/components/schemas/TeamOwnership"
 
+
+
+  /organizations/{organizationId}/ownership/teams:
+    get:
+      operationId: listTeamOwnerships
+      tags: [ownership]
+      summary: List team ownership assignments
+      parameters:
+        - $ref: "#/components/parameters/OrganizationIdParam"
+      responses:
+        "200":
+          description: Team ownership assignments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TeamOwnershipCollection"
+
   /organizations/{organizationId}/positions:
     get:
       operationId: listPositions
@@ -292,6 +309,23 @@ paths:
             application/json:
               schema:
                 $ref: "#/components/schemas/PositionOwnership"
+
+
+
+  /organizations/{organizationId}/ownership/positions:
+    get:
+      operationId: listPositionOwnerships
+      tags: [ownership]
+      summary: List position ownership assignments
+      parameters:
+        - $ref: "#/components/parameters/OrganizationIdParam"
+      responses:
+        "200":
+          description: Position ownership assignments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/PositionOwnershipCollection"
 
   /organizations/{organizationId}/people:
     get:
@@ -956,6 +990,16 @@ components:
           createdAt,
           updatedAt,
         ]
+
+    TeamOwnershipCollection:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/TeamOwnership"
+      required: [items]
+
     PositionOwnership:
       type: object
       properties:
@@ -993,6 +1037,16 @@ components:
           createdAt,
           updatedAt,
         ]
+
+    PositionOwnershipCollection:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/PositionOwnership"
+      required: [items]
+
     ActionLinkInput:
       type: object
       properties:

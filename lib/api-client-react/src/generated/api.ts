@@ -44,9 +44,11 @@ import type {
   Position,
   PositionCollection,
   PositionOwnership,
+  PositionOwnershipCollection,
   Team,
   TeamCollection,
   TeamOwnership,
+  TeamOwnershipCollection,
   UpdatePersonRequest,
   UpdatePositionRequest,
   UpdateTeamRequest
@@ -818,6 +820,83 @@ export const useAssignTeamOwnership = <TError = ErrorType<unknown>,
       return useMutation(getAssignTeamOwnershipMutationOptions(options));
     }
 
+export const getListTeamOwnershipsUrl = (organizationId: string,) => {
+
+
+
+
+  return `/api/organizations/${organizationId}/ownership/teams`
+}
+
+/**
+ * @summary List team ownership assignments
+ */
+export const listTeamOwnerships = async (organizationId: string, options?: RequestInit): Promise<TeamOwnershipCollection> => {
+
+  return customFetch<TeamOwnershipCollection>(getListTeamOwnershipsUrl(organizationId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListTeamOwnershipsQueryKey = (organizationId: string,) => {
+    return [
+    `/api/organizations/${organizationId}/ownership/teams`
+    ] as const;
+    }
+
+
+export const getListTeamOwnershipsQueryOptions = <TData = Awaited<ReturnType<typeof listTeamOwnerships>>, TError = ErrorType<unknown>>(organizationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeamOwnerships>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListTeamOwnershipsQueryKey(organizationId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listTeamOwnerships>>> = ({ signal }) => listTeamOwnerships(organizationId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(organizationId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listTeamOwnerships>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListTeamOwnershipsQueryResult = NonNullable<Awaited<ReturnType<typeof listTeamOwnerships>>>
+export type ListTeamOwnershipsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List team ownership assignments
+ */
+
+export function useListTeamOwnerships<TData = Awaited<ReturnType<typeof listTeamOwnerships>>, TError = ErrorType<unknown>>(
+ organizationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listTeamOwnerships>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListTeamOwnershipsQueryOptions(organizationId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
 export const getListPositionsUrl = (organizationId: string,) => {
 
 
@@ -1268,6 +1347,83 @@ export const useAssignPositionOwnership = <TError = ErrorType<unknown>,
       > => {
       return useMutation(getAssignPositionOwnershipMutationOptions(options));
     }
+
+export const getListPositionOwnershipsUrl = (organizationId: string,) => {
+
+
+
+
+  return `/api/organizations/${organizationId}/ownership/positions`
+}
+
+/**
+ * @summary List position ownership assignments
+ */
+export const listPositionOwnerships = async (organizationId: string, options?: RequestInit): Promise<PositionOwnershipCollection> => {
+
+  return customFetch<PositionOwnershipCollection>(getListPositionOwnershipsUrl(organizationId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListPositionOwnershipsQueryKey = (organizationId: string,) => {
+    return [
+    `/api/organizations/${organizationId}/ownership/positions`
+    ] as const;
+    }
+
+
+export const getListPositionOwnershipsQueryOptions = <TData = Awaited<ReturnType<typeof listPositionOwnerships>>, TError = ErrorType<unknown>>(organizationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPositionOwnerships>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListPositionOwnershipsQueryKey(organizationId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listPositionOwnerships>>> = ({ signal }) => listPositionOwnerships(organizationId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(organizationId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listPositionOwnerships>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListPositionOwnershipsQueryResult = NonNullable<Awaited<ReturnType<typeof listPositionOwnerships>>>
+export type ListPositionOwnershipsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List position ownership assignments
+ */
+
+export function useListPositionOwnerships<TData = Awaited<ReturnType<typeof listPositionOwnerships>>, TError = ErrorType<unknown>>(
+ organizationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listPositionOwnerships>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListPositionOwnershipsQueryOptions(organizationId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
 
 export const getListPeopleUrl = (organizationId: string,) => {
 
