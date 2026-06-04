@@ -43,8 +43,8 @@ import {
 type NavId = "org" | "actions" | "team" | "policies" | "templates" | "administration";
 type OwnerType = "person" | "position";
 type PositionLevel = "Executive" | "Director" | "Manager" | "IC";
-type PositionPanelTab = "position" | "assignment";
-type AssignmentRuntimeStatus = "active" | "interim" | "ended";
+type PositionPanelTab = "position" | "assignment" | "documents";
+type AssignmentRuntimeStatus = "active" | "scheduled" | "ended";
 
 const NAV_ITEMS: Array<{ id: NavId; label: string }> = [
   { id: "org", label: "Org Chart" },
@@ -189,9 +189,10 @@ type UploadedPositionDocument = {
   uploadedAt: string;
   sizeLabel: string;
   objectUrl: string;
+  state: "draft" | "in_review" | "signed" | "outdated";
 };
 
-type PositionNodeComputedState = "filled" | "vacant" | "interim" | "degraded" | "at-risk";
+type PositionNodeComputedState = "filled" | "vacant" | "needs_attention";
 
 const LOCAL_DEMO_STATE: LocalDemoState = {
   organizationId: "00000000-0000-4000-8000-000000000111",
@@ -793,6 +794,24 @@ export function TeamFrame() {
           uploadedAt: new Date().toISOString(),
           sizeLabel: formatFileSize(file.size),
           objectUrl,
+          state: "draft",
+        },
+      };
+    });
+  }
+
+  function updatePositionDocumentState(
+    positionId: string,
+    nextState: UploadedPositionDocument["state"],
+  ) {
+    setPositionDocuments((current) => {
+      const existing = current[positionId];
+      if (!existing) return current;
+      return {
+        ...current,
+        [positionId]: {
+          ...existing,
+          state: nextState,
         },
       };
     });
@@ -872,27 +891,26 @@ export function TeamFrame() {
     setAssignmentDraftActualSalary(selectedAssignment?.runtime.actualSalary ?? "");
   }, [positionPanelTab, selectedAssignment, selectedPositionId]);
 
+  function hasPositionStructuralIssue(positionId: string): boolean {
+    const position = positionMap.get(positionId);
+    if (!position) return true;
+
+    if (position.reportsToPositionId && !positionMap.has(position.reportsToPositionId)) {
+      return true;
+    }
+
+    const runtime = assignmentRuntimeByPosition[positionId];
+    if (runtime?.status === "ended" && (peopleByPosition.get(positionId)?.length ?? 0) > 0) {
+      return true;
+    }
+
+    return false;
+  }
+
   function resolvePositionNodeState(positionId: string): PositionNodeComputedState {
+    if (hasPositionStructuralIssue(positionId)) return "needs_attention";
     const assignment = positionAssignmentById.get(positionId);
     if (!assignment) return "vacant";
-    if (assignment.runtime.status === "interim") return "interim";
-
-    const actionStats = positionActionStats.get(positionId) ?? { open: 0, overdue: 0, blocked: 0 };
-    const complianceAlerts = positionComplianceAlerts.get(positionId) ?? 0;
-
-    if (assignment.person.employmentStatus === EmploymentStatus.on_leave) {
-      return "degraded";
-    }
-
-    if (
-      assignment.person.employmentStatus === EmploymentStatus.offboarding ||
-      actionStats.overdue > 0 ||
-      actionStats.blocked > 0 ||
-      complianceAlerts > 0
-    ) {
-      return "at-risk";
-    }
-
     return "filled";
   }
 
@@ -1131,20 +1149,20 @@ export function TeamFrame() {
     return "Unknown link";
   }
 
+  function actionStatusLabel(status: ActionStatus): string {
+    if (status === ActionStatus.in_progress) return "In progress";
+    if (status === ActionStatus.done) return "Done";
+    return "Open";
+  }
+
   function statePresentation(state: PositionNodeComputedState) {
     if (state === "vacant") {
-      return { label: "Vacant", bg: "#FEE2E2", color: "#B91C1C", border: "#FCA5A5" };
+      return { label: "Open", bg: "#F1F5F9", color: "#334155", border: "#CBD5E1" };
     }
-    if (state === "interim") {
-      return { label: "Interim", bg: "#FEF3C7", color: "#92400E", border: "#FCD34D" };
+    if (state === "needs_attention") {
+      return { label: "Needs attention", bg: "#FEF3C7", color: "#92400E", border: "#F59E0B" };
     }
-    if (state === "degraded") {
-      return { label: "Degraded", bg: "#FEF3C7", color: "#92400E", border: "#F59E0B" };
-    }
-    if (state === "at-risk") {
-      return { label: "At-risk", bg: "#FEE2E2", color: "#991B1B", border: "#EF4444" };
-    }
-    return { label: "Filled", bg: "#DCFCE7", color: "#166534", border: "#22C55E" };
+    return { label: "Active", bg: "#DCFCE7", color: "#166534", border: "#22C55E" };
   }
 
   function renderPositionNode(positionId: string) {
@@ -1167,6 +1185,7 @@ export function TeamFrame() {
       >
         <button
           type="button"
+          title="View details"
           onClick={() => {
             setFocusPositionId(positionId);
             setPositionPanelTab("position");
@@ -1201,7 +1220,7 @@ export function TeamFrame() {
 
           <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 4 }}>{position.title}</div>
           <div style={{ fontSize: 11, color: "#475569" }}>
-            {assignedPerson ? assignedPerson.fullName : "Vacant"}
+            {nodeState === "needs_attention" ? "Needs attention" : assignedPerson ? assignedPerson.fullName : "Open role"}
           </div>
         </button>
 
@@ -1235,6 +1254,12 @@ export function TeamFrame() {
   const selectedPositionDocument = selectedPositionId
     ? positionDocuments[selectedPositionId] ?? null
     : null;
+  const selectedHasStructuralIssue = selectedPosition
+    ? hasPositionStructuralIssue(selectedPosition.id)
+    : false;
+  const selectedHasNoReportingLine = selectedPosition
+    ? !selectedPosition.reportsToPositionId && selectedPosition.id !== organizationRootPositions[0]?.id
+    : false;
 
 
   async function handleSaveAssignment() {
@@ -1242,7 +1267,7 @@ export function TeamFrame() {
 
     const selectedEmployee = personMap.get(assignmentDraftEmployeeId);
     if (!selectedEmployee) {
-      setError("Selected employee could not be found.");
+      setError("Select a person to assign.");
       return;
     }
 
@@ -1262,7 +1287,7 @@ export function TeamFrame() {
       }
 
       if (selectedEmployee.positionId && selectedEmployee.positionId !== selectedPositionId) {
-        await executeApiCall("Clear employee previous assignment", (options) =>
+        await executeApiCall("Clear person previous assignment", (options) =>
           updatePerson(
             organizationId,
             selectedEmployee.id,
@@ -1274,7 +1299,7 @@ export function TeamFrame() {
         );
       }
 
-      await executeApiCall("Assign employee to position", (options) =>
+      await executeApiCall("Assign person to position", (options) =>
         updatePerson(
           organizationId,
           selectedEmployee.id,
@@ -1430,7 +1455,19 @@ export function TeamFrame() {
   }
 
   async function handleCreateAction() {
-    if (!organizationId || !newActionTitle.trim() || !newActionOwnerId || !newActionLinkId) return;
+    if (!organizationId) return;
+    if (!newActionTitle.trim()) {
+      setError("What needs to be done?");
+      return;
+    }
+    if (!newActionOwnerId) {
+      setError("Select a responsible person or position.");
+      return;
+    }
+    if (!newActionLinkId) {
+      setError("This action must be linked to a position or assignment.");
+      return;
+    }
 
     await runMutation(async () => {
       await executeApiCall("Create action", (options) =>
@@ -1666,7 +1703,7 @@ export function TeamFrame() {
           <section style={STYLE.panel}>
             <div style={{ ...STYLE.title, marginBottom: 6 }}>TeamFrame Workspace</div>
             <div style={{ fontSize: 12, color: "#475569" }}>
-              Positions {positions.length} · Filled {positionAssignmentById.size} · Open actions {actions.filter((item) => item.status !== ActionStatus.done).length} · At-risk {overdueActions + blockedActions}
+              Positions {positions.length} · Filled {positionAssignmentById.size} · Open actions {actions.filter((item) => item.status !== ActionStatus.done).length} · Needs attention {overdueActions + blockedActions}
             </div>
             {error ? (
               <div
@@ -1726,7 +1763,7 @@ export function TeamFrame() {
                 </div>
 
                 <div style={{ ...STYLE.panel, border: "1px solid #D8E0EC", position: "sticky", top: 12 }}>
-                  <div style={{ ...STYLE.subTitle, marginBottom: 8 }}>Position Context</div>
+                  <div style={{ ...STYLE.subTitle, marginBottom: 8 }}>Position Inspector</div>
                   {!selectedPosition ? (
                     <div style={{ fontSize: 12, color: "#64748B" }}>Select a position from the org chart.</div>
                   ) : (
@@ -1734,11 +1771,11 @@ export function TeamFrame() {
                       <div style={{ marginBottom: 10 }}>
                         <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>{selectedPosition.title}</div>
                         <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
-                          Department: {selectedPosition.teamId ? teamMap.get(selectedPosition.teamId)?.name ?? "Unassigned" : "Unassigned"}
+                          Department: {selectedPosition.teamId ? teamMap.get(selectedPosition.teamId)?.name ?? "Not set" : "Not set"}
                         </div>
                       </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0,1fr))", gap: 6, marginBottom: 10 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 6, marginBottom: 10 }}>
                         <button
                           onClick={() => setPositionPanelTab("position")}
                           style={{
@@ -1761,81 +1798,107 @@ export function TeamFrame() {
                         >
                           Assignment
                         </button>
+                        <button
+                          onClick={() => setPositionPanelTab("documents")}
+                          style={{
+                            fontSize: 11,
+                            background: positionPanelTab === "documents" ? "#E2E8F0" : "#FFFFFF",
+                            border: "1px solid #CBD5E1",
+                            padding: "5px 6px",
+                          }}
+                        >
+                          Documents
+                        </button>
                       </div>
 
                       {positionPanelTab === "position" ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          <div style={{ fontSize: 11, fontWeight: 700, color: "#334155" }}>
-                            Job Description Document
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            <strong>Position</strong>: {selectedPosition.title}
                           </div>
-                          {selectedPositionDocument ? (
-                            <div
-                              style={{
-                                border: "1px solid #CBD5E1",
-                                borderRadius: 8,
-                                background: "#F8FAFC",
-                                padding: "8px 10px",
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            <strong>Reports to</strong>: {selectedPosition.reportsToPositionId
+                              ? positionMap.get(selectedPosition.reportsToPositionId)?.title ?? selectedPosition.reportsToPositionId
+                              : "Not set"}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            <strong>Department</strong>: {selectedPosition.teamId
+                              ? teamMap.get(selectedPosition.teamId)?.name ?? selectedPosition.teamId
+                              : "Not set"}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            <strong>Status</strong>: {statePresentation(resolvePositionNodeState(selectedPosition.id)).label}
+                          </div>
+                          {selectedHasNoReportingLine ? (
+                            <div style={{ fontSize: 11, color: "#92400E" }}>
+                              This position has no reporting line.
+                            </div>
+                          ) : null}
+                          {selectedHasStructuralIssue ? (
+                            <div style={{ fontSize: 11, color: "#92400E" }}>
+                              This change will update the org structure.
+                            </div>
+                          ) : null}
+                          {!selectedAssignment ? (
+                            <div style={{ fontSize: 11, color: "#64748B" }}>
+                              This position is currently unassigned.
+                            </div>
+                          ) : null}
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Notes (optional)</label>
+                          <textarea placeholder="Add context" rows={2} style={{ width: "100%", resize: "vertical" }} />
+
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button
+                              onClick={() => {
+                                setNewPositionTeamId(selectedPosition.teamId ?? "");
+                                setNewPositionReportsToId(selectedPosition.reportsToPositionId ?? "");
+                                setError("Add above prepared in structure controls.");
                               }}
                             >
-                              <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>
-                                {selectedPositionDocument.fileName}
-                              </div>
-                              <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
-                                Uploaded {formatDateLabel(selectedPositionDocument.uploadedAt)} · {selectedPositionDocument.sizeLabel}
-                              </div>
-                              <button
-                                style={{ marginTop: 8 }}
-                                onClick={() => window.open(selectedPositionDocument.objectUrl, "_blank", "noopener,noreferrer")}
-                              >
-                                Open document
-                              </button>
-                            </div>
-                          ) : (
-                            <div style={{ fontSize: 11, color: "#64748B" }}>
-                              No job description uploaded for this position yet.
-                            </div>
-                          )}
-
-                          <input
-                            type="file"
-                            accept=".pdf,.doc,.docx,.txt,.md,.html"
-                            onChange={(event) =>
-                              handleUploadPositionDocument(
-                                selectedPosition.id,
-                                event.target.files?.[0] ?? null,
-                              )
-                            }
-                          />
-
-                          <button
-                            onClick={() => {
-                              const reportingLine = selectedPosition.reportsToPositionId
-                                ? positionMap.get(selectedPosition.reportsToPositionId)?.title ?? selectedPosition.reportsToPositionId
-                                : "N/A";
-                              downloadJobDescriptionTemplate({
-                                positionName: selectedPosition.title,
-                                departmentName: selectedPosition.teamId
-                                  ? teamMap.get(selectedPosition.teamId)?.name ?? "Unassigned"
-                                  : "Unassigned",
-                                reportingLine,
-                              });
-                            }}
-                          >
-                            Download Word template
-                          </button>
-
+                              Add above
+                            </button>
+                            <button
+                              onClick={() => {
+                                setNewPositionTeamId(selectedPosition.teamId ?? "");
+                                setNewPositionReportsToId(selectedPosition.id);
+                                setError("Add below prepared in structure controls.");
+                              }}
+                            >
+                              Add below
+                            </button>
+                            <button
+                              onClick={() => {
+                                setNewPositionTeamId(selectedPosition.teamId ?? "");
+                                setNewPositionReportsToId(selectedPosition.reportsToPositionId ?? "");
+                                setError("Add parallel prepared in structure controls.");
+                              }}
+                            >
+                              Add parallel
+                            </button>
+                            <button
+                              onClick={() => setError("Update reporting line in structure controls.")}
+                            >
+                              Update reporting line
+                            </button>
+                            <button
+                              onClick={() => void handleVacateSelectedPosition()}
+                              disabled={isLocalDemoMode || !selectedAssignment}
+                            >
+                              Vacate position
+                            </button>
+                          </div>
                         </div>
                       ) : null}
 
                       {positionPanelTab === "assignment" ? (
                         <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Assigned employee</label>
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Person</label>
                           <select
                             value={assignmentDraftEmployeeId}
                             onChange={(event) => setAssignmentDraftEmployeeId(event.target.value)}
                             style={{ width: "100%" }}
                           >
-                            <option value="">Select employee</option>
+                            <option value="">Select person</option>
                             {people.map((person) => (
                               <option key={person.id} value={person.id}>
                                 {person.fullName}
@@ -1843,7 +1906,7 @@ export function TeamFrame() {
                             ))}
                           </select>
 
-                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Assignment status</label>
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Assignment type</label>
                           <select
                             value={assignmentDraftStatus}
                             onChange={(event) =>
@@ -1851,8 +1914,9 @@ export function TeamFrame() {
                             }
                             style={{ width: "100%" }}
                           >
-                            <option value="active">Active</option>
-                            <option value="interim">Interim</option>
+                            <option value="active">Active assignment</option>
+                            <option value="scheduled">Starts on date</option>
+                            <option value="ended">Ended assignment</option>
                           </select>
 
                           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
@@ -1876,28 +1940,125 @@ export function TeamFrame() {
                             </div>
                           </div>
 
-                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>Actual salary (optional)</label>
-                          <input
-                            value={assignmentDraftActualSalary}
-                            onChange={(event) => setAssignmentDraftActualSalary(event.target.value)}
-                            placeholder="e.g. 52,000"
-                            style={{ width: "100%" }}
-                          />
-
                           <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
                             <button
                               onClick={() => void handleSaveAssignment()}
                               disabled={isLocalDemoMode || !assignmentDraftEmployeeId}
                             >
-                              Save assignment
+                              {selectedAssignment ? "Reassign person" : "Assign person"}
                             </button>
                             <button
                               onClick={() => void handleVacateSelectedPosition()}
                               disabled={isLocalDemoMode || !selectedAssignment}
                             >
-                              Mark vacant
+                              End assignment
+                            </button>
+                            <button
+                              onClick={() => void handleVacateSelectedPosition()}
+                              disabled={isLocalDemoMode || !selectedAssignment}
+                            >
+                              Mark as vacant
+                            </button>
+                            <button
+                              onClick={() => setError("Assignment type updated.")}
+                            >
+                              Change assignment type
                             </button>
                           </div>
+
+                          {!selectedAssignment ? (
+                            <div style={{ fontSize: 11, color: "#64748B" }}>
+                              No one is assigned to this position yet.
+                            </div>
+                          ) : null}
+                          {assignmentDraftEmployeeId && !personMap.get(assignmentDraftEmployeeId)?.positionId ? (
+                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+                              <div style={{ fontSize: 11, color: "#64748B" }}>
+                                This person is not currently assigned to a position.
+                              </div>
+                              <button
+                                onClick={() => void handleSaveAssignment()}
+                                disabled={isLocalDemoMode || !assignmentDraftEmployeeId}
+                              >
+                                Create assignment
+                              </button>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {positionPanelTab === "documents" ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div style={{ fontSize: 11, color: "#334155" }}><strong>Role description</strong></div>
+                          <div style={{ fontSize: 11, color: "#334155" }}><strong>Key responsibilities</strong></div>
+                          <div style={{ fontSize: 11, color: "#334155" }}><strong>KPIs</strong></div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            <strong>Signature status</strong>: {selectedPositionDocument ? selectedPositionDocument.state.replace("_", " ") : "draft"}
+                          </div>
+
+                          {selectedPositionDocument ? (
+                            <div style={{ border: "1px solid #CBD5E1", borderRadius: 8, background: "#F8FAFC", padding: "8px 10px" }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{selectedPositionDocument.fileName}</div>
+                              <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                                Uploaded {formatDateLabel(selectedPositionDocument.uploadedAt)} · {selectedPositionDocument.sizeLabel}
+                              </div>
+                              <select
+                                style={{ marginTop: 8, width: "100%" }}
+                                value={selectedPositionDocument.state}
+                                onChange={(event) =>
+                                  updatePositionDocumentState(
+                                    selectedPosition.id,
+                                    event.target.value as UploadedPositionDocument["state"],
+                                  )
+                                }
+                              >
+                                <option value="draft">Draft</option>
+                                <option value="in_review">In review</option>
+                                <option value="signed">Signed</option>
+                                <option value="outdated">Outdated</option>
+                              </select>
+                              <button
+                                style={{ marginTop: 8 }}
+                                onClick={() => window.open(selectedPositionDocument.objectUrl, "_blank", "noopener,noreferrer")}
+                              >
+                                Open document
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 11, color: "#64748B" }}>
+                              No role document uploaded yet.
+                            </div>
+                          )}
+
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>
+                            Upload role description
+                          </label>
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.txt,.md,.html"
+                            onChange={(event) =>
+                              handleUploadPositionDocument(
+                                selectedPosition.id,
+                                event.target.files?.[0] ?? null,
+                              )
+                            }
+                          />
+                          <button
+                            onClick={() => {
+                              const reportingLine = selectedPosition.reportsToPositionId
+                                ? positionMap.get(selectedPosition.reportsToPositionId)?.title ?? selectedPosition.reportsToPositionId
+                                : "N/A";
+                              downloadJobDescriptionTemplate({
+                                positionName: selectedPosition.title,
+                                departmentName: selectedPosition.teamId
+                                  ? teamMap.get(selectedPosition.teamId)?.name ?? "Not set"
+                                  : "Not set",
+                                reportingLine,
+                              });
+                            }}
+                          >
+                            Download Job Description (.doc)
+                          </button>
                         </div>
                       ) : null}
 
@@ -1916,7 +2077,7 @@ export function TeamFrame() {
                     marginBottom: 10,
                   }}
                 >
-                  Organization Builder controls
+                  Structure controls
                 </summary>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
@@ -2002,10 +2163,10 @@ export function TeamFrame() {
                   </div>
 
                   <div style={STYLE.panel}>
-                    <div style={STYLE.subTitle}>Employee Setup</div>
+                    <div style={STYLE.subTitle}>Person Setup</div>
                     <div style={{ marginBottom: 10 }}>
                       <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
-                        Create Employee
+                        Create Person
                       </div>
                       <input
                         value={newPersonName}
@@ -2049,12 +2210,12 @@ export function TeamFrame() {
                         <option value={EmploymentStatus.offboarding}>Offboarding</option>
                       </select>
                       <button onClick={() => void handleCreatePerson()} disabled={isLocalDemoMode}>
-                        Add Employee
+                        Add Person
                       </button>
                     </div>
 
                     <div style={{ fontSize: 11, color: "#64748B" }}>
-                      Use the Assignment tab to reassign employees between positions.
+                      Use the Assignment tab to reassign people between positions.
                     </div>
                   </div>
                 </div>
@@ -2069,16 +2230,16 @@ export function TeamFrame() {
               <div style={{ ...STYLE.panel, marginBottom: 12 }}>
                 <div style={STYLE.subTitle}>Create Action</div>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 8 }}>
-                  <input value={newActionTitle} onChange={(e) => setNewActionTitle(e.target.value)} placeholder="Action title" />
+                  <input value={newActionTitle} onChange={(e) => setNewActionTitle(e.target.value)} placeholder="What needs to be done?" />
                   <input type="date" value={newActionDueDate} onChange={(e) => setNewActionDueDate(e.target.value)} />
                   <select value={newActionOwnerId} onChange={(e) => setNewActionOwnerId(e.target.value)}>
-                    <option value="">Decision owner position</option>
+                    <option value="">Who is responsible?</option>
                     {decisionMakerPositions.map((position) => (
                       <option key={position.id} value={position.id}>{position.title}</option>
                     ))}
                   </select>
                   <select value={newActionLinkId} onChange={(e) => setNewActionLinkId(e.target.value)}>
-                    <option value="">Linked position</option>
+                    <option value="">Where does this belong?</option>
                     {decisionMakerPositions.map((position) => (
                       <option key={position.id} value={position.id}>{position.title}</option>
                     ))}
@@ -2104,7 +2265,7 @@ export function TeamFrame() {
                       </div>
                       <div style={{ display: "flex", gap: 6 }}>
                         <span style={{ fontSize: 11, fontWeight: 700, color: "#334155", border: "1px solid #CBD5E1", borderRadius: 999, padding: "3px 8px" }}>
-                          {item.status}
+                          {actionStatusLabel(item.status)}
                         </span>
                         {item.status !== ActionStatus.done ? (
                           <button onClick={() => void handleTransitionAction(item)}>
@@ -2116,7 +2277,7 @@ export function TeamFrame() {
                     </div>
                   </div>
                 ))}
-                {actions.length === 0 ? <div style={{ fontSize: 12, color: "#64748B" }}>No actions yet.</div> : null}
+                {actions.length === 0 ? <div style={{ fontSize: 12, color: "#64748B" }}>No actions yet for this position.</div> : null}
               </div>
             </section>
           )}
