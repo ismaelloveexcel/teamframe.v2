@@ -587,6 +587,7 @@ export function TeamFrame() {
   const [demoResetSummary, setDemoResetSummary] = useState<string>("");
   const [isLocalDemoMode, setIsLocalDemoMode] = useState(false);
   const [expandedPositionIds, setExpandedPositionIds] = useState<Set<string>>(new Set());
+  const [focusPositionId, setFocusPositionId] = useState<string | null>(null);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -729,6 +730,29 @@ export function TeamFrame() {
 
   const blockedActions = useMemo(
     () => actions.filter((item) => item.status !== ActionStatus.done && item.blocked).length,
+    [actions],
+  );
+
+  const ownershipResolvedCount = useMemo(
+    () =>
+      actions.filter(
+        (item) => Boolean(item.assignmentId || item.ownerPersonId || item.ownerPositionId),
+      ).length,
+    [actions],
+  );
+
+  const assignmentLinkedCount = useMemo(
+    () => actions.filter((item) => Boolean(item.assignmentId)).length,
+    [actions],
+  );
+
+  const positionOwnedCount = useMemo(
+    () => actions.filter((item) => Boolean(item.ownerPositionId)).length,
+    [actions],
+  );
+
+  const personOwnedCount = useMemo(
+    () => actions.filter((item) => Boolean(item.ownerPersonId)).length,
     [actions],
   );
 
@@ -957,7 +981,10 @@ useEffect(() => {
       >
         <button
           type="button"
-          onClick={() => togglePositionExpansion(positionId)}
+          onClick={() => {
+            setFocusPositionId(positionId);
+            togglePositionExpansion(positionId);
+          }}
           style={{
             width: "100%",
             maxWidth: 290,
@@ -1101,6 +1128,27 @@ useEffect(() => {
       };
     });
   }, [chartDepartmentTeams, positions, people]);
+
+  const effectiveFocusPositionId = focusPositionId ?? rootPositions[0]?.id ?? null;
+  const focusedPosition = effectiveFocusPositionId
+    ? positionMap.get(effectiveFocusPositionId) ?? null
+    : null;
+  const focusedExecutionSummary = useMemo(() => {
+    if (!effectiveFocusPositionId) {
+      return { total: 0, open: 0, inProgress: 0, done: 0 };
+    }
+    const scoped = actions.filter(
+      (item) =>
+        item.positionId === effectiveFocusPositionId ||
+        item.ownerPositionId === effectiveFocusPositionId,
+    );
+    return {
+      total: scoped.length,
+      open: scoped.filter((item) => item.status === ActionStatus.open).length,
+      inProgress: scoped.filter((item) => item.status === ActionStatus.in_progress).length,
+      done: scoped.filter((item) => item.status === ActionStatus.done).length,
+    };
+  }, [actions, effectiveFocusPositionId]);
 
   async function handleCreateTeam() {
     if (!organizationId || !newTeamName.trim()) return;
@@ -1415,7 +1463,7 @@ useEffect(() => {
     <div style={STYLE.page}>
       <div style={STYLE.shell}>
         <aside style={STYLE.sidebar}>
-          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: "#F8FAFC" }}>TeamFrame V1</div>
+          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: "#F8FAFC" }}>TeamFrame V1 · Execution</div>
           {NAV_ITEMS.map((item) => (
             <button
               key={item.id}
@@ -1469,6 +1517,41 @@ useEffect(() => {
                 <div style={{ fontSize: 20, fontWeight: 800, color: blockedActions ? "#B45309" : "#0F172A" }}>{blockedActions}</div>
               </div>
             </div>
+            <div
+              style={{
+                marginTop: 10,
+                border: "1px solid #BFDBFE",
+                background: "#EFF6FF",
+                borderRadius: 10,
+                padding: "8px 10px",
+                display: "grid",
+                gridTemplateColumns: "repeat(5, minmax(0,1fr))",
+                gap: 8,
+              }}
+            >
+              <div>
+                <div style={{ ...STYLE.subTitle, color: "#1D4ED8" }}>Execution Layer</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#1E3A8A" }}>V1 Active</div>
+              </div>
+              <div>
+                <div style={{ ...STYLE.subTitle, color: "#1D4ED8" }}>Ownership Resolved</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#1E3A8A" }}>
+                  {ownershipResolvedCount}/{actions.length || 0}
+                </div>
+              </div>
+              <div>
+                <div style={{ ...STYLE.subTitle, color: "#1D4ED8" }}>Assignment Linked</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#1E3A8A" }}>{assignmentLinkedCount}</div>
+              </div>
+              <div>
+                <div style={{ ...STYLE.subTitle, color: "#1D4ED8" }}>Position Owned</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#1E3A8A" }}>{positionOwnedCount}</div>
+              </div>
+              <div>
+                <div style={{ ...STYLE.subTitle, color: "#1D4ED8" }}>Person Owned</div>
+                <div style={{ fontSize: 12, fontWeight: 800, color: "#1E3A8A" }}>{personOwnedCount}</div>
+              </div>
+            </div>
             {error ? (
               <div
                 style={{
@@ -1517,6 +1600,24 @@ useEffect(() => {
                     style={{ width: "100%", marginBottom: 10, background: "#FFFFFF" }}
                     readOnly
                   />
+                  <div
+                    style={{
+                      border: "1px solid #DBEAFE",
+                      borderRadius: 10,
+                      padding: "8px 10px",
+                      background: "#EFF6FF",
+                      marginBottom: 8,
+                    }}
+                  >
+                    <div style={{ ...STYLE.subTitle, color: "#1D4ED8", marginBottom: 4 }}>Focused Position Execution</div>
+                    <div style={{ fontSize: 12, fontWeight: 700, color: "#1E3A8A" }}>
+                      {focusedPosition?.title ?? "No focus"}
+                    </div>
+                    <div style={{ fontSize: 11, color: "#334155", marginTop: 4 }}>
+                      Total {focusedExecutionSummary.total} · Open {focusedExecutionSummary.open} · In-progress {focusedExecutionSummary.inProgress} · Done {focusedExecutionSummary.done}
+                    </div>
+                  </div>
+
                   <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
                     {departmentOverview.map((team) => (
                       <div
@@ -1839,6 +1940,10 @@ useEffect(() => {
                         <div style={{ fontSize: 12, color: "#475569" }}>{linkLabel(item)}</div>
                         <div style={{ fontSize: 12, color: "#475569" }}>
                           Owner: {ownerLabel(item.ownerPersonId, item.ownerPositionId)} · Due: {formatDateLabel(item.dueDate)}
+                        </div>
+                        <div style={{ fontSize: 11, color: "#1D4ED8", marginTop: 2 }}>
+                          Path: {item.assignmentId ? "assignment > person > position" : item.ownerPersonId ? "person > position fallback" : "position structural"}
+                          {item.assignmentId ? ` · Assignment ${item.assignmentId.slice(0, 8)}` : ""}
                         </div>
                       </div>
                       <div style={{ display: "flex", gap: 6 }}>
