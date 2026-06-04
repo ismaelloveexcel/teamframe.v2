@@ -5,6 +5,7 @@ import {
   check,
   date,
   index,
+  jsonb,
   pgEnum,
   pgTable,
   text,
@@ -39,6 +40,11 @@ export const policyScopeEnum = pgEnum("policy_scope", [
   "organization",
   "team",
   "position",
+]);
+export const auditEventTypeEnum = pgEnum("audit_event_type", [
+  "ownership_changed",
+  "action_status_changed",
+  "policy_scope_changed",
 ]);
 
 export const organizationsTable = pgTable("organizations", {
@@ -246,7 +252,11 @@ export const actionsTable = pgTable(
     ),
     check(
       "actions_structural_link_required",
-      sql`${table.teamId} IS NOT NULL OR ${table.positionId} IS NOT NULL OR ${table.personId} IS NOT NULL`,
+      sql`(
+        (CASE WHEN ${table.teamId} IS NULL THEN 0 ELSE 1 END) +
+        (CASE WHEN ${table.positionId} IS NULL THEN 0 ELSE 1 END) +
+        (CASE WHEN ${table.personId} IS NULL THEN 0 ELSE 1 END)
+      ) = 1`,
     ),
   ],
 );
@@ -290,6 +300,30 @@ export const policiesTable = pgTable(
         (${table.scope} = 'position' AND ${table.teamId} IS NULL AND ${table.positionId} IS NOT NULL)
       )`,
     ),
+  ],
+);
+
+
+
+export const auditEventsTable = pgTable(
+  "audit_events",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    actorUserId: uuid("actor_user_id")
+      .notNull()
+      .references(() => usersTable.id, { onDelete: "cascade" }),
+    eventType: auditEventTypeEnum("event_type").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: uuid("entity_id").notNull(),
+    metadata: jsonb("metadata").$type<Record<string, unknown> | null>(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("audit_events_org_idx").on(table.organizationId),
+    index("audit_events_entity_idx").on(table.entityType, table.entityId),
   ],
 );
 
