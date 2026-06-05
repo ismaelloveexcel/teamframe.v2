@@ -1,4 +1,5 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { LayoutGrid, UserCheck, FileText } from "lucide-react";
 import { AppShell, type NavId as ShellNavId } from "./AppShell";
 import { LoadingScreen } from "./LoadingScreen";
 import { EmptyOrgGuide } from "./EmptyOrgGuide";
@@ -813,6 +814,7 @@ export function TeamFrame() {
   const [showOrgReadyBanner, setShowOrgReadyBanner] = useState(false);
   const [prevPositionCount, setPrevPositionCount] = useState(0);
   const [prevFilledCount, setPrevFilledCount] = useState(0);
+  const assignPersonSelectRef = useRef<HTMLSelectElement>(null);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -1866,7 +1868,7 @@ export function TeamFrame() {
     if (!organizationId || !newPositionTitle.trim()) return;
     await runMutation(
       async () => {
-        await executeApiCall("Create position", (options) =>
+        const created = await executeApiCall("Create position", (options) =>
           createPosition(
             organizationId,
             {
@@ -1881,6 +1883,11 @@ export function TeamFrame() {
         setNewPositionTitle("");
         setNewPositionTeamId("");
         setNewPositionReportsToId("");
+        // Auto-focus newly created position — matches hover-insert path behaviour
+        if (created?.id) {
+          setFocusPositionId(created.id);
+          setPositionPanelTab("position");
+        }
       },
       {
         loadingMessage: UI_TERMS.feedback.loading.updatingStructure,
@@ -2254,8 +2261,14 @@ export function TeamFrame() {
           positionCount={positions.length}
           filledCount={positionAssignmentById.size}
           onAssignPerson={() => {
+            // Deep-link: ensure org nav is active, panel is open on Assignment tab, first field focused
             setActiveNav("org");
+            setPositionPanelTab("assignment");
             setShowOrgReadyBanner(false);
+            // Defer focus until after render cycle
+            setTimeout(() => {
+              assignPersonSelectRef.current?.focus();
+            }, 80);
           }}
           onDismiss={() => setShowOrgReadyBanner(false)}
         />
@@ -2401,40 +2414,81 @@ export function TeamFrame() {
                         </div>
                       </div>
 
-                      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0,1fr))", gap: 6, marginBottom: 10 }}>
-                        <button
-                          onClick={() => setPositionPanelTab("position")}
-                          style={{
-                            fontSize: 11,
-                            background: positionPanelTab === "position" ? "#E2E8F0" : "#FFFFFF",
-                            border: "1px solid #CBD5E1",
-                            padding: "5px 6px",
-                          }}
-                        >
-                          {UI_TERMS.panel.tabs.position}
-                        </button>
-                        <button
-                          onClick={() => setPositionPanelTab("assignment")}
-                          style={{
-                            fontSize: 11,
-                            background: positionPanelTab === "assignment" ? "#E2E8F0" : "#FFFFFF",
-                            border: "1px solid #CBD5E1",
-                            padding: "5px 6px",
-                          }}
-                        >
-                          {UI_TERMS.panel.tabs.assignment}
-                        </button>
-                        <button
-                          onClick={() => setPositionPanelTab("documents")}
-                          style={{
-                            fontSize: 11,
-                            background: positionPanelTab === "documents" ? "#E2E8F0" : "#FFFFFF",
-                            border: "1px solid #CBD5E1",
-                            padding: "5px 6px",
-                          }}
-                        >
-                          {UI_TERMS.panel.tabs.documents}
-                        </button>
+                      {/* Numbered workflow tabs — communicate intended sequence */}
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(3, minmax(0,1fr))",
+                          gap: 4,
+                          marginBottom: 14,
+                          padding: 3,
+                          background: "#F1F5F9",
+                          borderRadius: 10,
+                        }}
+                      >
+                        {(
+                          [
+                            { id: "position" as PositionPanelTab, step: "1", label: "Structure", Icon: LayoutGrid },
+                            { id: "assignment" as PositionPanelTab, step: "2", label: "Assign", Icon: UserCheck },
+                            { id: "documents" as PositionPanelTab, step: "3", label: "Evidence", Icon: FileText },
+                          ] as const
+                        ).map(({ id, step, label, Icon }) => {
+                          const isActive = positionPanelTab === id;
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => setPositionPanelTab(id)}
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: 3,
+                                padding: "7px 4px",
+                                border: "none",
+                                borderRadius: 8,
+                                background: isActive ? "#FFFFFF" : "transparent",
+                                boxShadow: isActive ? "0 1px 4px rgba(15,23,42,0.08)" : "none",
+                                cursor: "pointer",
+                                transition: "background 0.12s",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    color: isActive ? "#2563EB" : "#94A3B8",
+                                    letterSpacing: "0.04em",
+                                  }}
+                                >
+                                  {step}
+                                </span>
+                                <Icon
+                                  size={13}
+                                  color={isActive ? "#2563EB" : "#94A3B8"}
+                                  strokeWidth={isActive ? 2.5 : 2}
+                                />
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: isActive ? 700 : 500,
+                                  color: isActive ? "#0F172A" : "#64748B",
+                                  letterSpacing: "0.02em",
+                                }}
+                              >
+                                {label}
+                              </span>
+                            </button>
+                          );
+                        })}
                       </div>
 
                       {positionPanelTab === "position" ? (
@@ -2497,99 +2551,135 @@ export function TeamFrame() {
                       ) : null}
 
                       {positionPanelTab === "assignment" ? (
-                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>{UI_TERMS.entities.person}</label>
-                          <select
-                            value={assignmentDraftEmployeeId}
-                            onChange={(event) => setAssignmentDraftEmployeeId(event.target.value)}
-                            style={{ width: "100%" }}
-                          >
-                            <option value="">Select person</option>
-                            {people.map((person) => (
-                              <option key={person.id} value={person.id}>
-                                {person.fullName}
-                              </option>
-                            ))}
-                          </select>
-
-                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>{UI_TERMS.panel.fields.assignmentType}</label>
-                          <select
-                            value={assignmentDraftStatus}
-                            onChange={(event) =>
-                              setAssignmentDraftStatus(event.target.value as AssignmentRuntimeStatus)
-                            }
-                            style={{ width: "100%" }}
-                          >
-                            <option value="active">{UI_TERMS.assignmentStates.active}</option>
-                            <option value="scheduled">{UI_TERMS.assignmentStates.scheduled}</option>
-                            <option value="ended">{UI_TERMS.assignmentStates.ended}</option>
-                          </select>
-
-                          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
-                            <div>
-                              <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>{UI_TERMS.panel.fields.startDate}</label>
-                              <input
-                                type="date"
-                                value={assignmentDraftStartDate}
-                                onChange={(event) => setAssignmentDraftStartDate(event.target.value)}
-                                style={{ width: "100%" }}
-                              />
-                            </div>
-                            <div>
-                              <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>{UI_TERMS.panel.fields.endDate}</label>
-                              <input
-                                type="date"
-                                value={assignmentDraftEndDate}
-                                onChange={(event) => setAssignmentDraftEndDate(event.target.value)}
-                                style={{ width: "100%" }}
-                              />
-                            </div>
-                          </div>
-
-                          <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
-                            <button
-                              onClick={() => void handleSaveAssignment()}
-                              disabled={isLocalDemoMode || !assignmentDraftEmployeeId}
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          {/* Current occupant summary */}
+                          {selectedAssignment ? (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "8px 10px",
+                                background: "#F0FDF4",
+                                border: "1px solid #BBF7D0",
+                                borderRadius: 8,
+                              }}
                             >
-                              {selectedAssignment ? "Reassign person" : "Assign person"}
-                            </button>
-                            <button
-                              onClick={() => void handleVacateSelectedPosition()}
-                              disabled={isLocalDemoMode || !selectedAssignment}
-                            >
-                              End assignment
-                            </button>
-                            <button
-                              onClick={() => void handleVacateSelectedPosition()}
-                              disabled={isLocalDemoMode || !selectedAssignment}
-                            >
-                              Mark as vacant
-                            </button>
-                            <button
-                              onClick={() => setError("Assignment type updated.")}
-                            >
-                              Change assignment type
-                            </button>
-                          </div>
-
-                          {!selectedAssignment ? (
-                            <div style={{ fontSize: 11, color: "#64748B" }}>
-                              No one is assigned to this position yet.
-                            </div>
-                          ) : null}
-                          {assignmentDraftEmployeeId && !activeAssignmentByPersonId.get(assignmentDraftEmployeeId) ? (
-                            <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
-                              <div style={{ fontSize: 11, color: "#64748B" }}>
-                                This person is not currently assigned to a position.
-                              </div>
-                              <button
-                                onClick={() => void handleSaveAssignment()}
-                                disabled={isLocalDemoMode || !assignmentDraftEmployeeId}
+                              <div
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: "50%",
+                                  background: "#D1FAE5",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  color: "#059669",
+                                  flexShrink: 0,
+                                }}
                               >
-                                Create assignment
-                              </button>
+                                {selectedAssignment.person.fullName
+                                  ? selectedAssignment.person.fullName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()
+                                  : "?"}
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "#065F46" }}>
+                                  {selectedAssignment.person.fullName ?? "Unknown"}
+                                </div>
+                                <div style={{ fontSize: 10, color: "#6EE7B7" }}>Active assignment</div>
+                              </div>
                             </div>
-                          ) : null}
+                          ) : (
+                            <div
+                              style={{
+                                padding: "8px 10px",
+                                background: "#FFFBEB",
+                                border: "1px solid #FDE68A",
+                                borderRadius: 8,
+                                fontSize: 11,
+                                color: "#92400E",
+                              }}
+                            >
+                              This position is vacant. Assign a person below.
+                            </div>
+                          )}
+
+                          {/* Person selector */}
+                          <div>
+                            <label
+                              htmlFor="assign-person-select"
+                              style={{ fontSize: 11, color: "#334155", fontWeight: 600, display: "block", marginBottom: 4 }}
+                            >
+                              {selectedAssignment ? "Reassign to" : "Assign person"}
+                            </label>
+                            <select
+                              id="assign-person-select"
+                              ref={assignPersonSelectRef}
+                              value={assignmentDraftEmployeeId}
+                              onChange={(event) => setAssignmentDraftEmployeeId(event.target.value)}
+                              style={{ width: "100%" }}
+                            >
+                              <option value="">Select person</option>
+                              {people.map((person) => (
+                                <option key={person.id} value={person.id}>
+                                  {person.fullName}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Primary action */}
+                          <button
+                            type="button"
+                            onClick={() => void handleSaveAssignment()}
+                            disabled={isLocalDemoMode || !assignmentDraftEmployeeId}
+                            style={{
+                              background: !isLocalDemoMode && assignmentDraftEmployeeId
+                                ? "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)"
+                                : "#E2E8F0",
+                              color: !isLocalDemoMode && assignmentDraftEmployeeId ? "#FFFFFF" : "#94A3B8",
+                              border: "none",
+                              borderRadius: 8,
+                              padding: "9px 14px",
+                              fontSize: 13,
+                              fontWeight: 700,
+                              cursor: !isLocalDemoMode && assignmentDraftEmployeeId ? "pointer" : "not-allowed",
+                              boxShadow: !isLocalDemoMode && assignmentDraftEmployeeId
+                                ? "0 2px 8px rgba(37,99,235,0.25)"
+                                : "none",
+                            }}
+                          >
+                            {selectedAssignment ? "Reassign person" : "Assign person"}
+                          </button>
+
+                          {/* Termination — single action, clear microcopy */}
+                          {selectedAssignment && (
+                            <button
+                              type="button"
+                              onClick={() => void handleVacateSelectedPosition()}
+                              disabled={isLocalDemoMode}
+                              style={{
+                                background: "none",
+                                border: "1px solid #E2E8F0",
+                                borderRadius: 8,
+                                padding: "8px 14px",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "#475569",
+                                cursor: isLocalDemoMode ? "not-allowed" : "pointer",
+                                textAlign: "left",
+                              }}
+                            >
+                              <div style={{ fontWeight: 700, color: "#334155", marginBottom: 2 }}>
+                                Vacate position
+                              </div>
+                              <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 400 }}>
+                                End the current assignment and make this position vacant.
+                              </div>
+                            </button>
+                          )}
                         </div>
                       ) : null}
 
