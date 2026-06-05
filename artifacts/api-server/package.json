@@ -12,7 +12,8 @@
     "test:founder-cert": "tsx ./src/founder-flow-certification.ts",
     "test:phase3-cert": "tsx ./src/phase3-certification.ts",
     "test:phase4-cert": "tsx ./src/phase4-certification.ts",
-    "test:phase4-validation": "tsx ./src/phase4-determinism-validation.ts"
+    "test:phase4-validation": "tsx ./src/phase4-determinism-validation.ts",
+    "test:system-stability-audit": "tsx ./src/system-stability-audit.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
