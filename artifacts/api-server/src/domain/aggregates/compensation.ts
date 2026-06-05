@@ -10,6 +10,13 @@ export type CompensationRecordSnapshot = {
   occurredAt: string;
 };
 
+function isUuid(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  );
+}
+
 export function deriveCompensationRecordsFromEvents(
   events: EventEnvelope[],
 ): CompensationRecordSnapshot[] {
@@ -31,9 +38,9 @@ export function deriveCompensationRecordsFromEvents(
     })
     .filter(
       (row) =>
-        row.compensationRecordId.length > 0 &&
-        row.assignmentId.length > 0 &&
-        row.sourceDocumentId.length > 0 &&
+        isUuid(row.compensationRecordId) &&
+        isUuid(row.assignmentId) &&
+        isUuid(row.sourceDocumentId) &&
         row.currency.length > 0 &&
         row.effectiveFrom.length > 0,
     )

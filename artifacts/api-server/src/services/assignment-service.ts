@@ -107,10 +107,13 @@ export class AssignmentService {
         payload,
       });
 
-      await this.projector.projectAssignmentEventTx(tx, {
+      await this.projector.rebuildFromEventsTx(tx, {
         organizationId,
-        eventType: "assignment.started",
-        payload,
+        include: {
+          assignments: true,
+          evidence: true,
+          compensationCurrent: true,
+        },
       });
 
       const [inserted] = await tx
@@ -198,10 +201,13 @@ export class AssignmentService {
         payload,
       });
 
-      await this.projector.projectAssignmentEventTx(tx, {
+      await this.projector.rebuildFromEventsTx(tx, {
         organizationId,
-        eventType: "assignment.ended",
-        payload,
+        include: {
+          assignments: true,
+          evidence: true,
+          compensationCurrent: true,
+        },
       });
 
       const [ended] = await tx

@@ -6,6 +6,7 @@ import {
   evidenceStatusByAssignmentTable,
   evidenceStatusByPositionTable,
   orgEventsTable,
+  peopleTable,
   personPositionAssignmentsTable,
   positionsTable,
 } from "@workspace/db";
@@ -24,7 +25,12 @@ import {
 function isUsableId(value: unknown): value is string {
   if (typeof value !== "string") return false;
   const normalized = value.trim().toLowerCase();
-  return normalized.length > 0 && normalized !== "undefined" && normalized !== "null";
+  if (normalized.length === 0 || normalized === "undefined" || normalized === "null") {
+    return false;
+  }
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/.test(
+    normalized,
+  );
 }
 
 function toEventEnvelope(row: typeof orgEventsTable.$inferSelect): EventEnvelope {
@@ -129,6 +135,67 @@ export class ProjectionBuilderService {
         ) {
           continue;
         }
+        const projectedStatus = assignment.status === "ended" ? "ended" : "active";
+
+        if (projectedStatus === "active") {
+          const [activeByPerson, activeByPosition] = await Promise.all([
+            tx
+              .select({ id: personPositionAssignmentsTable.id })
+              .from(personPositionAssignmentsTable)
+              .where(
+                and(
+                  eq(personPositionAssignmentsTable.organizationId, input.organizationId),
+                  eq(personPositionAssignmentsTable.personId, assignment.employeeId),
+                  eq(personPositionAssignmentsTable.status, "active"),
+                ),
+              )
+              .limit(1),
+            tx
+              .select({ id: personPositionAssignmentsTable.id })
+              .from(personPositionAssignmentsTable)
+              .where(
+                and(
+                  eq(personPositionAssignmentsTable.organizationId, input.organizationId),
+                  eq(personPositionAssignmentsTable.positionId, assignment.positionId),
+                  eq(personPositionAssignmentsTable.status, "active"),
+                ),
+              )
+              .limit(1),
+          ]);
+          if (activeByPerson[0] && activeByPerson[0].id !== assignment.assignmentId) {
+            continue;
+          }
+          if (activeByPosition[0] && activeByPosition[0].id !== assignment.assignmentId) {
+            continue;
+          }
+        }
+
+        const [personRecord, positionRecord] = await Promise.all([
+          tx
+            .select({ id: peopleTable.id })
+            .from(peopleTable)
+            .where(
+              and(
+                eq(peopleTable.organizationId, input.organizationId),
+                eq(peopleTable.id, assignment.employeeId),
+              ),
+            )
+            .limit(1),
+          tx
+            .select({ id: positionsTable.id })
+            .from(positionsTable)
+            .where(
+              and(
+                eq(positionsTable.organizationId, input.organizationId),
+                eq(positionsTable.id, assignment.positionId),
+              ),
+            )
+            .limit(1),
+        ]);
+        if (!personRecord[0] || !positionRecord[0]) {
+          continue;
+        }
+
         await tx
           .insert(personPositionAssignmentsTable)
           .values({
@@ -138,7 +205,7 @@ export class ProjectionBuilderService {
             positionId: assignment.positionId,
             startedAt: new Date(assignment.effectiveFrom),
             endedAt: assignment.effectiveTo ? new Date(assignment.effectiveTo) : null,
-            status: assignment.status === "ended" ? "ended" : "active",
+            status: projectedStatus,
             updatedAt: new Date(),
           })
           .onConflictDoUpdate({
@@ -149,7 +216,7 @@ export class ProjectionBuilderService {
               positionId: assignment.positionId,
               startedAt: new Date(assignment.effectiveFrom),
               endedAt: assignment.effectiveTo ? new Date(assignment.effectiveTo) : null,
-              status: assignment.status === "ended" ? "ended" : "active",
+              status: projectedStatus,
               updatedAt: new Date(),
             },
           });

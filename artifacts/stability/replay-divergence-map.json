@@ -1,0 +1,45 @@
+{
+  "generatedAt": "2026-06-05T11:44:54.519Z",
+  "runtimeCommit": "a15ffc4dd292ded4480cb001dbddd6d9a83a436e",
+  "applyFixes": true,
+  "divergenceMap": [
+    {
+      "orgId": "a28773d5-f9b1-4661-9dba-8ebf0454aea5",
+      "projection": "evidence_status_by_assignment",
+      "firstMismatch": {
+        "aggregateId": "87a89080-456d-499d-8ba1-2a0b9f56fd1a",
+        "eventVersion": 1,
+        "expected": {
+          "assignmentId": "87a89080-456d-499d-8ba1-2a0b9f56fd1a",
+          "positionId": "8259e409-dd62-4dbd-9f83-952eaf71865d",
+          "status": "compliant",
+          "missingCount": 0,
+          "pendingCount": 0,
+          "nonCompliantCount": 0
+        },
+        "actual": null
+      },
+      "rootCauseClass": "historical_projection_corruption",
+      "fixCommit": "a15ffc4dd292ded4480cb001dbddd6d9a83a436e"
+    },
+    {
+      "orgId": "a28773d5-f9b1-4661-9dba-8ebf0454aea5",
+      "projection": "evidence_status_by_position",
+      "firstMismatch": {
+        "aggregateId": "8259e409-dd62-4dbd-9f83-952eaf71865d",
+        "eventVersion": 1,
+        "expected": {
+          "positionId": "8259e409-dd62-4dbd-9f83-952eaf71865d",
+          "status": "compliant",
+          "missingCount": 0,
+          "pendingCount": 0,
+          "nonCompliantCount": 0
+        },
+        "actual": null
+      },
+      "rootCauseClass": "historical_projection_corruption",
+      "fixCommit": "a15ffc4dd292ded4480cb001dbddd6d9a83a436e"
+    }
+  ],
+  "postFixMismatchedOrgs": []
+}

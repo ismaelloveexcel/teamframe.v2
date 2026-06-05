@@ -1,0 +1,27 @@
+{
+  "generatedAt": "2026-06-05T11:45:48.487864Z",
+  "sourceSection": "E",
+  "sectionPass": true,
+  "scenarios": {
+    "delay": {
+      "pendingBefore": 7,
+      "deliveredOnRun1": 35,
+      "pass": true
+    },
+    "duplicate": {
+      "dedupeTriggered": true,
+      "run2Delivered": 0,
+      "pass": true
+    },
+    "crash": {
+      "crashInjected": true,
+      "pass": true
+    },
+    "restart": {
+      "replayLiveEquivalentAfterRecovery": true,
+      "pass": true
+    }
+  },
+  "outboxDivergences": 0,
+  "replayLiveEquivalenceMaintained": true
+}

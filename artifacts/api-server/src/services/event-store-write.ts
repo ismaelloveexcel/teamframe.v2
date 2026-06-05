@@ -23,11 +23,20 @@ export function parseDateOrNow(value?: string): Date {
   return parsed;
 }
 
+function normalizeActorUserId(actorUserId: string | null | undefined): string | null {
+  if (!actorUserId) return null;
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(
+    actorUserId,
+  )
+    ? actorUserId
+    : null;
+}
+
 export async function appendDomainEvent(
   tx: any,
   input: {
     organizationId: string;
-    actorUserId: string;
+    actorUserId?: string | null;
     aggregateType: AggregateType;
     aggregateId: string;
     eventType: string;
@@ -84,7 +93,7 @@ export async function appendDomainEvent(
       aggregateId: input.aggregateId,
       eventType: input.eventType,
       version: nextVersion,
-      actorUserId: input.actorUserId,
+      actorUserId: normalizeActorUserId(input.actorUserId),
       idempotencyKey: input.idempotencyKey,
       schemaVersion: 1,
       payload: input.payload,

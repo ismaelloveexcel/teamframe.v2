@@ -23,7 +23,7 @@ export class OutboxReliabilityService {
     now?: Date;
     handler: OutboxDeliveryHandler;
   }) {
-    const maxBatchSize = input.maxBatchSize ?? 50;
+    const maxBatchSize = input.maxBatchSize ?? 5000;
     const maxAttempts = input.maxAttempts ?? 5;
     const baseBackoffMs = input.baseBackoffMs ?? 1000;
     const now = input.now ?? new Date();

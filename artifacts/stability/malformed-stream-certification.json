@@ -1,0 +1,32 @@
+{
+  "generatedAt": "2026-06-05T11:41:28.111Z",
+  "results": [
+    {
+      "scenario": "missing_version",
+      "projectorCrashed": false,
+      "converged": true,
+      "error": null
+    },
+    {
+      "scenario": "duplicate_version",
+      "projectorCrashed": false,
+      "converged": true,
+      "error": null
+    },
+    {
+      "scenario": "invalid_payload",
+      "projectorCrashed": false,
+      "converged": true,
+      "error": null
+    },
+    {
+      "scenario": "legacy_schema_version",
+      "projectorCrashed": false,
+      "converged": true,
+      "error": null
+    }
+  ],
+  "projectorCrashes": 0,
+  "convergenceFailures": 0,
+  "pass": true
+}

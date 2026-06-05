@@ -12,6 +12,13 @@ export type AssignmentTimeline = {
   streamVersion: number;
 };
 
+function isUuid(value: unknown): value is string {
+  return (
+    typeof value === "string" &&
+    /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value)
+  );
+}
+
 export function deriveAssignments(events: EventEnvelope[]): AssignmentTimeline[] {
   const assignmentEvents = events
     .filter((event) => event.aggregateType === "assignment")
@@ -33,10 +40,15 @@ export function deriveAssignments(events: EventEnvelope[]): AssignmentTimeline[]
     if (event.eventType === "assignment.started") {
       const payload = event.payload as Record<string, unknown>;
       const assignmentId = String(payload.assignmentId);
+      const employeeId = String(payload.employeeId ?? payload.personId ?? "");
+      const positionId = String(payload.positionId ?? "");
+      if (!isUuid(assignmentId) || !isUuid(employeeId) || !isUuid(positionId)) {
+        continue;
+      }
       map.set(assignmentId, {
         assignmentId,
-        positionId: String(payload.positionId),
-        employeeId: String(payload.employeeId ?? payload.personId ?? ""),
+        positionId,
+        employeeId,
         effectiveFrom: String(payload.effectiveFrom),
         effectiveTo:
           payload.effectiveTo === null || payload.effectiveTo === undefined
@@ -51,6 +63,7 @@ export function deriveAssignments(events: EventEnvelope[]): AssignmentTimeline[]
     if (event.eventType === "assignment.ended") {
       const payload = event.payload as Record<string, unknown>;
       const assignmentId = String(payload.assignmentId);
+      if (!isUuid(assignmentId)) continue;
       const existing = map.get(assignmentId);
       if (!existing) continue;
       map.set(assignmentId, {
@@ -65,7 +78,29 @@ export function deriveAssignments(events: EventEnvelope[]): AssignmentTimeline[]
     }
   }
 
-  return [...map.values()].sort((a, b) => a.assignmentId.localeCompare(b.assignmentId));
+  const ordered = [...map.values()].sort((a, b) => {
+    const byEffectiveFrom = a.effectiveFrom.localeCompare(b.effectiveFrom);
+    if (byEffectiveFrom !== 0) return byEffectiveFrom;
+    return a.assignmentId.localeCompare(b.assignmentId);
+  });
+  const activePeople = new Set<string>();
+  const activePositions = new Set<string>();
+  const filtered: AssignmentTimeline[] = [];
+
+  for (const assignment of ordered) {
+    if (assignment.status !== "active") {
+      filtered.push(assignment);
+      continue;
+    }
+    if (activePeople.has(assignment.employeeId) || activePositions.has(assignment.positionId)) {
+      continue;
+    }
+    activePeople.add(assignment.employeeId);
+    activePositions.add(assignment.positionId);
+    filtered.push(assignment);
+  }
+
+  return filtered;
 }
 
 export function isAssignmentActive(assignment: AssignmentTimeline, nowIso: string): boolean {

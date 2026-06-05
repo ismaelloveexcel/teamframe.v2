@@ -116,8 +116,8 @@ export function deriveEvidenceStatusByAssignment(input: {
   documentSnapshots: DocumentSnapshot[];
   events: EventEnvelope[];
 }): AssignmentEvidenceStatus[] {
-  const activeAssignments = deriveAssignments(input.events)
-    .filter((assignment) => assignment.status === "active")
+  const eligibleAssignments = deriveAssignments(input.events)
+    .filter((assignment) => assignment.status !== "cancelled")
     .map((assignment) => ({
       assignmentId: assignment.assignmentId,
       positionId: assignment.positionId,
@@ -143,7 +143,7 @@ export function deriveEvidenceStatusByAssignment(input: {
     latestDocs.set(`${doc.assignmentId}:${doc.requirementKey}`, doc);
   }
 
-  return activeAssignments.map((assignment) => {
+  return eligibleAssignments.map((assignment) => {
     const requiredKeys = requiredByPosition.get(assignment.positionId) ?? [];
     let missingCount = 0;
     let pendingCount = 0;
