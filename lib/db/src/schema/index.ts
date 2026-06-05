@@ -753,10 +753,66 @@ export const outboxEventsTable = pgTable(
     processed: boolean("processed").notNull().default(false),
     processedAt: timestamp("processed_at", { withTimezone: true }),
     attempts: integer("attempts").notNull().default(0),
+    nextAttemptAt: timestamp("next_attempt_at", { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    lastError: text("last_error"),
     createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   },
   (table) => [
     uniqueIndex("outbox_events_org_event_unique").on(table.orgId, table.eventId),
+    index("outbox_events_due_idx").on(table.processed, table.nextAttemptAt),
+  ],
+);
+
+export const outboxDeadLettersTable = pgTable(
+  "outbox_dead_letters",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    outboxEventId: uuid("outbox_event_id")
+      .notNull()
+      .references(() => outboxEventsTable.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => orgEventsTable.id, { onDelete: "cascade" }),
+    consumerKey: text("consumer_key").notNull(),
+    reason: text("reason").notNull(),
+    attempts: integer("attempts").notNull().default(0),
+    payload: jsonb("payload").$type<Record<string, unknown>>().notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("outbox_dead_letters_consumer_outbox_unique").on(
+      table.consumerKey,
+      table.outboxEventId,
+    ),
+    index("outbox_dead_letters_org_idx").on(table.orgId),
+  ],
+);
+
+export const outboxDeliveryReceiptsTable = pgTable(
+  "outbox_delivery_receipts",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => orgEventsTable.id, { onDelete: "cascade" }),
+    consumerKey: text("consumer_key").notNull(),
+    deliveredAt: timestamp("delivered_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("outbox_delivery_receipts_org_event_consumer_unique").on(
+      table.orgId,
+      table.eventId,
+      table.consumerKey,
+    ),
+    index("outbox_delivery_receipts_org_idx").on(table.orgId),
   ],
 );
 
@@ -839,9 +895,76 @@ export const phaseRunsTable = pgTable("phase_runs", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+export const streamRepairAdaptersTable = pgTable(
+  "stream_repair_adapters",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    eventId: uuid("event_id")
+      .notNull()
+      .references(() => orgEventsTable.id, { onDelete: "cascade" }),
+    aggregateType: eventAggregateTypeEnum("aggregate_type").notNull(),
+    aggregateId: text("aggregate_id").notNull(),
+    adapterType: text("adapter_type").notNull(),
+    details: jsonb("details").$type<Record<string, unknown>>().default({}).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("stream_repair_adapters_org_event_unique").on(table.orgId, table.eventId),
+    index("stream_repair_adapters_org_aggregate_idx").on(
+      table.orgId,
+      table.aggregateType,
+      table.aggregateId,
+    ),
+  ],
+);
+
+export const replayRunsTable = pgTable(
+  "replay_runs",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    scope: text("scope").notNull(),
+    aggregateType: eventAggregateTypeEnum("aggregate_type"),
+    aggregateId: text("aggregate_id"),
+    status: text("status").notNull(),
+    diagnostics: jsonb("diagnostics").$type<Record<string, unknown>>().default({}).notNull(),
+    startedAt: timestamp("started_at", { withTimezone: true }).defaultNow().notNull(),
+    completedAt: timestamp("completed_at", { withTimezone: true }),
+  },
+  (table) => [index("replay_runs_org_idx").on(table.orgId, table.startedAt)],
+);
+
+export const projectionIntegrityChecksTable = pgTable(
+  "projection_integrity_checks",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    orgId: uuid("org_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    projectionName: text("projection_name").notNull(),
+    liveHash: text("live_hash").notNull(),
+    replayedHash: text("replayed_hash").notNull(),
+    driftDetected: boolean("drift_detected").notNull(),
+    autoRepaired: boolean("auto_repaired").notNull().default(false),
+    details: jsonb("details").$type<Record<string, unknown>>().default({}).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("projection_integrity_checks_org_idx").on(table.orgId, table.createdAt)],
+);
+
 export const createOrgEventSchema = createInsertSchema(orgEventsTable);
 export const createIdempotencyRecordSchema = createInsertSchema(idempotencyRecordsTable);
 
 export type OrgEvent = typeof orgEventsTable.$inferSelect;
 export type IdempotencyRecord = typeof idempotencyRecordsTable.$inferSelect;
+export type OutboxDeadLetter = typeof outboxDeadLettersTable.$inferSelect;
+export type OutboxDeliveryReceipt = typeof outboxDeliveryReceiptsTable.$inferSelect;
+export type ReplayRun = typeof replayRunsTable.$inferSelect;
+export type ProjectionIntegrityCheck = typeof projectionIntegrityChecksTable.$inferSelect;
+export type StreamRepairAdapter = typeof streamRepairAdaptersTable.$inferSelect;
 

@@ -1,0 +1,49 @@
+{
+  "generatedAt": "2026-06-05T07:15:32.916Z",
+  "organizationId": "22810a12-c6ec-44a8-a8c1-7008045500ba",
+  "detection": {
+    "organizationId": "22810a12-c6ec-44a8-a8c1-7008045500ba",
+    "continuityErrors": [],
+    "schemaViolations": [
+      {
+        "eventId": "af42dc5c-cd31-458f-a973-bb34da6f1efd",
+        "aggregateType": "document",
+        "aggregateId": "corrupt-doc-a82247fe-69cd-47aa-9e12-e36eca425892",
+        "eventType": "document.uploaded",
+        "missingKeys": [
+          "documentId",
+          "assignmentId",
+          "positionId",
+          "requirementKey"
+        ]
+      }
+    ],
+    "projectionDriftMismatches": [],
+    "quarantined": [
+      {
+        "aggregateType": "document",
+        "aggregateId": "corrupt-doc-a82247fe-69cd-47aa-9e12-e36eca425892",
+        "reason": "schema_violation event=document.uploaded missing=documentId,assignmentId,positionId,requirementKey"
+      }
+    ]
+  },
+  "recovery": {
+    "organizationId": "22810a12-c6ec-44a8-a8c1-7008045500ba",
+    "aggregateType": "document",
+    "aggregateId": "corrupt-doc-a82247fe-69cd-47aa-9e12-e36eca425892",
+    "recovered": true,
+    "repairMode": "schema_adapter"
+  },
+  "quarantineSnapshot": [
+    {
+      "id": "76c1fd28-a7bb-498a-be30-a0d7dd448603",
+      "orgId": "22810a12-c6ec-44a8-a8c1-7008045500ba",
+      "aggregateType": "document",
+      "aggregateId": "corrupt-doc-a82247fe-69cd-47aa-9e12-e36eca425892",
+      "state": "restored",
+      "reason": "recovered:schema_adapter:phase4-cert-adapter",
+      "createdAt": "2026-06-05T07:15:32.881Z",
+      "updatedAt": "2026-06-05T07:15:32.906Z"
+    }
+  ]
+}

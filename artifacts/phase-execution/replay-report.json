@@ -1,0 +1,31 @@
+{
+  "generatedAt": "2026-06-05T07:15:32.873Z",
+  "organizationId": "22810a12-c6ec-44a8-a8c1-7008045500ba",
+  "replayComparison": {
+    "organizationId": "22810a12-c6ec-44a8-a8c1-7008045500ba",
+    "diagnostics": {
+      "continuityErrors": [],
+      "eventCount": 5
+    },
+    "comparison": {
+      "assignmentProjectionHash": {
+        "replayed": "1ddb0642af8616b1b8782e01b7071b28c9f2c1893b90edec1deb37154a6f210f",
+        "live": "1ddb0642af8616b1b8782e01b7071b28c9f2c1893b90edec1deb37154a6f210f"
+      },
+      "evidenceByAssignmentHash": {
+        "replayed": "87ac2348a313ebb59ba7f1f57202ededcaf643a038e50c060c37b415f190a240",
+        "live": "87ac2348a313ebb59ba7f1f57202ededcaf643a038e50c060c37b415f190a240"
+      },
+      "evidenceByPositionHash": {
+        "replayed": "83a1c0c39919501d845a7547ba206872e83a2322dee2e19d0b74ec15f9d3c024",
+        "live": "83a1c0c39919501d845a7547ba206872e83a2322dee2e19d0b74ec15f9d3c024"
+      },
+      "compensationCurrentHash": {
+        "replayed": "5f8db08559b59cd6a5daffe273a73cb80201acef86a2ee3228b47bb2b4a04a9f",
+        "live": "5f8db08559b59cd6a5daffe273a73cb80201acef86a2ee3228b47bb2b4a04a9f"
+      }
+    },
+    "mismatches": [],
+    "matches": true
+  }
+}

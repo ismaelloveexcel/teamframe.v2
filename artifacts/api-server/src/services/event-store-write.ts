@@ -1,4 +1,4 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import {
   aggregateVersionsTable,
   orgEventsTable,
@@ -63,7 +63,19 @@ export async function appendDomainEvent(
     )
     .limit(1);
 
-  const nextVersion = (currentVersion?.version ?? 0) + 1;
+  const [eventVersion] = await tx
+    .select({ version: sql<number>`coalesce(max(${orgEventsTable.version}), 0)` })
+    .from(orgEventsTable)
+    .where(
+      and(
+        eq(orgEventsTable.orgId, input.organizationId),
+        eq(orgEventsTable.aggregateType, input.aggregateType),
+        eq(orgEventsTable.aggregateId, input.aggregateId),
+      ),
+    );
+
+  const baseVersion = Math.max(currentVersion?.version ?? 0, eventVersion?.version ?? 0);
+  const nextVersion = baseVersion + 1;
   const [event] = await tx
     .insert(orgEventsTable)
     .values({
