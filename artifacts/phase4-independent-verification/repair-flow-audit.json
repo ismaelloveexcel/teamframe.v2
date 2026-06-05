@@ -1,0 +1,11 @@
+{
+  "name": "Repair Flow Audit",
+  "pass": true,
+  "details": [
+    "emitsRepairRequestedEvent=true",
+    "directProjectionMutationFound=false"
+  ],
+  "errors": [],
+  "emitsRepairRequestedEvent": true,
+  "directProjectionMutationFound": false
+}

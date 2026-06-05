@@ -1,0 +1,12 @@
+{
+  "generatedAt": "2026-06-05T07:58:50.688Z",
+  "pass": true,
+  "checks": {
+    "projectionImmutability": true,
+    "replayEquivalence": true,
+    "repairSafety": true,
+    "quarantineIsolation": true,
+    "occGuardPresent": true,
+    "legacyPathRemoval": true
+  }
+}

@@ -1,0 +1,47 @@
+{
+  "generatedAt": "2026-06-05T07:23:03.715Z",
+  "organizationId": "a33635e6-2fa9-440c-ae73-00a348d5d329",
+  "driftDetected": {
+    "organizationId": "a33635e6-2fa9-440c-ae73-00a348d5d329",
+    "drifted": [
+      {
+        "projectionName": "evidenceByAssignmentHash",
+        "liveHash": "2e087213ea4f3aa03c19726bc8932b31a17c7347e4041a330d3643aa6bd3ad29",
+        "replayedHash": "e2b4596629b2da782c238d5f6a0d9b2835f84311c41e437339a9d7763394d5a0",
+        "driftDetected": true,
+        "autoRepaired": false
+      }
+    ],
+    "healthy": false,
+    "hashSummary": {
+      "live": "bf0ba86b6de745a7f385dd5c1f2464441fcf99718a5170f8d86006017a7c08b1",
+      "replayed": "d699bff2135dca13f10e3c0f54dd8023ca3887262d3c7c5589fd4728d49277cb"
+    }
+  },
+  "repaired": {
+    "organizationId": "a33635e6-2fa9-440c-ae73-00a348d5d329",
+    "drifted": [
+      {
+        "projectionName": "evidenceByAssignmentHash",
+        "liveHash": "2e087213ea4f3aa03c19726bc8932b31a17c7347e4041a330d3643aa6bd3ad29",
+        "replayedHash": "e2b4596629b2da782c238d5f6a0d9b2835f84311c41e437339a9d7763394d5a0",
+        "driftDetected": true,
+        "autoRepaired": true
+      }
+    ],
+    "healthy": false,
+    "hashSummary": {
+      "live": "bf0ba86b6de745a7f385dd5c1f2464441fcf99718a5170f8d86006017a7c08b1",
+      "replayed": "d699bff2135dca13f10e3c0f54dd8023ca3887262d3c7c5589fd4728d49277cb"
+    }
+  },
+  "healthyAfterRepair": {
+    "organizationId": "a33635e6-2fa9-440c-ae73-00a348d5d329",
+    "drifted": [],
+    "healthy": true,
+    "hashSummary": {
+      "live": "d6fdc21b657cfc3bead41471aa5f02a0c048065c574250c3b7ad3e08f5d0bcc1",
+      "replayed": "d699bff2135dca13f10e3c0f54dd8023ca3887262d3c7c5589fd4728d49277cb"
+    }
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "phase_id": "phase-1-event-core",
+  "commit_hash": "edefc5aa21ac21a10a604e5622547e122dca149b",
+  "status": "PASS",
+  "scope_completed": [
+    "Phase 0 migration/cutover scaffolding helpers",
+    "Phase 1 command pipeline ordering + fail-fast behavior",
+    "Idempotency hash conflict detection",
+    "OCC checks including multi-aggregate expected_versions",
+    "In-memory deterministic gate harness and tests",
+    "DB schema additions for org_events/outbox/aggregate_versions/idempotency/quarantine/phase_runs",
+    "Append-only SQL guard trigger script for org_events"
+  ],
+  "known_limits": [
+    "SQL trigger script is supplied under lib/db/sql but not auto-applied in this phase",
+    "Phase 2+ aggregates and replay engine not yet implemented"
+  ]
+}

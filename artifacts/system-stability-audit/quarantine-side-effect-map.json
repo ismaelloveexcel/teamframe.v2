@@ -1,0 +1,31 @@
+{
+  "generatedAt": "2026-06-05T07:32:58.587Z",
+  "model": "quarantine-service side-effect graph",
+  "operations": [
+    {
+      "service": "detectAndQuarantine",
+      "sideEffects": [
+        "reads org_events",
+        "invokes replay.compareReplayWithLive",
+        "upserts stream_quarantines",
+        "appends system quarantine.applied events"
+      ]
+    },
+    {
+      "service": "recoverStream",
+      "sideEffects": [
+        "reads org_events + repair adapters",
+        "optionally inserts stream_repair_adapters",
+        "invokes replay.replayAggregate",
+        "updates stream_quarantines state",
+        "appends system quarantine.restored events"
+      ]
+    }
+  ],
+  "violations": {
+    "invokesReplayFromQuarantineHandler": true,
+    "containsUpdateStatements": true,
+    "projectionMutationTriggeredInQuarantineFlow": false
+  },
+  "quarantineRowsCount": 14
+}

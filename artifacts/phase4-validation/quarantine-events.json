@@ -1,0 +1,16 @@
+{
+  "generatedAt": "2026-06-05T07:22:26.411Z",
+  "organizationId": "a122e102-19b7-45b9-a3c1-591bec9a2920",
+  "corruptAggregateId": "corrupt-338009fd-bc15-44ad-93aa-08a8b168ad30",
+  "quarantined": true,
+  "writeBlocked": true,
+  "recovered": true,
+  "postRecoveryReplayMatches": false,
+  "preRecoveryHash": "6fb4de2e4253155b7bcfb55b74ea45aaf37aeb0ba953cbe7de8b8cdffb909d56",
+  "postRecoveryHash": "5dc4b94beeb9fe5b189c052db4079caf7ac7e311bf637fe0bf4c6fb93b2d766b",
+  "corruptAggregateEventCount": 1,
+  "errors": [
+    "Replay/live comparison diverged after recovery.",
+    "Recovered assignment replay hash diverged from pre-corruption expected hash."
+  ]
+}

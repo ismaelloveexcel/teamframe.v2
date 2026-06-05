@@ -1,0 +1,61 @@
+{
+  "generatedAt": "2026-06-05T07:22:26.462Z",
+  "organizationId": "a122e102-19b7-45b9-a3c1-591bec9a2920",
+  "beforeCorruption": {
+    "organizationId": "a122e102-19b7-45b9-a3c1-591bec9a2920",
+    "diagnostics": {
+      "continuityErrors": [],
+      "eventCount": 5
+    },
+    "comparison": {
+      "assignmentProjectionHash": {
+        "replayed": "6fb4de2e4253155b7bcfb55b74ea45aaf37aeb0ba953cbe7de8b8cdffb909d56",
+        "live": "6fb4de2e4253155b7bcfb55b74ea45aaf37aeb0ba953cbe7de8b8cdffb909d56"
+      },
+      "evidenceByAssignmentHash": {
+        "replayed": "4b68111eeaa8af242ee6d592980b4fe259c6ca9b2082753b2cf4f6cd923597de",
+        "live": "4b68111eeaa8af242ee6d592980b4fe259c6ca9b2082753b2cf4f6cd923597de"
+      },
+      "evidenceByPositionHash": {
+        "replayed": "77ef916a51bfe481c3250d8dab47714dbd2e40cf2f730a8fe2337575428b91a6",
+        "live": "77ef916a51bfe481c3250d8dab47714dbd2e40cf2f730a8fe2337575428b91a6"
+      },
+      "compensationCurrentHash": {
+        "replayed": "3bb148186cab8b8e4eda2a49a641388cee62b09364787559df26b720593b560e",
+        "live": "3bb148186cab8b8e4eda2a49a641388cee62b09364787559df26b720593b560e"
+      }
+    },
+    "mismatches": [],
+    "matches": true
+  },
+  "finalComparison": {
+    "organizationId": "a122e102-19b7-45b9-a3c1-591bec9a2920",
+    "diagnostics": {
+      "continuityErrors": [],
+      "eventCount": 13
+    },
+    "comparison": {
+      "assignmentProjectionHash": {
+        "replayed": "5dc4b94beeb9fe5b189c052db4079caf7ac7e311bf637fe0bf4c6fb93b2d766b",
+        "live": "5dc4b94beeb9fe5b189c052db4079caf7ac7e311bf637fe0bf4c6fb93b2d766b"
+      },
+      "evidenceByAssignmentHash": {
+        "replayed": "7b2639fa580e0818e24ea0e3bdff18e57a4477857db722748ef957595f6f91be",
+        "live": "112139d6690ac6f2d3cf00ffd8b0340fa809005d2791037524b797c488e3f80e"
+      },
+      "evidenceByPositionHash": {
+        "replayed": "91951f463ea8e51daab1624529df861696d2db50df307e5358d985ffbc05403a",
+        "live": "57ebec1e39d8bfade1188c81330368e101efc403dbe0f997ac883608b72264f2"
+      },
+      "compensationCurrentHash": {
+        "replayed": "3bb148186cab8b8e4eda2a49a641388cee62b09364787559df26b720593b560e",
+        "live": "3bb148186cab8b8e4eda2a49a641388cee62b09364787559df26b720593b560e"
+      }
+    },
+    "mismatches": [
+      "evidenceByAssignmentHash",
+      "evidenceByPositionHash"
+    ],
+    "matches": false
+  }
+}
