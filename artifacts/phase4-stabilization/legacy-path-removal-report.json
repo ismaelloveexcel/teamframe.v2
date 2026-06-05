@@ -1,0 +1,54 @@
+{
+  "generatedAt": "2026-06-05T07:58:50.688Z",
+  "pass": true,
+  "findings": [
+    {
+      "path": "artifacts/api-server/src/founder-flow-certification.ts",
+      "line": 200,
+      "snippet": "positionId: peopleTable.positionId,",
+      "classification": "TRANSITIONAL"
+    },
+    {
+      "path": "artifacts/api-server/src/founder-flow-certification.ts",
+      "line": 209,
+      "snippet": "assert.equal(seededPeople[0]?.positionId ?? null, null, \"people.positionId must remain non-authoritative.\");",
+      "classification": "TRANSITIONAL"
+    },
+    {
+      "path": "artifacts/api-server/src/phase4-stabilization.ts",
+      "line": 169,
+      "snippet": "line.includes(\"peopleTable.positionId\") ||",
+      "classification": "TRANSITIONAL"
+    },
+    {
+      "path": "artifacts/api-server/src/phase4-stabilization.ts",
+      "line": 170,
+      "snippet": "line.includes(\"person.positionId\") ||",
+      "classification": "TRANSITIONAL"
+    },
+    {
+      "path": "artifacts/api-server/src/phase4-stabilization.ts",
+      "line": 171,
+      "snippet": "line.includes(\"people.positionId\")",
+      "classification": "TRANSITIONAL"
+    },
+    {
+      "path": "artifacts/api-server/src/system-stability-audit.ts",
+      "line": 331,
+      "snippet": "line.includes(\"peopleTable.positionId\") ||",
+      "classification": "TRANSITIONAL"
+    },
+    {
+      "path": "artifacts/api-server/src/system-stability-audit.ts",
+      "line": 332,
+      "snippet": "line.includes(\"person.positionId\") ||",
+      "classification": "TRANSITIONAL"
+    },
+    {
+      "path": "artifacts/api-server/src/system-stability-audit.ts",
+      "line": 333,
+      "snippet": "line.includes(\"people.positionId\")",
+      "classification": "TRANSITIONAL"
+    }
+  ]
+}

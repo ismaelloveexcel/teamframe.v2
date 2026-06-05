@@ -1,3 +1,6 @@
+import { randomUUID } from "node:crypto";
+import { and, eq } from "drizzle-orm";
+import { db, positionsTable } from "@workspace/db";
 import type { ActorContext } from "../lib/request-context";
 import { badRequest, notFound } from "../lib/http-error";
 import { OrganizationAccessControl } from "../access/organization-access";
@@ -12,6 +15,8 @@ import {
   type OwnershipAssignmentInput,
 } from "../persistence/repositories";
 import { requireOwnershipInput } from "./helpers";
+import { appendDomainEvent } from "./event-store-write";
+import { buildProjectionBuilderService, ProjectionBuilderService } from "./projection-builder-service";
 
 export class PositionService {
   constructor(
@@ -21,6 +26,7 @@ export class PositionService {
     private readonly people: PeopleRepository,
     private readonly ownerships: OwnershipRepository,
     private readonly audit: AuditRepository,
+    private readonly projector: ProjectionBuilderService,
   ) {}
 
   async list(actor: ActorContext, organizationId: string) {
@@ -56,7 +62,41 @@ export class PositionService {
       if (!manager) badRequest("reportsToPositionId must belong to the same organization");
     }
 
-    return this.positions.create(organizationId, input);
+    const positionId = randomUUID();
+    return db.transaction(async (tx) => {
+      const payload = {
+        positionId,
+        title: input.title,
+        teamId: input.teamId ?? null,
+        reportsToPositionId: input.reportsToPositionId ?? null,
+        lifecycleStatus: input.lifecycleStatus ?? "vacant",
+      };
+      await appendDomainEvent(tx, {
+        organizationId,
+        actorUserId: actor.userId,
+        aggregateType: "position",
+        aggregateId: positionId,
+        eventType: "position.created",
+        idempotencyKey: `position-create-${positionId}`,
+        payload,
+      });
+
+      await this.projector.projectPositionEventTx(tx, {
+        organizationId,
+        eventType: "position.created",
+        payload,
+      });
+
+      const [position] = await tx
+        .select()
+        .from(positionsTable)
+        .where(and(eq(positionsTable.organizationId, organizationId), eq(positionsTable.id, positionId)))
+        .limit(1);
+      if (!position) {
+        badRequest("Failed to create position projection");
+      }
+      return position;
+    });
   }
 
   async update(
@@ -87,15 +127,71 @@ export class PositionService {
       if (!manager) badRequest("reportsToPositionId must belong to the same organization");
     }
 
-    const position = await this.positions.update(organizationId, positionId, input);
-    if (!position) notFound("Position not found");
-    return position;
+    const existing = await this.positions.getById(organizationId, positionId);
+    if (!existing) notFound("Position not found");
+
+    return db.transaction(async (tx) => {
+      const payload: Record<string, unknown> = {
+        positionId,
+      };
+      if (typeof input.teamId !== "undefined") payload.teamId = input.teamId;
+      if (typeof input.title !== "undefined") payload.title = input.title;
+      if (typeof input.reportsToPositionId !== "undefined") {
+        payload.reportsToPositionId = input.reportsToPositionId;
+      }
+      if (typeof input.lifecycleStatus !== "undefined") {
+        payload.lifecycleStatus = input.lifecycleStatus;
+      }
+
+      await appendDomainEvent(tx, {
+        organizationId,
+        actorUserId: actor.userId,
+        aggregateType: "position",
+        aggregateId: positionId,
+        eventType: "position.updated",
+        idempotencyKey: `position-update-${positionId}-${randomUUID()}`,
+        payload,
+      });
+
+      await this.projector.projectPositionEventTx(tx, {
+        organizationId,
+        eventType: "position.updated",
+        payload,
+      });
+
+      const [updated] = await tx
+        .select()
+        .from(positionsTable)
+        .where(and(eq(positionsTable.organizationId, organizationId), eq(positionsTable.id, positionId)))
+        .limit(1);
+      if (!updated) notFound("Position not found");
+      return updated;
+    });
   }
 
   async delete(actor: ActorContext, organizationId: string, positionId: string) {
     await this.access.requireMembership(organizationId, actor.userId, "admin");
-    const deleted = await this.positions.delete(organizationId, positionId);
-    if (!deleted) notFound("Position not found");
+    const existing = await this.positions.getById(organizationId, positionId);
+    if (!existing) notFound("Position not found");
+
+    await db.transaction(async (tx) => {
+      const payload = { positionId };
+      await appendDomainEvent(tx, {
+        organizationId,
+        actorUserId: actor.userId,
+        aggregateType: "position",
+        aggregateId: positionId,
+        eventType: "position.deleted",
+        idempotencyKey: `position-delete-${positionId}-${randomUUID()}`,
+        payload,
+      });
+
+      await this.projector.projectPositionEventTx(tx, {
+        organizationId,
+        eventType: "position.deleted",
+        payload,
+      });
+    });
   }
 
   async assignOwnership(
@@ -155,5 +251,6 @@ export function buildPositionService() {
     new PeopleRepository(),
     new OwnershipRepository(),
     new AuditRepository(),
+    buildProjectionBuilderService(),
   );
 }

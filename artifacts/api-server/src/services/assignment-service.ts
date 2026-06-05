@@ -4,10 +4,7 @@ import {
   aggregateVersionsTable,
   db,
   idempotencyRecordsTable,
-  orgEventsTable,
-  outboxEventsTable,
   personPositionAssignmentsTable,
-  streamQuarantinesTable,
 } from "@workspace/db";
 import { OrganizationAccessControl } from "../access/organization-access";
 import { stableHash } from "../domain/event-core";
@@ -20,21 +17,14 @@ import {
   PersonPositionAssignmentRepository,
   PositionRepository,
 } from "../persistence/repositories";
+import { appendDomainEvent, assertIdempotencyKey, parseDateOrNow } from "./event-store-write";
+import { buildProjectionBuilderService, ProjectionBuilderService } from "./projection-builder-service";
 
 type AssignmentCommandInput = {
   idempotencyKey: string;
 };
 
-function parseDateOrNow(value?: string): Date {
-  if (!value) return new Date();
-  const parsed = new Date(value);
-  if (Number.isNaN(parsed.getTime())) {
-    badRequest("Invalid timestamp format");
-  }
-  return parsed;
-}
-
-function assertIdempotencyKey(input: AssignmentCommandInput): void {
+function assertCommandIdempotency(input: AssignmentCommandInput): void {
   if (input.idempotencyKey.trim().length < 8) {
     badRequest("idempotencyKey must be at least 8 characters");
   }
@@ -46,6 +36,7 @@ export class AssignmentService {
     private readonly assignments: PersonPositionAssignmentRepository,
     private readonly people: PeopleRepository,
     private readonly positions: PositionRepository,
+    private readonly projector: ProjectionBuilderService,
   ) {}
 
   async list(actor: ActorContext, organizationId: string) {
@@ -64,7 +55,7 @@ export class AssignmentService {
     },
   ) {
     await this.access.requireMembership(organizationId, actor.userId, "admin");
-    assertIdempotencyKey(input);
+    assertCommandIdempotency(input);
 
     const [person, position] = await Promise.all([
       this.people.getById(organizationId, input.personId),
@@ -98,37 +89,44 @@ export class AssignmentService {
         return { ...(replay[0].responseBlob as Record<string, unknown>), replayed: true };
       }
 
-      const [inserted] = await tx
-        .insert(personPositionAssignmentsTable)
-        .values({
-          id: assignmentId,
-          organizationId,
-          personId: input.personId,
-          positionId: input.positionId,
-          startedAt,
-          status: "active",
-          updatedAt: new Date(),
-        })
-        .returning();
-
-      if (!inserted) {
-        badRequest("Failed to create assignment");
-      }
-
       const payload = {
         assignmentId,
         personId: input.personId,
+        employeeId: input.personId,
         positionId: input.positionId,
         effectiveFrom: startedAt.toISOString(),
       };
-      await this.appendAssignmentEvent(tx, {
+
+      await appendDomainEvent(tx, {
         organizationId,
         actorUserId: actor.userId,
+        aggregateType: "assignment",
         aggregateId: assignmentId,
         eventType: "assignment.started",
         idempotencyKey: input.idempotencyKey,
         payload,
       });
+
+      await this.projector.projectAssignmentEventTx(tx, {
+        organizationId,
+        eventType: "assignment.started",
+        payload,
+      });
+
+      const [inserted] = await tx
+        .select()
+        .from(personPositionAssignmentsTable)
+        .where(
+          and(
+            eq(personPositionAssignmentsTable.organizationId, organizationId),
+            eq(personPositionAssignmentsTable.id, assignmentId),
+          ),
+        )
+        .limit(1);
+
+      if (!inserted) {
+        badRequest("Failed to create assignment projection");
+      }
 
       const response = {
         assignment: inserted,
@@ -161,7 +159,7 @@ export class AssignmentService {
     },
   ) {
     await this.access.requireMembership(organizationId, actor.userId, "admin");
-    assertIdempotencyKey(input);
+    assertCommandIdempotency(input);
 
     const assignment = await this.assignments.getById(organizationId, assignmentId);
     if (!assignment) notFound("Assignment not found");
@@ -185,35 +183,39 @@ export class AssignmentService {
         return { ...(replay[0].responseBlob as Record<string, unknown>), replayed: true };
       }
 
+      const payload = {
+        assignmentId,
+        effectiveTo: endedAt.toISOString(),
+      };
+
+      await appendDomainEvent(tx, {
+        organizationId,
+        actorUserId: actor.userId,
+        aggregateType: "assignment",
+        aggregateId: assignmentId,
+        eventType: "assignment.ended",
+        idempotencyKey: input.idempotencyKey,
+        payload,
+      });
+
+      await this.projector.projectAssignmentEventTx(tx, {
+        organizationId,
+        eventType: "assignment.ended",
+        payload,
+      });
+
       const [ended] = await tx
-        .update(personPositionAssignmentsTable)
-        .set({
-          status: "ended",
-          endedAt,
-          updatedAt: new Date(),
-        })
+        .select()
+        .from(personPositionAssignmentsTable)
         .where(
           and(
             eq(personPositionAssignmentsTable.organizationId, organizationId),
             eq(personPositionAssignmentsTable.id, assignmentId),
           ),
         )
-        .returning();
+        .limit(1);
 
       if (!ended) notFound("Assignment not found");
-
-      const payload = {
-        assignmentId: ended.id,
-        effectiveTo: endedAt.toISOString(),
-      };
-      await this.appendAssignmentEvent(tx, {
-        organizationId,
-        actorUserId: actor.userId,
-        aggregateId: ended.id,
-        eventType: "assignment.ended",
-        idempotencyKey: input.idempotencyKey,
-        payload,
-      });
 
       const response = {
         assignment: ended,
@@ -225,7 +227,7 @@ export class AssignmentService {
         idempotencyKey: input.idempotencyKey,
         requestHash: stableHash({
           commandType: "assignment.end",
-          assignmentId: ended.id,
+          assignmentId,
           endedAt: endedAt.toISOString(),
         }),
         responseBlob: response,
@@ -248,7 +250,7 @@ export class AssignmentService {
     },
   ) {
     await this.access.requireMembership(organizationId, actor.userId, "admin");
-    assertIdempotencyKey(input);
+    assertCommandIdempotency(input);
 
     const [person, targetPosition, seatAssignment] = await Promise.all([
       this.people.getById(organizationId, input.personId),
@@ -299,67 +301,79 @@ export class AssignmentService {
         return { ...(replay[0].responseBlob as Record<string, unknown>), replayed: true };
       }
 
-      const [ended] = await tx
-        .update(personPositionAssignmentsTable)
-        .set({
-          status: "ended",
-          endedAt: effectiveAt,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(personPositionAssignmentsTable.organizationId, organizationId),
-            eq(personPositionAssignmentsTable.id, currentAssignment.id),
-          ),
-        )
-        .returning();
-      if (!ended) notFound("Assignment not found");
-
-      const [inserted] = await tx
-        .insert(personPositionAssignmentsTable)
-        .values({
-          id: newAssignmentId,
-          organizationId,
-          personId: input.personId,
-          positionId: input.toPositionId,
-          startedAt: effectiveAt,
-          status: "active",
-          updatedAt: new Date(),
-        })
-        .returning();
-      if (!inserted) {
-        badRequest("Failed to create assignment");
-      }
-
-      await this.appendAssignmentEvent(tx, {
+      const endedPayload = {
+        assignmentId: currentAssignment.id,
+        effectiveTo: effectiveAt.toISOString(),
+      };
+      await appendDomainEvent(tx, {
         organizationId,
         actorUserId: actor.userId,
-        aggregateId: ended.id,
+        aggregateType: "assignment",
+        aggregateId: currentAssignment.id,
         eventType: "assignment.ended",
         idempotencyKey: `${input.idempotencyKey}-end`,
-        payload: {
-          assignmentId: ended.id,
-          effectiveTo: effectiveAt.toISOString(),
-        },
+        payload: endedPayload,
+      });
+      await this.projector.projectAssignmentEventTx(tx, {
+        organizationId,
+        eventType: "assignment.ended",
+        payload: endedPayload,
       });
 
-      await this.appendAssignmentEvent(tx, {
+      const startedPayload = {
+        assignmentId: newAssignmentId,
+        personId: input.personId,
+        employeeId: input.personId,
+        positionId: input.toPositionId,
+        effectiveFrom: effectiveAt.toISOString(),
+      };
+      await appendDomainEvent(tx, {
         organizationId,
         actorUserId: actor.userId,
-        aggregateId: inserted.id,
+        aggregateType: "assignment",
+        aggregateId: newAssignmentId,
         eventType: "assignment.started",
         idempotencyKey: `${input.idempotencyKey}-start`,
-        payload: {
-          assignmentId: inserted.id,
-          personId: input.personId,
-          positionId: input.toPositionId,
-          effectiveFrom: effectiveAt.toISOString(),
-        },
+        payload: startedPayload,
+      });
+      await this.projector.projectAssignmentEventTx(tx, {
+        organizationId,
+        eventType: "assignment.started",
+        payload: startedPayload,
       });
 
+      const [inserted, ended] = await Promise.all([
+        tx
+          .select()
+          .from(personPositionAssignmentsTable)
+          .where(
+            and(
+              eq(personPositionAssignmentsTable.organizationId, organizationId),
+              eq(personPositionAssignmentsTable.id, newAssignmentId),
+            ),
+          )
+          .limit(1),
+        tx
+          .select()
+          .from(personPositionAssignmentsTable)
+          .where(
+            and(
+              eq(personPositionAssignmentsTable.organizationId, organizationId),
+              eq(personPositionAssignmentsTable.id, currentAssignment.id),
+            ),
+          )
+          .limit(1),
+      ]);
+
+      const nextAssignment = inserted[0];
+      const previousAssignment = ended[0];
+      if (!nextAssignment || !previousAssignment) {
+        badRequest("Failed to project assignment transfer state");
+      }
+
       const response = {
-        assignment: inserted,
-        endedAssignmentId: ended.id,
+        assignment: nextAssignment,
+        endedAssignmentId: previousAssignment.id,
         replayed: false,
       };
 
@@ -393,97 +407,6 @@ export class AssignmentService {
       .limit(1);
     return record?.version ?? 0;
   }
-
-  private async appendAssignmentEvent(
-    tx: any,
-    input: {
-      organizationId: string;
-      actorUserId: string;
-      aggregateId: string;
-      eventType: "assignment.started" | "assignment.ended";
-      idempotencyKey: string;
-      payload: Record<string, unknown>;
-    },
-  ) {
-    const [quarantine] = await tx
-      .select({ state: streamQuarantinesTable.state })
-      .from(streamQuarantinesTable)
-      .where(
-        and(
-          eq(streamQuarantinesTable.orgId, input.organizationId),
-          eq(streamQuarantinesTable.aggregateType, "assignment"),
-          eq(streamQuarantinesTable.aggregateId, input.aggregateId),
-        ),
-      )
-      .limit(1);
-
-    if (quarantine?.state === "quarantined") {
-      badRequest(`Assignment aggregate ${input.aggregateId} is quarantined`);
-    }
-
-    const [currentVersion] = await tx
-      .select({ version: aggregateVersionsTable.version })
-      .from(aggregateVersionsTable)
-      .where(
-        and(
-          eq(aggregateVersionsTable.orgId, input.organizationId),
-          eq(aggregateVersionsTable.aggregateType, "assignment"),
-          eq(aggregateVersionsTable.aggregateId, input.aggregateId),
-        ),
-      )
-      .limit(1);
-
-    const nextVersion = (currentVersion?.version ?? 0) + 1;
-    const payloadHash = stableHash(input.payload);
-
-    const [event] = await tx
-      .insert(orgEventsTable)
-      .values({
-        orgId: input.organizationId,
-        aggregateType: "assignment",
-        aggregateId: input.aggregateId,
-        eventType: input.eventType,
-        version: nextVersion,
-        actorUserId: input.actorUserId,
-        idempotencyKey: input.idempotencyKey,
-        schemaVersion: 1,
-        payload: input.payload,
-        payloadHash,
-      })
-      .returning({ id: orgEventsTable.id });
-
-    if (!event) {
-      badRequest("Failed to append assignment event");
-    }
-
-    await tx
-      .insert(aggregateVersionsTable)
-      .values({
-        orgId: input.organizationId,
-        aggregateType: "assignment",
-        aggregateId: input.aggregateId,
-        version: nextVersion,
-        updatedAt: new Date(),
-      })
-      .onConflictDoUpdate({
-        target: [
-          aggregateVersionsTable.orgId,
-          aggregateVersionsTable.aggregateType,
-          aggregateVersionsTable.aggregateId,
-        ],
-        set: {
-          version: nextVersion,
-          updatedAt: new Date(),
-        },
-      });
-
-    await tx.insert(outboxEventsTable).values({
-      orgId: input.organizationId,
-      eventId: event.id,
-      type: input.eventType,
-      payload: input.payload,
-    });
-  }
 }
 
 export function buildAssignmentService() {
@@ -496,5 +419,6 @@ export function buildAssignmentService() {
     new PersonPositionAssignmentRepository(),
     new PeopleRepository(),
     new PositionRepository(),
+    buildProjectionBuilderService(),
   );
 }

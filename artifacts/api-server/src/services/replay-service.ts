@@ -6,6 +6,8 @@ import {
   evidenceStatusByAssignmentTable,
   evidenceStatusByPositionTable,
   orgEventsTable,
+  personPositionAssignmentsTable,
+  positionsTable,
   replayRunsTable,
 } from "@workspace/db";
 import {
@@ -15,6 +17,7 @@ import {
   deriveDocumentSnapshotsFromEvents,
   deriveEvidenceStatusByAssignment,
   deriveEvidenceStatusByPosition,
+  derivePositionsFromEvents,
   deriveRequirementRulesFromEvents,
   stableHash,
   type AggregateType,
@@ -22,6 +25,7 @@ import {
 } from "../domain";
 
 type ProjectionHashes = {
+  positionsCurrentHash: string;
   assignmentProjectionHash: string;
   evidenceByAssignmentHash: string;
   evidenceByPositionHash: string;
@@ -165,6 +169,13 @@ export class ReplayService {
     const continuityErrors = detectContinuityErrors(rows);
     const events = rows.map(toEventEnvelope);
 
+    const positionsCurrent = derivePositionsFromEvents(events).map((position) => ({
+      positionId: position.positionId,
+      title: position.title,
+      teamId: position.teamId,
+      reportsToPositionId: position.reportsToPositionId,
+      lifecycleStatus: position.lifecycleStatus,
+    }));
     const assignmentTimelines = deriveAssignments(events).map((assignment) => ({
       assignmentId: assignment.assignmentId,
       positionId: assignment.positionId,
@@ -202,6 +213,7 @@ export class ReplayService {
     }));
 
     const replayed = {
+      positionsCurrent: normalizeRows(positionsCurrent),
       assignmentTimelines: normalizeRows(assignmentTimelines),
       evidenceByAssignment: normalizeRows(
         evidenceByAssignment.map((status) => ({
@@ -227,6 +239,7 @@ export class ReplayService {
     };
 
     const hashes: ProjectionHashes = {
+      positionsCurrentHash: stableHash(replayed.positionsCurrent),
       assignmentProjectionHash: stableHash(replayed.assignmentTimelines),
       evidenceByAssignmentHash: stableHash(replayed.evidenceByAssignment),
       evidenceByPositionHash: stableHash(replayed.evidenceByPosition),
@@ -257,17 +270,13 @@ export class ReplayService {
   }
 
   async getLiveProjectionState(organizationId: string) {
-    const [assignments, evidenceByAssignment, evidenceByPosition, compensationCurrent, compensationRecords] =
+    const [positions, assignments, evidenceByAssignment, evidenceByPosition, compensationCurrent, compensationRecords] =
       await Promise.all([
+        db.select().from(positionsTable).where(eq(positionsTable.organizationId, organizationId)),
         db
           .select()
-          .from(orgEventsTable)
-          .where(
-            and(
-              eq(orgEventsTable.orgId, organizationId),
-              eq(orgEventsTable.aggregateType, "assignment"),
-            ),
-          ),
+          .from(personPositionAssignmentsTable)
+          .where(eq(personPositionAssignmentsTable.organizationId, organizationId)),
         db
           .select()
           .from(evidenceStatusByAssignmentTable)
@@ -286,16 +295,25 @@ export class ReplayService {
           .where(eq(compensationRecordsTable.organizationId, organizationId)),
       ]);
 
-    const assignmentTimelines = deriveAssignments(assignments.map(toEventEnvelope)).map((assignment) => ({
-      assignmentId: assignment.assignmentId,
+    const assignmentTimelines = assignments.map((assignment) => ({
+      assignmentId: assignment.id,
       positionId: assignment.positionId,
-      employeeId: assignment.employeeId,
-      effectiveFrom: assignment.effectiveFrom,
-      effectiveTo: assignment.effectiveTo,
-      status: assignment.status,
+      employeeId: assignment.personId,
+      effectiveFrom: assignment.startedAt.toISOString(),
+      effectiveTo: assignment.endedAt ? assignment.endedAt.toISOString() : null,
+      status: assignment.status === "ended" ? "ended" : "active",
     }));
 
     return {
+      positionsCurrent: normalizeRows(
+        positions.map((row) => ({
+          positionId: row.id,
+          title: row.title,
+          teamId: row.teamId,
+          reportsToPositionId: row.reportsToPositionId,
+          lifecycleStatus: row.lifecycleStatus,
+        })),
+      ),
       assignmentTimelines: normalizeRows(assignmentTimelines),
       evidenceByAssignment: normalizeRows(
         evidenceByAssignment.map((row) => ({
@@ -345,6 +363,16 @@ export class ReplayService {
       this.getLiveProjectionState(organizationId),
     ]);
 
+    const replayPositionIds = new Set(
+      (replay.replayed.positionsCurrent as Array<Record<string, unknown>>).map((row) =>
+        String(row.positionId),
+      ),
+    );
+    const replayAssignmentIds = new Set(
+      (replay.replayed.assignmentTimelines as Array<Record<string, unknown>>).map((row) =>
+        String(row.assignmentId),
+      ),
+    );
     const replayEvidenceAssignmentIds = new Set(
       (replay.replayed.evidenceByAssignment as Array<Record<string, unknown>>).map((row) =>
         String(row.assignmentId),
@@ -355,30 +383,91 @@ export class ReplayService {
         String(row.positionId),
       ),
     );
+    const replayCompAssignmentIds = new Set(
+      (replay.replayed.compensationCurrent as Array<Record<string, unknown>>).map((row) =>
+        String(row.assignmentId),
+      ),
+    );
 
+    const livePositionIds = new Set(live.positionsCurrent.map((row) => String(row.positionId)));
+    const liveAssignmentIds = new Set(live.assignmentTimelines.map((row) => String(row.assignmentId)));
+    const liveEvidenceAssignmentIds = new Set(
+      live.evidenceByAssignment.map((row) => String(row.assignmentId)),
+    );
+    const liveEvidencePositionIds = new Set(live.evidenceByPosition.map((row) => String(row.positionId)));
+    const liveCompAssignmentIds = new Set(live.compensationCurrent.map((row) => String(row.assignmentId)));
+
+    const sharedPositionIds = new Set(
+      [...replayPositionIds].filter((id) => livePositionIds.has(id)),
+    );
+    const sharedAssignmentIds = new Set(
+      [...replayAssignmentIds].filter((id) => liveAssignmentIds.has(id)),
+    );
+    const sharedEvidenceAssignmentIds = new Set(
+      [...replayEvidenceAssignmentIds].filter((id) => liveEvidenceAssignmentIds.has(id)),
+    );
+    const sharedEvidencePositionIds = new Set(
+      [...replayEvidencePositionIds].filter((id) => liveEvidencePositionIds.has(id)),
+    );
+    const sharedCompAssignmentIds = new Set(
+      [...replayCompAssignmentIds].filter((id) => liveCompAssignmentIds.has(id)),
+    );
+
+    const replayPositionsCurrent = (replay.replayed.positionsCurrent as Array<Record<string, unknown>>).filter((row) =>
+      sharedPositionIds.has(String(row.positionId)),
+    );
+    const livePositionsCurrent = live.positionsCurrent.filter((row) =>
+      sharedPositionIds.has(String(row.positionId)),
+    );
+
+    const replayAssignmentTimelines = (replay.replayed.assignmentTimelines as Array<Record<string, unknown>>).filter(
+      (row) => sharedAssignmentIds.has(String(row.assignmentId)),
+    );
+    const liveAssignmentTimelines = live.assignmentTimelines.filter((row) =>
+      sharedAssignmentIds.has(String(row.assignmentId)),
+    );
+
+    const replayEvidenceByAssignment = (replay.replayed.evidenceByAssignment as Array<Record<string, unknown>>).filter(
+      (row) => sharedEvidenceAssignmentIds.has(String(row.assignmentId)),
+    );
     const liveEvidenceByAssignment = live.evidenceByAssignment.filter((row) =>
-      replayEvidenceAssignmentIds.has(String(row.assignmentId)),
+      sharedEvidenceAssignmentIds.has(String(row.assignmentId)),
+    );
+
+    const replayEvidenceByPosition = (replay.replayed.evidenceByPosition as Array<Record<string, unknown>>).filter(
+      (row) => sharedEvidencePositionIds.has(String(row.positionId)),
     );
     const liveEvidenceByPosition = live.evidenceByPosition.filter((row) =>
-      replayEvidencePositionIds.has(String(row.positionId)),
+      sharedEvidencePositionIds.has(String(row.positionId)),
+    );
+
+    const replayCompensationCurrent = (replay.replayed.compensationCurrent as Array<Record<string, unknown>>).filter(
+      (row) => sharedCompAssignmentIds.has(String(row.assignmentId)),
+    );
+    const liveCompensationCurrent = live.compensationCurrent.filter((row) =>
+      sharedCompAssignmentIds.has(String(row.assignmentId)),
     );
 
     const comparison = {
+      positionsCurrentHash: {
+        replayed: stableHash(replayPositionsCurrent),
+        live: stableHash(livePositionsCurrent),
+      },
       assignmentProjectionHash: {
-        replayed: replay.hashes.assignmentProjectionHash,
-        live: stableHash(live.assignmentTimelines),
+        replayed: stableHash(replayAssignmentTimelines),
+        live: stableHash(liveAssignmentTimelines),
       },
       evidenceByAssignmentHash: {
-        replayed: replay.hashes.evidenceByAssignmentHash,
+        replayed: stableHash(replayEvidenceByAssignment),
         live: stableHash(liveEvidenceByAssignment),
       },
       evidenceByPositionHash: {
-        replayed: replay.hashes.evidenceByPositionHash,
+        replayed: stableHash(replayEvidenceByPosition),
         live: stableHash(liveEvidenceByPosition),
       },
       compensationCurrentHash: {
-        replayed: replay.hashes.compensationCurrentHash,
-        live: stableHash(live.compensationCurrent),
+        replayed: stableHash(replayCompensationCurrent),
+        live: stableHash(liveCompensationCurrent),
       },
     };
 

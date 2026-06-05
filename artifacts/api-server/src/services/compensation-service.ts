@@ -14,9 +14,13 @@ import { badRequest } from "../lib/http-error";
 import type { ActorContext } from "../lib/request-context";
 import { MembershipRepository, OrganizationRepository } from "../persistence/repositories";
 import { appendDomainEvent, assertIdempotencyKey, parseDateOrNow } from "./event-store-write";
+import { buildProjectionBuilderService, ProjectionBuilderService } from "./projection-builder-service";
 
 export class CompensationService {
-  constructor(private readonly access: OrganizationAccessControl) {}
+  constructor(
+    private readonly access: OrganizationAccessControl,
+    private readonly projector: ProjectionBuilderService,
+  ) {}
 
   async listRecords(actor: ActorContext, organizationId: string) {
     await this.access.requireMembership(organizationId, actor.userId, "member");
@@ -132,47 +136,12 @@ export class CompensationService {
         },
       });
 
-      const [current] = await tx
-        .select()
-        .from(compensationCurrentTable)
-        .where(
-          and(
-            eq(compensationCurrentTable.organizationId, organizationId),
-            eq(compensationCurrentTable.assignmentId, input.assignmentId),
-          ),
-        )
-        .limit(1);
-
-      const existingKey = current
-        ? `${current.effectiveFrom.toISOString()}:${current.compensationRecordId}`
-        : "";
-      const incomingKey = `${effectiveFrom.toISOString()}:${compensationRecordId}`;
-      if (!current || incomingKey.localeCompare(existingKey) >= 0) {
-        await tx
-          .insert(compensationCurrentTable)
-          .values({
-            assignmentId: input.assignmentId,
-            organizationId,
-            compensationRecordId,
-            sourceDocumentId: input.sourceDocumentId,
-            amount: input.amount,
-            currency,
-            effectiveFrom,
-            computedAt: new Date(),
-          })
-          .onConflictDoUpdate({
-            target: [compensationCurrentTable.assignmentId],
-            set: {
-              organizationId,
-              compensationRecordId,
-              sourceDocumentId: input.sourceDocumentId,
-              amount: input.amount,
-              currency,
-              effectiveFrom,
-              computedAt: new Date(),
-            },
-          });
-      }
+      await this.projector.rebuildFromEventsTx(tx, {
+        organizationId,
+        include: {
+          compensationCurrent: true,
+        },
+      });
 
       const response = {
         compensationRecord: record,
@@ -200,5 +169,5 @@ export function buildCompensationService() {
   const organizations = new OrganizationRepository();
   const memberships = new MembershipRepository();
   const access = new OrganizationAccessControl(organizations, memberships);
-  return new CompensationService(access);
+  return new CompensationService(access, buildProjectionBuilderService());
 }

@@ -7,6 +7,7 @@ import { MembershipRepository, OrganizationRepository } from "../persistence/rep
 import { buildOperationalMetricsService } from "../services/operational-metrics-service";
 import { buildOutboxReliabilityService } from "../services/outbox-reliability-service";
 import { buildProjectionIntegrityService } from "../services/projection-integrity-service";
+import { buildProjectionBuilderService } from "../services/projection-builder-service";
 import { buildQuarantineService } from "../services/quarantine-service";
 import { buildReplayService } from "../services/replay-service";
 
@@ -30,6 +31,7 @@ const replay = buildReplayService();
 const quarantine = buildQuarantineService();
 const outbox = buildOutboxReliabilityService();
 const projections = buildProjectionIntegrityService();
+const projector = buildProjectionBuilderService();
 const metrics = buildOperationalMetricsService();
 
 const router: IRouter = Router();
@@ -83,6 +85,32 @@ router.post(
       notes: typeof body.notes === "string" ? body.notes : undefined,
     });
     res.json(result);
+  }),
+);
+
+
+router.post(
+  "/ops/:organizationId/replay/rebuild",
+  asyncHandler(async (req, res) => {
+    const actor = actorFromReq(req);
+    const organizationId = parseOrganizationId(req.params as Record<string, unknown>);
+    await access.requireMembership(organizationId, actor.userId, "admin");
+    const body = req.body as Record<string, unknown>;
+    const include = {
+      positions: body.positions !== false,
+      assignments: body.assignments !== false,
+      evidence: body.evidence !== false,
+      compensationCurrent: body.compensationCurrent !== false,
+    };
+    await projector.rebuildFromEvents({
+      organizationId,
+      include,
+    });
+    res.json({
+      organizationId,
+      include,
+      rebuiltAt: new Date().toISOString(),
+    });
   }),
 );
 

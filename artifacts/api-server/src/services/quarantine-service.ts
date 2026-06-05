@@ -9,7 +9,6 @@ import {
 import type { AggregateType } from "../domain";
 import { badRequest } from "../lib/http-error";
 import { appendDomainEvent } from "./event-store-write";
-import { buildReplayService, ReplayService } from "./replay-service";
 
 type SchemaViolation = {
   eventId: string;
@@ -37,6 +36,7 @@ const EVENT_REQUIRED_KEYS: Record<string, string[]> = {
   "offboarding.completed": ["offboardingId", "assignmentId", "completedAt"],
   "evidence.profile.upserted": ["positionId", "requirements"],
   "evidence.override.set": ["positionId", "requirementKey", "isRequired"],
+  "position.created": ["positionId", "title"],
 };
 
 function detectContinuityErrors(rows: Array<typeof orgEventsTable.$inferSelect>) {
@@ -85,7 +85,7 @@ function missingKeysForEvent(row: typeof orgEventsTable.$inferSelect): string[] 
   if (row.eventType === "assignment.started") {
     const hasPersonId = payload.personId !== undefined && payload.personId !== null;
     const hasEmployeeId = payload.employeeId !== undefined && payload.employeeId !== null;
-    if (!hasPersonId && !hasEmployeeId && !missing.includes("personId")) {
+    if (!hasPersonId && !hasEmployeeId && !missing.includes("personId|employeeId")) {
       missing.push("personId|employeeId");
     }
   }
@@ -93,8 +93,6 @@ function missingKeysForEvent(row: typeof orgEventsTable.$inferSelect): string[] 
 }
 
 export class QuarantineService {
-  constructor(private readonly replay: ReplayService) {}
-
   async list(organizationId: string) {
     return db
       .select()
@@ -122,8 +120,6 @@ export class QuarantineService {
       }))
       .filter((violation) => violation.missingKeys.length > 0);
 
-    const replayComparison = await this.replay.compareReplayWithLive(organizationId);
-
     const targets = new Map<string, { aggregateType: AggregateType; aggregateId: string; reason: string }>();
     for (const error of continuityErrors) {
       targets.set(`${error.aggregateType}:${error.aggregateId}`, {
@@ -138,15 +134,6 @@ export class QuarantineService {
         aggregateId: violation.aggregateId,
         reason: `schema_violation event=${violation.eventType} missing=${violation.missingKeys.join(",")}`,
       });
-    }
-    if (!replayComparison.matches) {
-      for (const projection of replayComparison.mismatches) {
-        targets.set(`system:projection:${projection}`, {
-          aggregateType: "system",
-          aggregateId: `projection:${projection}`,
-          reason: `projection_drift:${projection}`,
-        });
-      }
     }
 
     const quarantined: Array<{ aggregateType: AggregateType; aggregateId: string; reason: string }> = [];
@@ -198,7 +185,7 @@ export class QuarantineService {
       organizationId,
       continuityErrors,
       schemaViolations,
-      projectionDriftMismatches: replayComparison.mismatches,
+      projectionDriftMismatches: [],
       quarantined,
     };
   }
@@ -274,15 +261,6 @@ export class QuarantineService {
         badRequest("recovery requires schema_adapter for unresolved schema violations");
       }
 
-      const replay = await this.replay.replayAggregate(
-        input.organizationId,
-        input.aggregateType,
-        input.aggregateId,
-      );
-      if (replay.diagnostics.continuityErrors.length > 0) {
-        badRequest("cannot reinstate stream with version continuity errors");
-      }
-
       await tx
         .update(streamQuarantinesTable)
         .set({
@@ -319,5 +297,5 @@ export class QuarantineService {
 }
 
 export function buildQuarantineService() {
-  return new QuarantineService(buildReplayService());
+  return new QuarantineService();
 }

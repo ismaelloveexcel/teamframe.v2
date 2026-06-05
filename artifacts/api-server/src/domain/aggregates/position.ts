@@ -8,8 +8,84 @@ export type PositionNode = {
 
 export type PositionGraph = Map<string, PositionNode>;
 
+export type PositionSnapshot = {
+  positionId: string;
+  title: string;
+  teamId: string | null;
+  reportsToPositionId: string | null;
+  lifecycleStatus: "filled" | "vacant" | "frozen";
+};
+
 export function buildPositionGraph(nodes: PositionNode[]): PositionGraph {
   return new Map(nodes.map((node) => [node.id, node]));
+}
+
+export function derivePositionsFromEvents(events: EventEnvelope[]): PositionSnapshot[] {
+  const sorted = [...events]
+    .filter((event) => event.aggregateType === "position")
+    .sort((a, b) => {
+      const byOccurred = a.occurredAt.localeCompare(b.occurredAt);
+      if (byOccurred !== 0) return byOccurred;
+      const byVersion = a.version - b.version;
+      if (byVersion !== 0) return byVersion;
+      const byAggregate = a.aggregateId.localeCompare(b.aggregateId);
+      if (byAggregate !== 0) return byAggregate;
+      return a.eventType.localeCompare(b.eventType);
+    });
+
+  const positions = new Map<string, PositionSnapshot>();
+  for (const event of sorted) {
+    const payload = event.payload as Record<string, unknown>;
+    const positionId = String(payload.positionId ?? payload.id ?? event.aggregateId ?? "");
+    if (!positionId) continue;
+
+    if (event.eventType === "position.deleted") {
+      positions.delete(positionId);
+      continue;
+    }
+
+    const existing = positions.get(positionId);
+    if (event.eventType === "position.created") {
+      positions.set(positionId, {
+        positionId,
+        title: String(payload.title ?? ""),
+        teamId: (payload.teamId as string | null | undefined) ?? null,
+        reportsToPositionId:
+          (payload.reportsToPositionId as string | null | undefined) ??
+          (payload.reportsToId as string | null | undefined) ??
+          null,
+        lifecycleStatus:
+          (payload.lifecycleStatus as "filled" | "vacant" | "frozen" | undefined) ?? "vacant",
+      });
+      continue;
+    }
+
+    if (!existing) continue;
+    positions.set(positionId, {
+      positionId,
+      title:
+        Object.prototype.hasOwnProperty.call(payload, "title") ?
+          String(payload.title ?? "")
+        : existing.title,
+      teamId:
+        Object.prototype.hasOwnProperty.call(payload, "teamId") ?
+          ((payload.teamId as string | null | undefined) ?? null)
+        : existing.teamId,
+      reportsToPositionId:
+        Object.prototype.hasOwnProperty.call(payload, "reportsToPositionId") ||
+          Object.prototype.hasOwnProperty.call(payload, "reportsToId") ?
+          ((payload.reportsToPositionId as string | null | undefined) ??
+            (payload.reportsToId as string | null | undefined) ??
+            null)
+        : existing.reportsToPositionId,
+      lifecycleStatus:
+        Object.prototype.hasOwnProperty.call(payload, "lifecycleStatus") ?
+          ((payload.lifecycleStatus as "filled" | "vacant" | "frozen" | undefined) ?? "vacant")
+        : existing.lifecycleStatus,
+    });
+  }
+
+  return [...positions.values()].sort((a, b) => a.positionId.localeCompare(b.positionId));
 }
 
 export function assertPositionTreeIsAcyclic(graph: PositionGraph): void {

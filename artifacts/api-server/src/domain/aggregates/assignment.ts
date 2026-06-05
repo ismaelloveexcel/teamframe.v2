@@ -36,7 +36,7 @@ export function deriveAssignments(events: EventEnvelope[]): AssignmentTimeline[]
       map.set(assignmentId, {
         assignmentId,
         positionId: String(payload.positionId),
-        employeeId: String(payload.employeeId),
+        employeeId: String(payload.employeeId ?? payload.personId ?? ""),
         effectiveFrom: String(payload.effectiveFrom),
         effectiveTo:
           payload.effectiveTo === null || payload.effectiveTo === undefined

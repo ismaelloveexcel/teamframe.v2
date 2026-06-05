@@ -12,9 +12,13 @@ import { badRequest } from "../lib/http-error";
 import type { ActorContext } from "../lib/request-context";
 import { MembershipRepository, OrganizationRepository } from "../persistence/repositories";
 import { appendDomainEvent, assertIdempotencyKey, parseDateOrNow } from "./event-store-write";
+import { buildProjectionBuilderService, ProjectionBuilderService } from "./projection-builder-service";
 
 export class OffboardingService {
-  constructor(private readonly access: OrganizationAccessControl) {}
+  constructor(
+    private readonly access: OrganizationAccessControl,
+    private readonly projector: ProjectionBuilderService,
+  ) {}
 
   async list(actor: ActorContext, organizationId: string) {
     await this.access.requireMembership(organizationId, actor.userId, "member");
@@ -68,22 +72,6 @@ export class OffboardingService {
         badRequest("offboarding.complete requires active assignment");
       }
 
-      const [endedAssignment] = await tx
-        .update(personPositionAssignmentsTable)
-        .set({
-          status: "ended",
-          endedAt: completedAt,
-          updatedAt: new Date(),
-        })
-        .where(
-          and(
-            eq(personPositionAssignmentsTable.organizationId, organizationId),
-            eq(personPositionAssignmentsTable.id, input.assignmentId),
-          ),
-        )
-        .returning();
-      if (!endedAssignment) badRequest("Failed to end assignment for offboarding");
-
       const completionId = randomUUID();
       const [completion] = await tx
         .insert(offboardingCompletionsTable)
@@ -98,6 +86,11 @@ export class OffboardingService {
       if (!completion) badRequest("Failed to create offboarding completion");
 
       // Required command boundary: assignment.ended + offboarding.completed in one transaction.
+      const endedPayload = {
+        assignmentId: input.assignmentId,
+        effectiveTo: completedAt.toISOString(),
+        reason: "offboarding.complete",
+      };
       await appendDomainEvent(tx, {
         organizationId,
         actorUserId: actor.userId,
@@ -105,11 +98,12 @@ export class OffboardingService {
         aggregateId: input.assignmentId,
         eventType: "assignment.ended",
         idempotencyKey: `${input.idempotencyKey}-end`,
-        payload: {
-          assignmentId: input.assignmentId,
-          effectiveTo: completedAt.toISOString(),
-          reason: "offboarding.complete",
-        },
+        payload: endedPayload,
+      });
+      await this.projector.projectAssignmentEventTx(tx, {
+        organizationId,
+        eventType: "assignment.ended",
+        payload: endedPayload,
       });
       await appendDomainEvent(tx, {
         organizationId,
@@ -151,5 +145,5 @@ export function buildOffboardingService() {
   const organizations = new OrganizationRepository();
   const memberships = new MembershipRepository();
   const access = new OrganizationAccessControl(organizations, memberships);
-  return new OffboardingService(access);
+  return new OffboardingService(access, buildProjectionBuilderService());
 }
