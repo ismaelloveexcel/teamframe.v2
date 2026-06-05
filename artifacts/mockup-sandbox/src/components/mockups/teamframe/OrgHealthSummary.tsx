@@ -11,6 +11,11 @@ type OrgHealthSummaryProps = {
   onClickCompliance: () => void;
 };
 
+/**
+ * Narrative priority: humans scan the first clause.
+ * Lead with the most urgent signal, not a structural summary.
+ * Order: compliance → blocked → overdue → vacancies → staffing ratio
+ */
 function healthNarrative(
   total: number,
   filled: number,
@@ -23,23 +28,40 @@ function healthNarrative(
   if (total === 0) return [];
   const lines: string[] = [];
   const pct = Math.round((filled / total) * 100);
+
+  // Priority 1 — compliance (highest urgency: missing required data)
+  if (complianceAlerts > 0) {
+    lines.push(
+      `${complianceAlerts} compliance item${complianceAlerts === 1 ? "" : "s"} require${complianceAlerts === 1 ? "s" : ""} attention.`,
+    );
+  }
+
+  // Priority 2 — blocked actions
+  if (blockedActions > 0) {
+    lines.push(
+      `${blockedActions} action${blockedActions === 1 ? " is" : "s are"} blocked.`,
+    );
+  }
+
+  // Priority 3 — overdue actions
+  if (overdueActions > 0) {
+    lines.push(
+      `${overdueActions} action${overdueActions === 1 ? " is" : "s are"} overdue.`,
+    );
+  }
+
+  // Priority 4 — vacancies
+  if (vacant > 0) {
+    lines.push(`${vacant} position${vacant === 1 ? " is" : "s are"} vacant.`);
+  }
+
+  // Priority 5 — staffing ratio (always last, positive framing)
   if (pct === 100) {
     lines.push(`All ${total} positions are filled.`);
   } else {
     lines.push(`Organization is ${pct}% staffed.`);
   }
-  if (vacant > 0) {
-    lines.push(`${vacant} position${vacant === 1 ? " is" : "s are"} vacant.`);
-  }
-  const urgentActions = overdueActions + blockedActions;
-  if (urgentActions > 0) {
-    lines.push(`${urgentActions} action${urgentActions === 1 ? "" : "s"} require attention.`);
-  } else if (openActions > 0) {
-    lines.push(`${openActions} open action${openActions === 1 ? "" : "s"} in progress.`);
-  }
-  if (complianceAlerts > 0) {
-    lines.push(`${complianceAlerts} compliance item${complianceAlerts === 1 ? "" : "s"} unresolved.`);
-  }
+
   return lines;
 }
 
