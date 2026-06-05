@@ -1,0 +1,374 @@
+{
+  "flow": "Flow #3 — Value Confirmation / Retention Loop",
+  "exploredAt": "2026-06-05",
+  "valueMoments": [
+    {
+      "id": "vm-1",
+      "screen": "Org Chart — OrgReadyBanner",
+      "trigger": "First position created (0→1 positions) or first assignment made (0→1 filled)",
+      "currentPresentation": "Fixed bottom banner: 'Your org chart is live.' or 'Position filled — org chart is live.' with optional 'Assign person' CTA; dismissible",
+      "valueSignal": "Early milestone confirmation that structure exists and is operational",
+      "realized": true,
+      "lineRef": "2225-2274"
+    },
+    {
+      "id": "vm-2",
+      "screen": "AppShell — health badges",
+      "trigger": "Any loaded org state with positions/actions",
+      "currentPresentation": "Header pills: positions count, filled count, open actions count, needs attention count (urgent styling when >0)",
+      "valueSignal": "At-a-glance org health and workload signals",
+      "realized": true,
+      "lineRef": "2242-2254"
+    },
+    {
+      "id": "vm-3",
+      "screen": "Org Chart — section header",
+      "trigger": "positions.length > 0",
+      "currentPresentation": "Subtitle: '{N} position(s) · {M} filled'",
+      "valueSignal": "Coverage ratio — how much of the structure is staffed",
+      "realized": true,
+      "lineRef": "2290-2297"
+    },
+    {
+      "id": "vm-4",
+      "screen": "Org Chart — node cards",
+      "trigger": "Position has active assignment, is vacant, or has structural issue",
+      "currentPresentation": "Per-node badge: Active (green), Open (vacant), or Needs attention (amber); person name or 'Open role' on card",
+      "valueSignal": "Visual proof that positions are owned and structurally sound",
+      "realized": true,
+      "lineRef": "1132-1137, 1561-1598"
+    },
+    {
+      "id": "vm-5",
+      "screen": "Position panel — Assignment tab",
+      "trigger": "Position has active assignment",
+      "currentPresentation": "Green occupant summary card with initials avatar, name, 'Active assignment' label",
+      "valueSignal": "Confirmation that a specific position is staffed",
+      "realized": true,
+      "lineRef": "2553-2593"
+    },
+    {
+      "id": "vm-6",
+      "screen": "Position panel — Assignment tab save",
+      "trigger": "User saves assignment",
+      "currentPresentation": "2.6s success toast; org chart node updates to filled state",
+      "valueSignal": "Transactional confirmation of assignment change",
+      "realized": true,
+      "lineRef": "1791, 3149-3165"
+    },
+    {
+      "id": "vm-7",
+      "screen": "Position panel — Documents tab",
+      "trigger": "User uploads role document or changes signature state",
+      "currentPresentation": "File card with name, upload date, size; signature status dropdown; 'Open document' button",
+      "valueSignal": "Compliance evidence attached to a position",
+      "realized": true,
+      "lineRef": "2686-2758"
+    },
+    {
+      "id": "vm-8",
+      "screen": "Actions",
+      "trigger": "Actions exist in org",
+      "currentPresentation": "Flat list with title, link label, owner, due date, status badge, Start/Mark Done transitions",
+      "valueSignal": "Execution accountability tied to positions",
+      "realized": true,
+      "lineRef": "2922-2978"
+    },
+    {
+      "id": "vm-9",
+      "screen": "Org Chart — full setup completion",
+      "trigger": "Founder fills all created positions (filled === positions, positions > 1)",
+      "currentPresentation": "No dedicated completion moment; only static org chart and header counts",
+      "valueSignal": "Org-wide 'you built your operating system' confirmation",
+      "realized": false,
+      "lineRef": "2225-2236, 2290-2297"
+    },
+    {
+      "id": "vm-10",
+      "screen": "Org Chart — org-wide compliance rollup",
+      "trigger": "Multiple positions with documents, missing contact info, or unsigned JDs",
+      "currentPresentation": "No org-level evidence/compliance summary; only per-position Documents tab",
+      "valueSignal": "Founder sees accumulated compliance value across the entire org",
+      "realized": false,
+      "lineRef": "977-991, 2686-2758"
+    },
+    {
+      "id": "vm-11",
+      "screen": "Actions — blocked/overdue per item",
+      "trigger": "Actions with blocked:true or past dueDate",
+      "currentPresentation": "Aggregate 'needs attention' badge in header only; individual actions do not show blocked or overdue flags",
+      "valueSignal": "Actionable urgency signals the system is actively monitoring execution",
+      "realized": false,
+      "lineRef": "956-975, 1172-1186"
+    }
+  ],
+  "deadEndMoments": [
+    {
+      "id": "de-1",
+      "screen": "Org Chart — after all positions assigned",
+      "description": "Filled org chart with green Active nodes, header counts, and collapsible Structure controls — no next-step prompt",
+      "afterHappyPath": "OrgReadyBanner only fires for first assignment (filledCount===1), not full coverage. Toast auto-dismisses. User has no guided path to Actions, Evidence, or Policies.",
+      "lineRef": "2225-2236, 2766-2918"
+    },
+    {
+      "id": "de-2",
+      "screen": "Position panel — Assignment tab after assign",
+      "description": "Green occupant card persists but no progression cue to Evidence tab or Actions",
+      "afterHappyPath": "Assignment saved → toast → same panel state; user must self-discover tab 3 Evidence",
+      "lineRef": "2553-2683, 2417-2492"
+    },
+    {
+      "id": "de-3",
+      "screen": "Actions",
+      "description": "Execution list with create form; no link back to org setup progress",
+      "afterHappyPath": "Empty state 'No actions yet for this position.' with no guided first action creation",
+      "lineRef": "2922-2978"
+    },
+    {
+      "id": "de-4",
+      "screen": "Templates",
+      "description": "Single download button with no connection to org state or unfilled evidence gaps",
+      "afterHappyPath": "User downloads generic JD template with no context about which positions need it",
+      "lineRef": "2981-2991"
+    },
+    {
+      "id": "de-5",
+      "screen": "Team Directory",
+      "description": "Read-only people table with Delete only — no create/edit shortcut, no link to org chart nodes",
+      "afterHappyPath": "Passive directory with no retention hook after people are created",
+      "lineRef": "2993-3029"
+    },
+    {
+      "id": "de-6",
+      "screen": "Administration",
+      "description": "Dev-oriented utilities: org ID, payroll CSV export, demo reset, recovery check",
+      "afterHappyPath": "Founder who reaches admin sees internal tooling, not product value confirmation",
+      "lineRef": "3125-3147"
+    }
+  ],
+  "retentionOpportunities": [
+    {
+      "id": "ro-1",
+      "screen": "AppShell — health badges",
+      "opportunity": "Clickable health badges that drill into filtered views (vacant positions, overdue actions, blocked items)",
+      "currentState": "Static non-interactive count pills",
+      "gap": "No navigation from aggregate signals to actionable queues"
+    },
+    {
+      "id": "ro-2",
+      "screen": "Actions",
+      "opportunity": "Daily operating rhythm — review open actions, transition statuses, clear blockers",
+      "currentState": "Manual list with Start/Mark Done; no recurring review prompt",
+      "gap": "No inbox-zero mechanic, no 'good morning, here are today's priorities'"
+    },
+    {
+      "id": "ro-3",
+      "screen": "Org Chart — evidence completion loop",
+      "opportunity": "Org-wide evidence score nudging founders to upload and sign pending role documents",
+      "currentState": "Per-position upload with local state; no org-wide evidence score",
+      "gap": "No compliance progress bar, no unsigned JD reminders"
+    },
+    {
+      "id": "ro-4",
+      "screen": "Org Chart — needs attention nodes",
+      "opportunity": "Return visits driven by compliance alerts on org nodes",
+      "currentState": "positionComplianceAlerts computed (missing email/phone) but never rendered in UI",
+      "gap": "Compliance alerts computed but fully invisible"
+    },
+    {
+      "id": "ro-5",
+      "screen": "Org Chart — per-position action counts",
+      "opportunity": "Position-scoped action backlog indicator on org nodes",
+      "currentState": "positionActionStats computed (open/overdue/blocked per position) but never rendered",
+      "gap": "Action debt per position completely invisible from org view"
+    },
+    {
+      "id": "ro-6",
+      "screen": "Administration — payroll export",
+      "opportunity": "Recurring payroll/HR export after org changes",
+      "currentState": "downloadPayrollCsv() exists but buried in admin",
+      "gap": "No prompt after assignment changes, no visible export hook in context"
+    }
+  ],
+  "upgradeOpportunities": [
+    {
+      "id": "uo-1",
+      "screen": "AppShell — demo mode badge",
+      "trigger": "isLocalDemoMode === true",
+      "proposedHook": "'Connect API to persist changes' upgrade CTA when user hits read-only wall"
+    },
+    {
+      "id": "uo-2",
+      "screen": "Org Chart — full coverage reached",
+      "trigger": "positionAssignmentById.size === positions.length && positions.length > 3",
+      "proposedHook": "Post-setup prompt to enable Actions/Policies modules or invite team members — natural expansion moment"
+    },
+    {
+      "id": "uo-3",
+      "screen": "Position panel — Documents tab",
+      "trigger": "User reaches 'in_review' or 'signed' document state",
+      "proposedHook": "E-signature integration upsell at the moment evidence compliance is being attempted"
+    },
+    {
+      "id": "uo-4",
+      "screen": "Templates",
+      "trigger": "User downloads JD template",
+      "proposedHook": "Template library with industry-specific role packs beyond single generic download"
+    },
+    {
+      "id": "uo-5",
+      "screen": "Administration — payroll export",
+      "trigger": "User clicks Download Payroll Export",
+      "proposedHook": "Gate advanced exports (compliance reports, audit logs) behind paid tier after founder sees data value"
+    }
+  ],
+  "trustBuildingOpportunities": [
+    {
+      "id": "tb-1",
+      "screen": "Org Chart — post-setup narrative",
+      "description": "Summary sentence tying visual to business outcome",
+      "currentState": "Static filled org chart nodes with green badges",
+      "gap": "No narrative: '8 roles accountable, 0 gaps, 3 actions in flight'"
+    },
+    {
+      "id": "tb-2",
+      "screen": "AppShell — needs attention badge",
+      "description": "System surfaces overdue + blocked action count proactively",
+      "currentState": "Urgent red styling when needsAttention > 0; but not clickable",
+      "gap": "Signal exists, action is impossible — erodes trust in urgency indicator"
+    },
+    {
+      "id": "tb-3",
+      "screen": "Actions — per-item blocked/overdue labeling",
+      "description": "Debug-style path labels ('Path: assignment > person > position') erode founder trust",
+      "currentState": "Technical copy on every action card",
+      "gap": "Should be plain-language accountability chain; 'Owned by Jane Smith · Engineering'"
+    },
+    {
+      "id": "tb-4",
+      "screen": "AppShell — last synced timestamp",
+      "description": "Persistent sync confirmation beyond transient mutation status",
+      "currentState": "mutationStatusText appears during save then disappears",
+      "gap": "No persistent 'last saved X minutes ago' for ongoing trust"
+    },
+    {
+      "id": "tb-5",
+      "screen": "Position panel — Documents",
+      "description": "Audit trail for document lifecycle changes",
+      "currentState": "Manual state dropdown with no audit record",
+      "gap": "No 'signed by / on' record; completeness is unverifiable"
+    }
+  ],
+  "computedButHiddenValue": [
+    {
+      "id": "ch-1",
+      "data": "positionActionStats — per-position { open, overdue, blocked } counts",
+      "currentUse": "Computed in useMemo; never referenced in JSX",
+      "missedOpportunity": "Org chart node badges, position panel header, Actions grouping by position",
+      "lineRef": "956-975"
+    },
+    {
+      "id": "ch-2",
+      "data": "positionComplianceAlerts — missing email/phone count per assigned position",
+      "currentUse": "Computed in useMemo; never rendered",
+      "missedOpportunity": "Compliance indicators on org nodes, Team directory rows, health badge drill-down",
+      "lineRef": "977-991"
+    },
+    {
+      "id": "ch-3",
+      "data": "teamOwnershipMap / positionOwnershipMap — responsibility owners with context strings",
+      "currentUse": "Maps built from API data; assignment handlers exist but have no UI",
+      "missedOpportunity": "Ownership layer in org chart, Team section, post-setup accountability summary",
+      "lineRef": "605-658, 892-899, 1944-1981"
+    },
+    {
+      "id": "ch-4",
+      "data": "action.blocked and action.description per action",
+      "currentUse": "blocked contributes to blockedActions aggregate only; description in seed but not shown",
+      "missedOpportunity": "Blocked badge and description text in Actions list to explain needs attention count",
+      "lineRef": "659-739, 2947-2975"
+    },
+    {
+      "id": "ch-5",
+      "data": "overdueActions and blockedActions — separate computed values",
+      "currentUse": "Summed into single needsAttention badge",
+      "missedOpportunity": "Separate overdue/blocked queues in Actions; filtered views from header badges",
+      "lineRef": "1172-1186, 2243"
+    },
+    {
+      "id": "ch-6",
+      "data": "Vacant position count (positions.length - positionAssignmentById.size)",
+      "currentUse": "Implicit in org chart subtitle only",
+      "missedOpportunity": "Dedicated 'open roles' health badge with link to vacant nodes",
+      "lineRef": "2296, 2249-2254"
+    },
+    {
+      "id": "ch-7",
+      "data": "positionDepthMap / resolvePositionLevel — Executive/Director/Manager/IC hierarchy",
+      "currentUse": "Used only to filter Actions owner dropdown",
+      "missedOpportunity": "Level badges on org nodes, hierarchy summary, level-based health metrics",
+      "lineRef": "1139-1170, 1578"
+    },
+    {
+      "id": "ch-8",
+      "data": "initials() helper function",
+      "currentUse": "Defined but unused",
+      "missedOpportunity": "Person avatar initials in Team directory, position panel occupant card, Actions owner display",
+      "lineRef": "130-138"
+    }
+  ],
+  "topUXDebt": [
+    {
+      "rank": 1,
+      "screen": "Org Chart — post-setup dead end",
+      "issue": "No value confirmation moment when founder completes org setup. OrgReadyBanner only fires on first position/first assignment — not full coverage. After setup the founder sees an identical editing surface with no 'you did it', no org health narrative, and no guided next step.",
+      "perceivedValueImpact": "HIGH",
+      "lineRef": "2225-2236, 2288-2358"
+    },
+    {
+      "rank": 2,
+      "screen": "Global — computed org intelligence invisible",
+      "issue": "positionActionStats, positionComplianceAlerts, and ownership maps are computed/loaded but never rendered. The product appears dumber than its data model. Founder cannot perceive any accumulated organizational intelligence.",
+      "perceivedValueImpact": "HIGH",
+      "lineRef": "956-991, 892-899"
+    },
+    {
+      "rank": 3,
+      "screen": "AppShell + Actions — urgency signals without resolution path",
+      "issue": "needs attention badge aggregates overdue+blocked but is not clickable. Actions list hides blocked/overdue status and description per item. Urgency is broadcast but the system provides no way to act on it.",
+      "perceivedValueImpact": "HIGH",
+      "lineRef": "2243, 2947-2975"
+    },
+    {
+      "rank": 4,
+      "screen": "Position panel — Evidence tab underdelivers on compliance value",
+      "issue": "Step 3 Evidence shows empty labels for role description/responsibilities/KPIs. Document state is local-only (lost on refresh). No org-wide compliance rollup. The compliance value proposition from EmptyOrgGuide is never delivered post-setup.",
+      "perceivedValueImpact": "MEDIUM",
+      "lineRef": "2686-2758, 828-829"
+    },
+    {
+      "rank": 5,
+      "screen": "Ownership layer — promised but unreachable",
+      "issue": "Administration COO walkthrough text promises 'Org Map → Teams → Owners → Actions → Policies' but Owners step has no UI. Ownership assignment handlers and demo data exist but are invisible. Breaks trust in product completeness.",
+      "perceivedValueImpact": "MEDIUM",
+      "lineRef": "1944-1981, 3143-3145"
+    }
+  ],
+  "postHappyPathAnalysis": {
+    "lastMeaningfulAction": "Assign person / save assignment on the Position panel Assignment tab, which produces a filled org chart node and brief success toast",
+    "afterThatAction": "2.6s success toast auto-dismisses. If first-ever assignment: OrgReadyBanner shows fill ratio then dismisses. User sees unchanged org chart with health badges and no guided next step.",
+    "nowWhatProblem": "After completing positions and assignments, the founder lands on a static org chart that looks identical to the editing surface they just used — no completion state, no org health narrative, no bridge to Actions/Policies/Evidence, and no reason to return beyond self-motivated exploration of six flat nav sections that do not reference setup progress.",
+    "retentionHooksMissing": [
+      "Full-setup completion moment with org coverage summary and guided next steps",
+      "Clickable health badges leading to actionable queues (vacant roles, overdue actions, blocked items)",
+      "Org-wide evidence/compliance score surfacing positionComplianceAlerts",
+      "Ownership accountability view from teamOwnerships/positionOwnerships data",
+      "Per-position action backlog indicators from positionActionStats on org nodes",
+      "Post-assignment nudge to complete Evidence tab (step 3)",
+      "Payroll export prompt after staffing changes",
+      "Return-visit alerts for needs_attention nodes and unsigned/outdated documents",
+      "API mode upgrade prompt when demo read-only blocks persistence",
+      "Operating rhythm hook tying Actions to a daily/weekly review loop"
+    ]
+  }
+}
