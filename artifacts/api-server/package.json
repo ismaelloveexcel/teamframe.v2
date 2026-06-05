@@ -9,7 +9,8 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:phase-core": "tsx --test \"src/domain/**/__tests__/*.test.ts\"",
-    "test:founder-cert": "tsx ./src/founder-flow-certification.ts"
+    "test:founder-cert": "tsx ./src/founder-flow-certification.ts",
+    "test:phase3-cert": "tsx ./src/phase3-certification.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",

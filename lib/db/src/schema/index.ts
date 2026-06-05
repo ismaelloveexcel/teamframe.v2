@@ -53,6 +53,18 @@ export const auditEventTypeEnum = pgEnum("audit_event_type", [
   "action_status_changed",
   "policy_scope_changed",
 ]);
+export const documentLifecycleStateEnum = pgEnum("document_lifecycle_state", [
+  "uploaded",
+  "signed",
+  "expired",
+  "revoked",
+]);
+export const complianceDerivedStatusEnum = pgEnum("compliance_derived_status", [
+  "missing",
+  "pending",
+  "compliant",
+  "non_compliant",
+]);
 
 export const organizationsTable = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -198,6 +210,221 @@ export const personPositionAssignmentsTable = pgTable(
       .on(table.personId)
       .where(sql`${table.status} = 'active'`),
   ],
+);
+
+export const evidenceRequirementProfilesTable = pgTable(
+  "evidence_requirement_profiles",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    positionId: uuid("position_id")
+      .notNull()
+      .references(() => positionsTable.id, { onDelete: "cascade" }),
+    profileName: text("profile_name").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("evidence_requirement_profiles_org_position_unique").on(
+      table.organizationId,
+      table.positionId,
+    ),
+    index("evidence_requirement_profiles_org_idx").on(table.organizationId),
+  ],
+);
+
+export const evidenceRequirementsTable = pgTable(
+  "evidence_requirements",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => evidenceRequirementProfilesTable.id, { onDelete: "cascade" }),
+    requirementKey: text("requirement_key").notNull(),
+    displayName: text("display_name").notNull(),
+    isRequired: boolean("is_required").notNull().default(true),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("evidence_requirements_profile_key_unique").on(table.profileId, table.requirementKey),
+    index("evidence_requirements_org_profile_idx").on(table.organizationId, table.profileId),
+  ],
+);
+
+export const positionRequirementOverridesTable = pgTable(
+  "position_requirement_overrides",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    positionId: uuid("position_id")
+      .notNull()
+      .references(() => positionsTable.id, { onDelete: "cascade" }),
+    requirementKey: text("requirement_key").notNull(),
+    isRequired: boolean("is_required").notNull(),
+    reason: text("reason").notNull().default(""),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("position_requirement_overrides_org_position_key_unique").on(
+      table.organizationId,
+      table.positionId,
+      table.requirementKey,
+    ),
+    index("position_requirement_overrides_org_position_idx").on(
+      table.organizationId,
+      table.positionId,
+    ),
+  ],
+);
+
+export const documentsTable = pgTable(
+  "documents",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    assignmentId: uuid("assignment_id")
+      .notNull()
+      .references(() => personPositionAssignmentsTable.id, { onDelete: "cascade" }),
+    positionId: uuid("position_id")
+      .notNull()
+      .references(() => positionsTable.id, { onDelete: "cascade" }),
+    requirementKey: text("requirement_key").notNull(),
+    sourceDocumentRef: text("source_document_ref").notNull(),
+    state: documentLifecycleStateEnum("state").notNull().default("uploaded"),
+    uploadedAt: timestamp("uploaded_at", { withTimezone: true }).defaultNow().notNull(),
+    signedAt: timestamp("signed_at", { withTimezone: true }),
+    expiredAt: timestamp("expired_at", { withTimezone: true }),
+    revokedAt: timestamp("revoked_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("documents_org_assignment_idx").on(table.organizationId, table.assignmentId),
+    index("documents_org_position_idx").on(table.organizationId, table.positionId),
+    index("documents_org_requirement_idx").on(table.organizationId, table.requirementKey),
+  ],
+);
+
+export const compensationRecordsTable = pgTable(
+  "compensation_records",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    assignmentId: uuid("assignment_id")
+      .notNull()
+      .references(() => personPositionAssignmentsTable.id, { onDelete: "cascade" }),
+    sourceDocumentId: uuid("source_document_id")
+      .notNull()
+      .references(() => documentsTable.id, { onDelete: "restrict" }),
+    amount: integer("amount").notNull(),
+    currency: text("currency").notNull(),
+    effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("compensation_records_org_assignment_effective_idx").on(
+      table.organizationId,
+      table.assignmentId,
+      table.effectiveFrom,
+    ),
+  ],
+);
+
+export const offboardingCompletionsTable = pgTable(
+  "offboarding_completions",
+  {
+    id: uuid("id").defaultRandom().primaryKey(),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    assignmentId: uuid("assignment_id")
+      .notNull()
+      .references(() => personPositionAssignmentsTable.id, { onDelete: "cascade" }),
+    completedAt: timestamp("completed_at", { withTimezone: true }).notNull(),
+    snapshot: jsonb("snapshot").$type<Record<string, unknown>>().default({}).notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    unique("offboarding_completions_org_assignment_unique").on(table.organizationId, table.assignmentId),
+    index("offboarding_completions_org_idx").on(table.organizationId),
+  ],
+);
+
+export const evidenceStatusByAssignmentTable = pgTable(
+  "evidence_status_by_assignment",
+  {
+    assignmentId: uuid("assignment_id")
+      .primaryKey()
+      .references(() => personPositionAssignmentsTable.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    positionId: uuid("position_id")
+      .notNull()
+      .references(() => positionsTable.id, { onDelete: "cascade" }),
+    status: complianceDerivedStatusEnum("status").notNull(),
+    missingCount: integer("missing_count").notNull().default(0),
+    pendingCount: integer("pending_count").notNull().default(0),
+    nonCompliantCount: integer("non_compliant_count").notNull().default(0),
+    computedAt: timestamp("computed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [
+    index("evidence_status_by_assignment_org_position_idx").on(table.organizationId, table.positionId),
+  ],
+);
+
+export const evidenceStatusByPositionTable = pgTable(
+  "evidence_status_by_position",
+  {
+    positionId: uuid("position_id")
+      .primaryKey()
+      .references(() => positionsTable.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    status: complianceDerivedStatusEnum("status").notNull(),
+    missingCount: integer("missing_count").notNull().default(0),
+    pendingCount: integer("pending_count").notNull().default(0),
+    nonCompliantCount: integer("non_compliant_count").notNull().default(0),
+    computedAt: timestamp("computed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("evidence_status_by_position_org_idx").on(table.organizationId)],
+);
+
+export const compensationCurrentTable = pgTable(
+  "compensation_current",
+  {
+    assignmentId: uuid("assignment_id")
+      .primaryKey()
+      .references(() => personPositionAssignmentsTable.id, { onDelete: "cascade" }),
+    organizationId: uuid("organization_id")
+      .notNull()
+      .references(() => organizationsTable.id, { onDelete: "cascade" }),
+    compensationRecordId: uuid("compensation_record_id")
+      .notNull()
+      .references(() => compensationRecordsTable.id, { onDelete: "cascade" }),
+    sourceDocumentId: uuid("source_document_id")
+      .notNull()
+      .references(() => documentsTable.id, { onDelete: "restrict" }),
+    amount: integer("amount").notNull(),
+    currency: text("currency").notNull(),
+    effectiveFrom: timestamp("effective_from", { withTimezone: true }).notNull(),
+    computedAt: timestamp("computed_at", { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => [index("compensation_current_org_idx").on(table.organizationId)],
 );
 
 export const teamOwnershipsTable = pgTable(
@@ -434,6 +661,15 @@ export type Action = typeof actionsTable.$inferSelect;
 export type Policy = typeof policiesTable.$inferSelect;
 export type TeamOwnership = typeof teamOwnershipsTable.$inferSelect;
 export type PositionOwnership = typeof positionOwnershipsTable.$inferSelect;
+export type EvidenceRequirementProfile = typeof evidenceRequirementProfilesTable.$inferSelect;
+export type EvidenceRequirement = typeof evidenceRequirementsTable.$inferSelect;
+export type PositionRequirementOverride = typeof positionRequirementOverridesTable.$inferSelect;
+export type Document = typeof documentsTable.$inferSelect;
+export type CompensationRecord = typeof compensationRecordsTable.$inferSelect;
+export type OffboardingCompletion = typeof offboardingCompletionsTable.$inferSelect;
+export type EvidenceStatusByAssignment = typeof evidenceStatusByAssignmentTable.$inferSelect;
+export type EvidenceStatusByPosition = typeof evidenceStatusByPositionTable.$inferSelect;
+export type CompensationCurrent = typeof compensationCurrentTable.$inferSelect;
 
 export type CreateOrganizationInput = z.infer<typeof createOrganizationSchema>;
 export type CreateTeamInput = z.infer<typeof createTeamSchema>;
