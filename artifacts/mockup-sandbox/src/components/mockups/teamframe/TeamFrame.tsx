@@ -4,6 +4,9 @@ import { AppShell, type NavId as ShellNavId } from "./AppShell";
 import { LoadingScreen } from "./LoadingScreen";
 import { EmptyOrgGuide } from "./EmptyOrgGuide";
 import { OrgReadyBanner } from "./OrgReadyBanner";
+import { OrgHealthSummary } from "./OrgHealthSummary";
+import { DrillDownPanel, type DrillDownMode } from "./DrillDownPanel";
+import { SetupProgressCard } from "./SetupProgressCard";
 import {
   ApiError,
   ActionStatus,
@@ -815,6 +818,11 @@ export function TeamFrame() {
   const [prevPositionCount, setPrevPositionCount] = useState(0);
   const [prevFilledCount, setPrevFilledCount] = useState(0);
   const assignPersonSelectRef = useRef<HTMLSelectElement>(null);
+
+  // Flow #3: drill-down panel + setup progress card
+  const [drillDownMode, setDrillDownMode] = useState<DrillDownMode>(null);
+  const [showSetupProgress, setShowSetupProgress] = useState(false);
+  const [setupProgressPositionId, setSetupProgressPositionId] = useState<string | null>(null);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -2222,7 +2230,7 @@ export function TeamFrame() {
     URL.revokeObjectURL(href);
   }
 
-  // Trigger org-ready banner when first position or first assignment is created
+  // Trigger org-ready banner and setup progress card when positions/assignments change
   useEffect(() => {
     const currentFilled = positionAssignmentById.size;
     const currentPositions = positions.length;
@@ -2231,9 +2239,14 @@ export function TeamFrame() {
     if (justAddedFirstPosition || justFilledFirstPosition) {
       setShowOrgReadyBanner(true);
     }
+    // Show setup progress card whenever a new assignment is created (any position, not just first)
+    if (currentFilled > prevFilledCount && selectedPositionId) {
+      setSetupProgressPositionId(selectedPositionId);
+      setShowSetupProgress(true);
+    }
     setPrevPositionCount(currentPositions);
     setPrevFilledCount(currentFilled);
-  }, [positions.length, positionAssignmentById.size]);
+  }, [positions.length, positionAssignmentById.size, selectedPositionId]);
 
   if (loading) {
     return <LoadingScreen />;
@@ -2241,6 +2254,94 @@ export function TeamFrame() {
 
   const openActions = actions.filter((item) => item.status !== ActionStatus.done).length;
   const needsAttention = overdueActions + blockedActions;
+  const vacantCount = positions.length - positionAssignmentById.size;
+  const totalComplianceAlerts = [...positionComplianceAlerts.values()].reduce((a, b) => a + b, 0);
+
+  // Drill-down data — derived from existing computed state, no new fetches
+  const vacancyRows = positions
+    .filter((p) => !positionAssignmentById.get(p.id))
+    .map((p) => ({
+      positionId: p.id,
+      title: p.title,
+      teamName: p.teamId ? teamMap.get(p.teamId)?.name ?? null : null,
+      reportsToTitle: p.reportsToPositionId
+        ? positionMap.get(p.reportsToPositionId)?.title ?? null
+        : null,
+      vacantSince: p.updatedAt?.toString() ?? null,
+    }));
+
+  const actionRows = actions
+    .filter((item) => item.status !== ActionStatus.done && (item.blocked || (() => {
+      if (!item.dueDate) return false;
+      const due = new Date(item.dueDate).getTime();
+      return !Number.isNaN(due) && due < Date.now();
+    })()))
+    .map((item) => ({
+      actionId: item.id,
+      title: item.title,
+      ownerName: item.ownerPersonId ? people.find((p) => p.id === item.ownerPersonId)?.fullName ?? null : null,
+      positionTitle: item.positionId ? positionMap.get(item.positionId)?.title ?? null : null,
+      dueDate: item.dueDate?.toString() ?? null,
+      status: item.status,
+      overdue: !!item.dueDate && (() => {
+        const due = new Date(item.dueDate!).getTime();
+        return !Number.isNaN(due) && due < Date.now();
+      })(),
+      blocked: item.blocked ?? false,
+    }));
+
+  // Include all open actions when drill-down opened (not just urgent ones)
+  const actionRowsAll = actions
+    .filter((item) => item.status !== ActionStatus.done)
+    .map((item) => ({
+      actionId: item.id,
+      title: item.title,
+      ownerName: item.ownerPersonId ? people.find((p) => p.id === item.ownerPersonId)?.fullName ?? null : null,
+      positionTitle: item.positionId ? positionMap.get(item.positionId)?.title ?? null : null,
+      dueDate: item.dueDate?.toString() ?? null,
+      status: item.status,
+      overdue: !!item.dueDate && (() => {
+        const due = new Date(item.dueDate!).getTime();
+        return !Number.isNaN(due) && due < Date.now();
+      })(),
+      blocked: item.blocked ?? false,
+    }))
+    .sort((a, b) => {
+      if (a.overdue && !b.overdue) return -1;
+      if (!a.overdue && b.overdue) return 1;
+      if (a.blocked && !b.blocked) return -1;
+      if (!a.blocked && b.blocked) return 1;
+      return 0;
+    });
+
+  const complianceRows = positions
+    .filter((p) => (positionComplianceAlerts.get(p.id) ?? 0) > 0)
+    .map((p) => {
+      const assignment = positionAssignmentById.get(p.id);
+      return {
+        positionId: p.id,
+        positionTitle: p.title,
+        personName: assignment?.person.fullName ?? "Unknown",
+        missingEmail: !assignment?.person.email,
+        missingPhone: !assignment?.person.phone,
+      };
+    });
+
+  // Setup progress for card
+  const progressPositionDoc = setupProgressPositionId
+    ? positionDocuments[setupProgressPositionId]
+    : null;
+  const progressHasEvidence = !!progressPositionDoc && progressPositionDoc.state === "signed";
+  const progressHasAssignment = setupProgressPositionId
+    ? !!positionAssignmentById.get(setupProgressPositionId)
+    : false;
+  const progressPositionTitle = setupProgressPositionId
+    ? positionMap.get(setupProgressPositionId)?.title ?? ""
+    : "";
+  const totalSigned = Object.values(positionDocuments).filter((d) => d.state === "signed").length;
+  const compliancePct = positions.length > 0
+    ? Math.round((totalSigned / positions.length) * 100)
+    : 0;
 
   return (
     <AppShell
@@ -2248,9 +2349,26 @@ export function TeamFrame() {
       onNavChange={setActiveNav}
       health={[
         { label: "positions", value: positions.length },
-        { label: "filled", value: positionAssignmentById.size },
-        { label: "open actions", value: openActions },
-        { label: "needs attention", value: needsAttention, urgent: true },
+        {
+          label: "filled",
+          value: positionAssignmentById.size,
+        },
+        {
+          label: "vacant",
+          value: vacantCount,
+          onClick: vacantCount > 0 ? () => setDrillDownMode("vacancies") : undefined,
+        },
+        {
+          label: "open actions",
+          value: openActions,
+          onClick: openActions > 0 ? () => setDrillDownMode("actions") : undefined,
+        },
+        {
+          label: "needs attention",
+          value: needsAttention,
+          urgent: true,
+          onClick: needsAttention > 0 ? () => setDrillDownMode("actions") : undefined,
+        },
       ]}
       statusMessage={mutationStatusText}
       errorMessage={error}
@@ -2274,9 +2392,57 @@ export function TeamFrame() {
         />
       )}
 
+      {/* Flow #3 — Drill-down panel (vacancy / actions / compliance) */}
+      <DrillDownPanel
+        mode={drillDownMode}
+        onClose={() => setDrillDownMode(null)}
+        vacancies={vacancyRows}
+        actions={actionRowsAll}
+        compliance={complianceRows}
+        onSelectPosition={(positionId) => {
+          setActiveNav("org");
+          setFocusPositionId(positionId);
+          setPositionPanelTab("position");
+        }}
+      />
+
+      {/* Flow #3 — Setup progress card (evidence completion guidance) */}
+      {showSetupProgress && setupProgressPositionId && (
+        <SetupProgressCard
+          positionTitle={progressPositionTitle}
+          hasAssignment={progressHasAssignment}
+          hasEvidence={progressHasEvidence}
+          compliancePct={compliancePct}
+          onCompleteEvidence={() => {
+            setActiveNav("org");
+            setFocusPositionId(setupProgressPositionId);
+            setPositionPanelTab("documents");
+            setShowSetupProgress(false);
+          }}
+          onDismiss={() => setShowSetupProgress(false)}
+        />
+      )}
+
       <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
           {activeNav === "org" && (
+            <>
+            {/* Flow #3 — Org Health Summary (persistent, uses existing computed state only) */}
+            {positions.length > 0 && (
+              <OrgHealthSummary
+                totalPositions={positions.length}
+                filledPositions={positionAssignmentById.size}
+                vacantPositions={vacantCount}
+                openActions={openActions}
+                overdueActions={overdueActions}
+                blockedActions={blockedActions}
+                complianceAlerts={totalComplianceAlerts}
+                onClickVacancies={() => setDrillDownMode("vacancies")}
+                onClickActions={() => setDrillDownMode("actions")}
+                onClickCompliance={() => setDrillDownMode("compliance")}
+              />
+            )}
+
             <section style={STYLE.panel}>
               <div
                 style={{
@@ -2917,6 +3083,7 @@ export function TeamFrame() {
                 </div>
               </details>
             </section>
+            </>
           )}
 
           {activeNav === "actions" && (

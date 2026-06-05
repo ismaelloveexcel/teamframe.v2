@@ -28,6 +28,7 @@ type HealthBadge = {
   label: string;
   value: number | string;
   urgent?: boolean;
+  onClick?: () => void;
 };
 
 type AppShellProps = {
@@ -199,30 +200,64 @@ export function AppShell({
           gap: 16,
         }}
       >
-        {/* Health badges */}
+        {/* Health badges — clickable when onClick provided */}
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          {health.map((badge) => (
-            <div
-              key={badge.label}
-              style={{
-                display: "flex",
-                alignItems: "center",
-                gap: 5,
-                padding: "4px 10px",
-                borderRadius: 20,
-                background: badge.urgent && Number(badge.value) > 0 ? "#FEF2F2" : "#F8FAFC",
-                border: `1px solid ${badge.urgent && Number(badge.value) > 0 ? "#FECACA" : "#E2E8F0"}`,
-                fontSize: 12,
-                fontWeight: 600,
-                color: badge.urgent && Number(badge.value) > 0 ? "#DC2626" : "#475569",
-              }}
-            >
-              <span style={{ fontWeight: 700, color: badge.urgent && Number(badge.value) > 0 ? "#DC2626" : "#0F172A" }}>
-                {badge.value}
-              </span>
-              <span style={{ fontWeight: 500 }}>{badge.label}</span>
-            </div>
-          ))}
+          {health.map((badge) => {
+            const isUrgent = badge.urgent && Number(badge.value) > 0;
+            const isClickable = !!badge.onClick && Number(badge.value) > 0;
+            return (
+              <button
+                key={badge.label}
+                type="button"
+                onClick={badge.onClick}
+                disabled={!isClickable}
+                title={isClickable ? `View ${badge.label}` : undefined}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 5,
+                  padding: "4px 10px",
+                  borderRadius: 20,
+                  background: isUrgent ? "#FEF2F2" : "#F8FAFC",
+                  border: `1px solid ${isUrgent ? "#FECACA" : "#E2E8F0"}`,
+                  fontSize: 12,
+                  fontWeight: 600,
+                  color: isUrgent ? "#DC2626" : "#475569",
+                  cursor: isClickable ? "pointer" : "default",
+                  transition: "box-shadow 0.12s",
+                }}
+                onMouseEnter={(e) => {
+                  if (isClickable)
+                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 1px 4px rgba(15,23,42,0.10)";
+                }}
+                onMouseLeave={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
+                }}
+              >
+                <span style={{ fontWeight: 700, color: isUrgent ? "#DC2626" : "#0F172A" }}>
+                  {badge.value}
+                </span>
+                <span style={{ fontWeight: 500 }}>{badge.label}</span>
+                {isClickable && (
+                  <svg
+                    width="9"
+                    height="9"
+                    viewBox="0 0 9 9"
+                    fill="none"
+                    style={{ opacity: 0.5, marginLeft: 1 }}
+                  >
+                    <path
+                      d="M2 4.5h5M5 2.5l2 2-2 2"
+                      stroke="currentColor"
+                      strokeWidth="1.2"
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                    />
+                  </svg>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Status / error message */}
