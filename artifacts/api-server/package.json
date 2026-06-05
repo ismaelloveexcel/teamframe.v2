@@ -8,7 +8,8 @@
     "build": "node ./build.mjs",
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
-    "test:phase-core": "tsx --test \"src/domain/**/__tests__/*.test.ts\""
+    "test:phase-core": "tsx --test \"src/domain/**/__tests__/*.test.ts\"",
+    "test:founder-cert": "tsx ./src/founder-flow-certification.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
