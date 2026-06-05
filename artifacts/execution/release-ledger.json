@@ -1,0 +1,66 @@
+{
+  "_meta": {
+    "purpose": "Single record of every certified release promotion. Updated before each release/certified-v1 merge.",
+    "certificationHarnessFile": "artifacts/api-server/src/system-certification-audit.ts",
+    "certificationHarnessHash": "e3d81881b739a1a0ddfd0fb172966ab38e8c568a62eea646ea01accd1348d4ab"
+  },
+  "releases": [
+    {
+      "tag": "teamframe-stable-core-v1",
+      "sourceBranch": "cursor/phase4-stabilization-closure-sequence-df31",
+      "certifiedAt": "2026-06-05",
+      "type": "backend-stability",
+      "description": "Phase 4 stabilization complete. All closure deliverables. Event-sourced platform certified.",
+      "certificationGates": {
+        "A": true, "B": true, "C": true, "D": true,
+        "E": true, "F": true, "G": true, "H": true,
+        "replayMismatchedOrgs": 0,
+        "globalMismatchedOrgs": 0,
+        "repairFailures": 0,
+        "outboxDivergences": 0,
+        "projectorCrashes": 0
+      },
+      "harnessHash": "e3d81881b739a1a0ddfd0fb172966ab38e8c568a62eea646ea01accd1348d4ab",
+      "stabilityArtifacts": [
+        "artifacts/stability/stable-core-certification.json",
+        "artifacts/stability/stabilization-baseline.json",
+        "artifacts/stability/independent-verification-report.json"
+      ]
+    },
+    {
+      "tag": "teamframe-phase5-certified-v1",
+      "sourceBranch": "cursor/phase4-stabilization-closure-sequence-df31",
+      "certifiedAt": "2026-06-05",
+      "type": "full-platform",
+      "description": "Phase 5 complete. Flows #1-3 (onboarding, core loop, value confirmation) + design system consolidation 5.4-A through 5.4-D.",
+      "certificationGates": {
+        "A": true, "B": true, "C": true, "D": true,
+        "E": true, "F": true, "G": true, "H": true,
+        "replayMismatchedOrgs": 0,
+        "globalMismatchedOrgs": 0,
+        "repairFailures": 0,
+        "outboxDivergences": 0,
+        "projectorCrashes": 0,
+        "frontendTypecheck": "PASS",
+        "designSystemCompliance": "PASS",
+        "fontSizes": 5,
+        "radiusValues": 4,
+        "shadowValues": 3,
+        "focusCoverage": "100%"
+      },
+      "harnessHash": "e3d81881b739a1a0ddfd0fb172966ab38e8c568a62eea646ea01accd1348d4ab",
+      "releaseArtifacts": [
+        "artifacts/stability/stable-core-certification.json",
+        "artifacts/ui/design-system-compliance.json",
+        "artifacts/ui/flow-1/audit-result.json",
+        "artifacts/ui/flow-2/audit-result.json",
+        "artifacts/ui/flow-3/audit-result.json",
+        "artifacts/stability/independent-verification-report.json"
+      ],
+      "deploymentRequirements": {
+        "api": { "DATABASE_URL": "required — postgresql connection string" },
+        "frontend": { "VITE_API_BASE_URL": "required — API server base URL; falls back to demo mode if absent" }
+      }
+    }
+  ]
+}
