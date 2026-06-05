@@ -10,6 +10,8 @@ export interface TransferAssignmentRequest {
   personId: string;
   toPositionId: string;
   effectiveAt?: Date;
+  fromAssignmentId?: string;
+  expectedFromAssignmentVersion?: number;
   /** @minLength 8 */
   idempotencyKey: string;
 }

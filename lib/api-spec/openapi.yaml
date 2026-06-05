@@ -1203,6 +1203,12 @@ components:
         effectiveAt:
           type: string
           format: date-time
+        fromAssignmentId:
+          type: string
+          format: uuid
+        expectedFromAssignmentVersion:
+          type: integer
+          minimum: 0
         idempotencyKey:
           type: string
           minLength: 8

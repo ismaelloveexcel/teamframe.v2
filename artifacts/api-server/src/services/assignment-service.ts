@@ -11,7 +11,7 @@ import {
 } from "@workspace/db";
 import { OrganizationAccessControl } from "../access/organization-access";
 import { stableHash } from "../domain/event-core";
-import { badRequest, notFound } from "../lib/http-error";
+import { badRequest, conflict, notFound } from "../lib/http-error";
 import type { ActorContext } from "../lib/request-context";
 import {
   MembershipRepository,
@@ -242,21 +242,38 @@ export class AssignmentService {
       personId: string;
       toPositionId: string;
       effectiveAt?: string;
+      fromAssignmentId?: string;
+      expectedFromAssignmentVersion?: number;
       idempotencyKey: string;
     },
   ) {
     await this.access.requireMembership(organizationId, actor.userId, "admin");
     assertIdempotencyKey(input);
 
-    const [person, targetPosition, currentAssignment, seatAssignment] = await Promise.all([
+    const [person, targetPosition, seatAssignment] = await Promise.all([
       this.people.getById(organizationId, input.personId),
       this.positions.getById(organizationId, input.toPositionId),
-      this.assignments.getActiveByPersonId(organizationId, input.personId),
       this.assignments.getActiveByPositionId(organizationId, input.toPositionId),
     ]);
+    const currentAssignment = input.fromAssignmentId
+      ? await this.assignments.getById(organizationId, input.fromAssignmentId)
+      : await this.assignments.getActiveByPersonId(organizationId, input.personId);
+
     if (!person) badRequest("personId must belong to the same organization");
     if (!targetPosition) badRequest("toPositionId must belong to the same organization");
     if (!currentAssignment) badRequest("No active assignment to transfer");
+    if (currentAssignment.personId !== input.personId) {
+      badRequest("fromAssignmentId must belong to personId");
+    }
+    if (typeof input.expectedFromAssignmentVersion !== "undefined") {
+      const currentVersion = await this.getAggregateVersion(organizationId, currentAssignment.id);
+      if (currentVersion !== input.expectedFromAssignmentVersion) {
+        conflict("version_conflict");
+      }
+    }
+    if (currentAssignment.status !== "active") {
+      badRequest("fromAssignmentId is not active");
+    }
     if (currentAssignment.positionId === input.toPositionId) {
       badRequest("Person is already assigned to the target position");
     }
@@ -360,6 +377,21 @@ export class AssignmentService {
 
       return response;
     });
+  }
+
+  private async getAggregateVersion(orgId: string, aggregateId: string): Promise<number> {
+    const [record] = await db
+      .select({ version: aggregateVersionsTable.version })
+      .from(aggregateVersionsTable)
+      .where(
+        and(
+          eq(aggregateVersionsTable.orgId, orgId),
+          eq(aggregateVersionsTable.aggregateType, "assignment"),
+          eq(aggregateVersionsTable.aggregateId, aggregateId),
+        ),
+      )
+      .limit(1);
+    return record?.version ?? 0;
   }
 
   private async appendAssignmentEvent(

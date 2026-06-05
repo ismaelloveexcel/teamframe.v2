@@ -404,6 +404,8 @@ router.post(
       personId: body.personId,
       toPositionId: body.toPositionId,
       effectiveAt: body.effectiveAt?.toISOString(),
+      fromAssignmentId: body.fromAssignmentId,
+      expectedFromAssignmentVersion: body.expectedFromAssignmentVersion,
       idempotencyKey: body.idempotencyKey,
     });
     res.json(TransferAssignmentResponse.parse(transferred));

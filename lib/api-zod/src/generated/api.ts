@@ -555,6 +555,8 @@ export const TransferAssignmentBody = zod.object({
   "personId": zod.string().uuid(),
   "toPositionId": zod.string().uuid(),
   "effectiveAt": zod.coerce.date().optional(),
+  "fromAssignmentId": zod.string().uuid().optional(),
+  "expectedFromAssignmentVersion": zod.number().int().nonnegative().optional(),
   "idempotencyKey": zod.string().min(transferAssignmentBodyIdempotencyKeyMin)
 })
 

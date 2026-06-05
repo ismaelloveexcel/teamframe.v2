@@ -220,6 +220,8 @@ export interface TransferAssignmentRequest {
   personId: string;
   toPositionId: string;
   effectiveAt?: string;
+  fromAssignmentId?: string;
+  expectedFromAssignmentVersion?: number;
   /** @minLength 8 */
   idempotencyKey: string;
 }

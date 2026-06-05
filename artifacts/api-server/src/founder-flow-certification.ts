@@ -1,7 +1,10 @@
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import { and, eq } from "drizzle-orm";
 import {
+  aggregateVersionsTable,
   db,
   orgEventsTable,
   outboxEventsTable,
@@ -10,6 +13,7 @@ import {
 } from "@workspace/db";
 import { stableHash } from "./domain/event-core";
 import type { ActorContext } from "./lib/request-context";
+import { HttpError } from "./lib/http-error";
 import { buildAssignmentService } from "./services/assignment-service";
 import { buildOrganizationService } from "./services/organization-service";
 import { buildPeopleService } from "./services/people-service";
@@ -342,11 +346,176 @@ async function runFounderFlowCertification(): Promise<void> {
         );
       assert.equal(operationsSeatActive.length, 0, "Ahmed's seat should be vacant after offboarding.");
 
+      const assignmentEndedEvents = await db
+        .select({ id: orgEventsTable.id })
+        .from(orgEventsTable)
+        .where(
+          and(
+            eq(orgEventsTable.orgId, organizationId),
+            eq(orgEventsTable.eventType, "assignment.ended"),
+          ),
+        );
+      assert.ok(
+        assignmentEndedEvents.length >= 1,
+        "Expected assignment.ended event(s) to be recorded after offboarding.",
+      );
+
       detailsD.push("Ended Ahmed assignment via assignment command.");
       detailsD.push("Validated seat vacancy + preserved ended assignment history.");
+      detailsD.push("Verified assignment.ended events recorded for offboarding.");
       results.push({ scenario: "D: Offboarding", passed: true, details: detailsD });
     }
+
+    // Scenario E — OCC Conflict (same expected version, dual transfer attempt)
+    {
+      const detailsE: string[] = [];
+      const [sarahActiveBefore] = await db
+        .select()
+        .from(personPositionAssignmentsTable)
+        .where(
+          and(
+            eq(personPositionAssignmentsTable.organizationId, organizationId),
+            eq(personPositionAssignmentsTable.personId, sarah.id),
+            eq(personPositionAssignmentsTable.status, "active"),
+          ),
+        )
+        .limit(1);
+      assert.ok(sarahActiveBefore, "Sarah must have an active assignment before OCC scenario.");
+
+      const [versionRecord] = await db
+        .select({ version: aggregateVersionsTable.version })
+        .from(aggregateVersionsTable)
+        .where(
+          and(
+            eq(aggregateVersionsTable.orgId, organizationId),
+            eq(aggregateVersionsTable.aggregateType, "assignment"),
+            eq(aggregateVersionsTable.aggregateId, sarahActiveBefore.id),
+          ),
+        )
+        .limit(1);
+
+      const expectedFromAssignmentVersion = versionRecord?.version ?? 0;
+      assert.ok(
+        expectedFromAssignmentVersion > 0,
+        "Expected source assignment aggregate version to be initialized before OCC test.",
+      );
+
+      const firstTransfer = await assignmentService.transfer(actor, organizationId, {
+        personId: sarah.id,
+        toPositionId: salesManager.id,
+        fromAssignmentId: sarahActiveBefore.id,
+        expectedFromAssignmentVersion,
+        idempotencyKey: idempotencyKey("cert-occ-transfer-a"),
+      });
+      assert.equal(firstTransfer.replayed, false);
+
+      let conflictError: unknown = null;
+      try {
+        await assignmentService.transfer(actor, organizationId, {
+          personId: sarah.id,
+          toPositionId: financeManager.id,
+          fromAssignmentId: sarahActiveBefore.id,
+          expectedFromAssignmentVersion,
+          idempotencyKey: idempotencyKey("cert-occ-transfer-b"),
+        });
+      } catch (error) {
+        conflictError = error;
+      }
+
+      assert.ok(conflictError instanceof HttpError, "Expected OCC conflict to raise HttpError.");
+      assert.equal(conflictError.statusCode, 409, "Second transfer must return 409 version conflict.");
+      assert.equal(conflictError.message, "version_conflict", "Conflict reason must be version_conflict.");
+
+      const sarahPostTransfers = await db
+        .select()
+        .from(personPositionAssignmentsTable)
+        .where(
+          and(
+            eq(personPositionAssignmentsTable.organizationId, organizationId),
+            eq(personPositionAssignmentsTable.personId, sarah.id),
+            eq(personPositionAssignmentsTable.status, "active"),
+          ),
+        );
+      assert.equal(sarahPostTransfers.length, 1, "Sarah must still have one active assignment after OCC conflict.");
+      assert.equal(
+        sarahPostTransfers[0]?.positionId,
+        salesManager.id,
+        "Sarah active assignment must remain the winner transfer target.",
+      );
+
+      detailsE.push("Captured source assignment version before concurrent transfer simulation.");
+      detailsE.push("Transfer A succeeded with expectedFromAssignmentVersion.");
+      detailsE.push("Transfer B failed with 409 version_conflict using same expected version.");
+      detailsE.push("Validated winner assignment remains single-active (no dual occupancy).");
+      results.push({ scenario: "E: OCC Conflict", passed: true, details: detailsE });
+    }
   }
+
+  const assignmentEvents = await db
+    .select({ eventType: orgEventsTable.eventType })
+    .from(orgEventsTable)
+    .where(eq(orgEventsTable.orgId, organizationId));
+  const assignmentStartedEventCount = assignmentEvents.filter((event) => event.eventType === "assignment.started").length;
+  const assignmentEndedEventCount = assignmentEvents.filter((event) => event.eventType === "assignment.ended").length;
+
+  const outboxAssignmentEvents = await db
+    .select({ type: outboxEventsTable.type })
+    .from(outboxEventsTable)
+    .where(eq(outboxEventsTable.orgId, organizationId));
+  const outboxStartedCount = outboxAssignmentEvents.filter((event) => event.type === "assignment.started").length;
+  const outboxEndedCount = outboxAssignmentEvents.filter((event) => event.type === "assignment.ended").length;
+
+  const assignmentProjectionRows = await db
+    .select({ status: personPositionAssignmentsTable.status })
+    .from(personPositionAssignmentsTable)
+    .where(eq(personPositionAssignmentsTable.organizationId, organizationId));
+  const projectionTotalCount = assignmentProjectionRows.length;
+  const projectionEndedCount = assignmentProjectionRows.filter((assignment) => assignment.status === "ended").length;
+
+  assert.equal(
+    projectionTotalCount,
+    assignmentStartedEventCount,
+    "Projection row count must reconcile with assignment.started event count.",
+  );
+  assert.equal(
+    projectionEndedCount,
+    assignmentEndedEventCount,
+    "Ended projection rows must reconcile with assignment.ended event count.",
+  );
+  assert.equal(
+    outboxStartedCount,
+    assignmentStartedEventCount,
+    "Outbox assignment.started count must match event store count.",
+  );
+  assert.equal(
+    outboxEndedCount,
+    assignmentEndedEventCount,
+    "Outbox assignment.ended count must match event store count.",
+  );
+
+  const artifactPath = path.resolve(process.cwd(), "../phase-execution/founder-flow-certification.latest.json");
+  const artifact = {
+    generatedAt: new Date().toISOString(),
+    organizationId,
+    scenarios: results,
+    reconciliation: {
+      eventStore: {
+        assignmentStarted: assignmentStartedEventCount,
+        assignmentEnded: assignmentEndedEventCount,
+      },
+      outbox: {
+        assignmentStarted: outboxStartedCount,
+        assignmentEnded: outboxEndedCount,
+      },
+      projection: {
+        rows: projectionTotalCount,
+        endedRows: projectionEndedCount,
+      },
+    },
+  };
+
+  await mkdir(path.dirname(artifactPath), { recursive: true });
+  await writeFile(artifactPath, JSON.stringify(artifact, null, 2));
 
   console.log(`Founder Flow Certification: PASS (${results.length} scenarios)`);
   for (const result of results) {
@@ -355,6 +524,12 @@ async function runFounderFlowCertification(): Promise<void> {
       console.log(`  • ${detail}`);
     }
   }
+  console.log(
+    `Reconciliation: events(started=${assignmentStartedEventCount}, ended=${assignmentEndedEventCount}) ` +
+      `outbox(started=${outboxStartedCount}, ended=${outboxEndedCount}) ` +
+      `projection(rows=${projectionTotalCount}, ended=${projectionEndedCount})`,
+  );
+  console.log(`Certification artifact written: ${artifactPath}`);
 }
 
 void runFounderFlowCertification().catch((error) => {
