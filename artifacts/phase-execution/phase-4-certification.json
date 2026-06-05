@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-06-05T07:15:33.178Z",
-  "organizationId": "22810a12-c6ec-44a8-a8c1-7008045500ba",
+  "generatedAt": "2026-06-05T07:23:03.837Z",
+  "organizationId": "a33635e6-2fa9-440c-ae73-00a348d5d329",
   "prerequisiteBaseline": "teamframe-phase3-certified-v1",
   "gates": [
     {
@@ -53,7 +53,7 @@
   ],
   "metrics": {
     "before": {
-      "organizationId": "22810a12-c6ec-44a8-a8c1-7008045500ba",
+      "organizationId": "a33635e6-2fa9-440c-ae73-00a348d5d329",
       "eventThroughputLast5m": 32,
       "projectionLagSeconds": 0,
       "outboxQueueDepth": 20,
@@ -61,8 +61,8 @@
       "deadLetterCount": 1,
       "replayExecutionHealth": {
         "status": "succeeded",
-        "startedAt": "2026-06-05T07:15:33.031Z",
-        "completedAt": "2026-06-05T07:15:33.033Z",
+        "startedAt": "2026-06-05T07:23:03.710Z",
+        "completedAt": "2026-06-05T07:23:03.712Z",
         "durationMs": 2
       },
       "quarantineCount": 0,
@@ -70,7 +70,7 @@
       "integrityStatus": "CORRUPTED"
     },
     "after": {
-      "organizationId": "22810a12-c6ec-44a8-a8c1-7008045500ba",
+      "organizationId": "a33635e6-2fa9-440c-ae73-00a348d5d329",
       "eventThroughputLast5m": 32,
       "projectionLagSeconds": 0,
       "outboxQueueDepth": 0,
@@ -78,8 +78,8 @@
       "deadLetterCount": 1,
       "replayExecutionHealth": {
         "status": "succeeded",
-        "startedAt": "2026-06-05T07:15:33.031Z",
-        "completedAt": "2026-06-05T07:15:33.033Z",
+        "startedAt": "2026-06-05T07:23:03.710Z",
+        "completedAt": "2026-06-05T07:23:03.712Z",
         "durationMs": 2
       },
       "quarantineCount": 0,
@@ -94,5 +94,5 @@
     "projectionDriftReport": "artifacts/phase-execution/projection-drift-report.json"
   },
   "signedBy": "cursor-agent",
-  "signature": "fa838499444197eef4101c0f8dec9857763a9ebccc24fa90a10203f131fd7128"
+  "signature": "e8b0f65f5e9f7d31536f516fdf9774da2122e30f0682130c7f8b71c079fe1e44"
 }

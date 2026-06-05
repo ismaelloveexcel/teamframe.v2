@@ -11,7 +11,8 @@
     "test:phase-core": "tsx --test \"src/domain/**/__tests__/*.test.ts\"",
     "test:founder-cert": "tsx ./src/founder-flow-certification.ts",
     "test:phase3-cert": "tsx ./src/phase3-certification.ts",
-    "test:phase4-cert": "tsx ./src/phase4-certification.ts"
+    "test:phase4-cert": "tsx ./src/phase4-certification.ts",
+    "test:phase4-validation": "tsx ./src/phase4-determinism-validation.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",

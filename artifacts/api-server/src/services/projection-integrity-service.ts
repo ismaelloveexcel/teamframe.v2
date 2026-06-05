@@ -9,6 +9,12 @@ import {
 import { stableHash } from "../domain";
 import { buildReplayService, ReplayService } from "./replay-service";
 
+function isUsableId(value: unknown): value is string {
+  if (typeof value !== "string") return false;
+  const normalized = value.trim().toLowerCase();
+  return normalized.length > 0 && normalized !== "undefined" && normalized !== "null";
+}
+
 type DriftRecord = {
   projectionName: string;
   liveHash: string;
@@ -47,10 +53,13 @@ export class ProjectionIntegrityService {
             .delete(evidenceStatusByAssignmentTable)
             .where(eq(evidenceStatusByAssignmentTable.organizationId, input.organizationId));
           for (const row of replayData.replayed.evidenceByAssignment as Array<Record<string, unknown>>) {
+            const assignmentId = row.assignmentId ? String(row.assignmentId) : "";
+            const positionId = row.positionId ? String(row.positionId) : "";
+            if (!isUsableId(assignmentId) || !isUsableId(positionId)) continue;
             await db.insert(evidenceStatusByAssignmentTable).values({
-              assignmentId: String(row.assignmentId),
+              assignmentId,
               organizationId: input.organizationId,
-              positionId: String(row.positionId),
+              positionId,
               status: row.status as "missing" | "pending" | "compliant" | "non_compliant",
               missingCount: Number(row.missingCount),
               pendingCount: Number(row.pendingCount),
@@ -64,8 +73,10 @@ export class ProjectionIntegrityService {
             .delete(evidenceStatusByPositionTable)
             .where(eq(evidenceStatusByPositionTable.organizationId, input.organizationId));
           for (const row of replayData.replayed.evidenceByPosition as Array<Record<string, unknown>>) {
+            const positionId = row.positionId ? String(row.positionId) : "";
+            if (!isUsableId(positionId)) continue;
             await db.insert(evidenceStatusByPositionTable).values({
-              positionId: String(row.positionId),
+              positionId,
               organizationId: input.organizationId,
               status: row.status as "missing" | "pending" | "compliant" | "non_compliant",
               missingCount: Number(row.missingCount),
@@ -80,14 +91,26 @@ export class ProjectionIntegrityService {
             .delete(compensationCurrentTable)
             .where(eq(compensationCurrentTable.organizationId, input.organizationId));
           for (const row of replayData.replayed.compensationCurrent as Array<Record<string, unknown>>) {
+            const assignmentId = row.assignmentId ? String(row.assignmentId) : "";
+            const compensationRecordId = row.compensationRecordId ? String(row.compensationRecordId) : "";
+            const sourceDocumentId = row.sourceDocumentId ? String(row.sourceDocumentId) : "";
+            const effectiveFromRaw = row.effectiveFrom ? String(row.effectiveFrom) : "";
+            if (
+              !isUsableId(assignmentId) ||
+              !isUsableId(compensationRecordId) ||
+              !isUsableId(sourceDocumentId) ||
+              !effectiveFromRaw ||
+              effectiveFromRaw === "undefined" ||
+              effectiveFromRaw === "null"
+            ) continue;
             await db.insert(compensationCurrentTable).values({
-              assignmentId: String(row.assignmentId),
+              assignmentId,
               organizationId: input.organizationId,
-              compensationRecordId: String(row.compensationRecordId),
-              sourceDocumentId: String(row.sourceDocumentId),
+              compensationRecordId,
+              sourceDocumentId,
               amount: Number(row.amount),
               currency: String(row.currency),
-              effectiveFrom: new Date(String(row.effectiveFrom)),
+              effectiveFrom: new Date(effectiveFromRaw),
               computedAt: new Date(),
             });
           }
