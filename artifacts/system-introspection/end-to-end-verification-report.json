@@ -1,0 +1,317 @@
+{
+  "_meta": {
+    "generated_at": "2026-06-05T16:35:00Z",
+    "extraction_method": "static_code_analysis — each flow checked for: UI trigger, route/handler, service call, DB write, projection update, missing wiring",
+    "executable_definition": "Every link in the flow chain exists in code and is wired — UI trigger → handler → service → persistence. For frontend-only flows: UI trigger → state → render update."
+  },
+  "flows": [
+    {
+      "flow": "GET /api/healthz — Health Check",
+      "executable": true,
+      "check_results": {
+        "ui_trigger_exists": "N/A — HTTP client or browser directly calls endpoint",
+        "api_route_exists": true,
+        "api_route_file": "artifacts/api-server/src/routes/health.ts:6",
+        "backend_service_exists": true,
+        "backend_service_file": "@workspace/api-zod (HealthCheckResponse.parse)",
+        "db_write_attempted": false,
+        "db_write_succeeds": "N/A — no DB interaction",
+        "projection_updates": false,
+        "missing_wiring": []
+      },
+      "breakpoints": [],
+      "missing_links": [],
+      "runtime_fail_risk": "low",
+      "notes": "Fully functional. Only active backend flow in the system. Response is hardcoded { status: 'ok' }, no external dependencies."
+    },
+    {
+      "flow": "TeamFrame Dashboard — Initial Load",
+      "executable": true,
+      "check_results": {
+        "ui_trigger_exists": true,
+        "ui_trigger_detail": "Navigate to {BASE_PATH}/preview/teamframe/TeamFrame",
+        "api_route_exists": "N/A — no API call made",
+        "backend_service_exists": "N/A — no backend involved",
+        "db_write_attempted": false,
+        "db_write_succeeds": "N/A",
+        "projection_updates": false,
+        "missing_wiring": []
+      },
+      "breakpoints": [],
+      "missing_links": [],
+      "runtime_fail_risk": "low",
+      "notes": "Fully executable. Vite dev server must be running with PORT and BASE_PATH set. All data is in-memory from SEED constant. computeUIState() called on mount via useMemo."
+    },
+    {
+      "flow": "TeamFrame Dashboard — Scenario Switch",
+      "executable": true,
+      "check_results": {
+        "ui_trigger_exists": true,
+        "ui_trigger_detail": "onClick on scenario button in TeamFrame.tsx",
+        "api_route_exists": "N/A",
+        "backend_service_exists": "N/A",
+        "db_write_attempted": false,
+        "db_write_succeeds": "N/A",
+        "projection_updates": false,
+        "missing_wiring": []
+      },
+      "breakpoints": [],
+      "missing_links": [],
+      "runtime_fail_risk": "low",
+      "notes": "All 6 SCENARIOS defined in compute.ts. controlState update triggers useMemo recompute. Fully functional."
+    },
+    {
+      "flow": "TeamFrame Dashboard — Position Selection",
+      "executable": true,
+      "check_results": {
+        "ui_trigger_exists": true,
+        "ui_trigger_detail": "onClick on OrgNodeCard in TeamFrame.tsx",
+        "api_route_exists": "N/A",
+        "backend_service_exists": "N/A",
+        "db_write_attempted": false,
+        "db_write_succeeds": "N/A",
+        "projection_updates": false,
+        "missing_wiring": []
+      },
+      "breakpoints": [],
+      "missing_links": [],
+      "runtime_fail_risk": "low",
+      "notes": "Position click sets controlState.selectedPositionId. computeUIState recomputes selectedPosition, directReports, complianceView. RightPanel updates. Fully functional."
+    },
+    {
+      "flow": "TeamFrame Dashboard — Action Resolution",
+      "executable": true,
+      "check_results": {
+        "ui_trigger_exists": true,
+        "ui_trigger_detail": "onClick Resolve button in RightPanel in TeamFrame.tsx",
+        "api_route_exists": "N/A",
+        "backend_service_exists": "N/A",
+        "db_write_attempted": false,
+        "db_write_succeeds": "N/A",
+        "projection_updates": false,
+        "missing_wiring": []
+      },
+      "breakpoints": [],
+      "missing_links": [],
+      "runtime_fail_risk": "low",
+      "notes": "Resolved action ID added to controlState.resolvedActions. computeSignals and computeActions filter out resolved IDs. Action disappears from list. Fully functional — in-memory only, resets on page refresh."
+    },
+    {
+      "flow": "TeamFrame Dashboard — Position Edit",
+      "executable": true,
+      "check_results": {
+        "ui_trigger_exists": true,
+        "ui_trigger_detail": "editingPosition state set via onClick; PositionForm submit event in TeamFrame.tsx",
+        "api_route_exists": "N/A",
+        "backend_service_exists": "N/A",
+        "db_write_attempted": false,
+        "db_write_succeeds": "N/A",
+        "projection_updates": false,
+        "missing_wiring": []
+      },
+      "breakpoints": [],
+      "missing_links": [],
+      "runtime_fail_risk": "low",
+      "notes": "Form submit adds PositionEdit to controlState.positionEdits. applyPositionEdits creates modified SEED copy. New title/department reflected in OrgTreeView. In-memory only."
+    },
+    {
+      "flow": "TeamFrame Dashboard — Employee Search",
+      "executable": true,
+      "check_results": {
+        "ui_trigger_exists": true,
+        "ui_trigger_detail": "onChange on search input in TeamFrame.tsx",
+        "api_route_exists": "N/A",
+        "backend_service_exists": "N/A",
+        "db_write_attempted": false,
+        "db_write_succeeds": "N/A",
+        "projection_updates": false,
+        "missing_wiring": []
+      },
+      "breakpoints": [],
+      "missing_links": [],
+      "runtime_fail_risk": "low",
+      "notes": "employeeSearch state updated on keypress. Employees list filtered by name match. Fully functional client-side."
+    },
+    {
+      "flow": "Employees Dense Table — View",
+      "executable": true,
+      "check_results": {
+        "ui_trigger_exists": true,
+        "ui_trigger_detail": "Navigate to {BASE_PATH}/preview/teamframe/EmployeesDenseTable",
+        "api_route_exists": "N/A",
+        "backend_service_exists": "N/A",
+        "db_write_attempted": false,
+        "db_write_succeeds": "N/A",
+        "projection_updates": false,
+        "missing_wiring": []
+      },
+      "breakpoints": [],
+      "missing_links": [],
+      "runtime_fail_risk": "low",
+      "notes": "Pure render from SEED.employees. No state. Fully executable."
+    },
+    {
+      "flow": "Employees Rich Grid — View + Hover",
+      "executable": true,
+      "check_results": {
+        "ui_trigger_exists": true,
+        "ui_trigger_detail": "Navigate to {BASE_PATH}/preview/teamframe/EmployeesRichGrid; hover cards",
+        "api_route_exists": "N/A",
+        "backend_service_exists": "N/A",
+        "db_write_attempted": false,
+        "db_write_succeeds": "N/A",
+        "projection_updates": false,
+        "missing_wiring": []
+      },
+      "breakpoints": [],
+      "missing_links": [],
+      "runtime_fail_risk": "low",
+      "notes": "Hover state wired via onMouseEnter/onMouseLeave. Fully functional."
+    },
+    {
+      "flow": "Employees Status Grouped — View + Accordion",
+      "executable": true,
+      "check_results": {
+        "ui_trigger_exists": true,
+        "ui_trigger_detail": "Navigate to {BASE_PATH}/preview/teamframe/EmployeesStatusGrouped; click section headers",
+        "api_route_exists": "N/A",
+        "backend_service_exists": "N/A",
+        "db_write_attempted": false,
+        "db_write_succeeds": "N/A",
+        "projection_updates": false,
+        "missing_wiring": []
+      },
+      "breakpoints": [],
+      "missing_links": [],
+      "runtime_fail_risk": "low",
+      "notes": "Accordion toggle via open state Record. Fully functional."
+    },
+    {
+      "flow": "Frontend calls backend API (any feature beyond health check)",
+      "executable": false,
+      "check_results": {
+        "ui_trigger_exists": false,
+        "api_route_exists": false,
+        "backend_service_exists": false,
+        "db_write_attempted": false,
+        "db_write_succeeds": false,
+        "projection_updates": false,
+        "missing_wiring": [
+          "No fetch() calls in any mockup component",
+          "@workspace/api-client-react not imported in mockup-sandbox",
+          "No QueryClient configured in frontend",
+          "No API routes beyond GET /api/healthz exist in backend"
+        ]
+      },
+      "breakpoints": [
+        "mockup-sandbox has zero API calls — it is a fully standalone frontend",
+        "api-server has zero domain routes"
+      ],
+      "missing_links": [
+        "API routes for domain entities (employees, positions, compliance)",
+        "QueryClient setup in frontend",
+        "Import of @workspace/api-client-react in mockup-sandbox"
+      ],
+      "runtime_fail_risk": "high",
+      "notes": "No frontend-to-backend integration exists anywhere in the system."
+    },
+    {
+      "flow": "Database write (any entity persistence)",
+      "executable": false,
+      "check_results": {
+        "ui_trigger_exists": false,
+        "api_route_exists": false,
+        "backend_service_exists": false,
+        "db_write_attempted": false,
+        "db_write_succeeds": false,
+        "projection_updates": false,
+        "missing_wiring": [
+          "lib/db/src/schema/index.ts is empty (export {})",
+          "@workspace/db never imported in api-server/src/",
+          "No database tables defined",
+          "DATABASE_URL not set → lib/db/src/index.ts throws on import"
+        ]
+      },
+      "breakpoints": [
+        "Zero database tables exist",
+        "Database library not wired into any server route"
+      ],
+      "missing_links": [
+        "Table definitions in lib/db/src/schema/index.ts",
+        "Import of @workspace/db in api-server",
+        "Database write handlers in route files",
+        "DATABASE_URL environment variable"
+      ],
+      "runtime_fail_risk": "high",
+      "notes": "Database layer is scaffold-only. No write path exists anywhere."
+    },
+    {
+      "flow": "Event sourcing / CQRS (command → event store → projection)",
+      "executable": false,
+      "check_results": {
+        "ui_trigger_exists": false,
+        "api_route_exists": false,
+        "backend_service_exists": false,
+        "db_write_attempted": false,
+        "db_write_succeeds": false,
+        "projection_updates": false,
+        "missing_wiring": [
+          "No event store implementation files",
+          "No command handler files",
+          "No projector files",
+          "No replay infrastructure",
+          "No outbox pattern files",
+          "No quarantine files"
+        ]
+      },
+      "breakpoints": [
+        "Zero CQRS infrastructure exists in codebase"
+      ],
+      "missing_links": [
+        "Event store implementation",
+        "Command bus / command handlers",
+        "Event projectors",
+        "Replay engine",
+        "Outbox processor",
+        "Quarantine handler"
+      ],
+      "runtime_fail_risk": "high",
+      "notes": "This architecture exists only in attached_assets/ design documents. Zero implementation."
+    },
+    {
+      "flow": "useHealthCheck React hook (api-client-react → backend)",
+      "executable": false,
+      "check_results": {
+        "ui_trigger_exists": false,
+        "api_route_exists": true,
+        "backend_service_exists": true,
+        "db_write_attempted": false,
+        "db_write_succeeds": "N/A",
+        "projection_updates": false,
+        "missing_wiring": [
+          "useHealthCheck is not imported by any component in mockup-sandbox",
+          "No QueryClient/QueryClientProvider in React tree",
+          "setBaseUrl() never called — base URL defaults to empty string"
+        ]
+      },
+      "breakpoints": [
+        "Hook exists and backend route exists, but hook is never mounted"
+      ],
+      "missing_links": [
+        "Import of useHealthCheck in any component",
+        "QueryClientProvider wrapper in main.tsx or App.tsx",
+        "setBaseUrl call with API server URL"
+      ],
+      "runtime_fail_risk": "high",
+      "notes": "The generated hook and backend route are both correctly implemented but never connected end-to-end. The missing link is purely on the frontend consumer side."
+    }
+  ],
+  "summary": {
+    "total_flows_checked": 14,
+    "executable": 10,
+    "not_executable": 4,
+    "low_risk": 10,
+    "medium_risk": 0,
+    "high_risk": 4
+  }
+}

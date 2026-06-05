@@ -1,0 +1,669 @@
+{
+  "_meta": {
+    "generated_at": "2026-06-05T16:35:00Z",
+    "extraction_method": "static_code_analysis — import graph + grep for usages",
+    "classification_rules": {
+      "mounted_in_runtime": "Component is reachable from main.tsx → App.tsx → discoveredModules chain",
+      "present_but_unused": "File exists in src/components/ui/ but is not imported by any mockup or App.tsx",
+      "dead_code": "Exported but provably unreachable from any runtime entry point",
+      "partially_wired": "Imported by another shadcn component but that parent is itself not mounted"
+    }
+  },
+  "application_components": [
+    {
+      "component": "App",
+      "file": "artifacts/mockup-sandbox/src/App.tsx",
+      "used_in_app": true,
+      "mounted_path": "/ (all routes — entry point from main.tsx)",
+      "event_handlers_connected": true,
+      "state_connected": true,
+      "classification": "mounted_in_runtime",
+      "notes": "Root component. Conditionally renders PreviewRenderer or Gallery based on URL path."
+    },
+    {
+      "component": "PreviewRenderer",
+      "file": "artifacts/mockup-sandbox/src/App.tsx (internal)",
+      "used_in_app": true,
+      "mounted_path": "{BASE_PATH}/preview/*",
+      "event_handlers_connected": false,
+      "state_connected": true,
+      "classification": "mounted_in_runtime",
+      "notes": "useState: Component, error. useEffect loads dynamic import. No user event handlers — purely programmatic."
+    },
+    {
+      "component": "Gallery",
+      "file": "artifacts/mockup-sandbox/src/App.tsx (internal)",
+      "used_in_app": true,
+      "mounted_path": "{BASE_PATH}/* (non-preview routes)",
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "mounted_in_runtime",
+      "notes": "Static informational placeholder. No state, no event handlers."
+    },
+    {
+      "component": "TeamFrame",
+      "file": "artifacts/mockup-sandbox/src/components/mockups/teamframe/TeamFrame.tsx",
+      "used_in_app": true,
+      "mounted_path": "{BASE_PATH}/preview/teamframe/TeamFrame",
+      "event_handlers_connected": true,
+      "state_connected": true,
+      "classification": "mounted_in_runtime",
+      "notes": "6 useState hooks. useMemo for derived UIState. All interactive panels have connected onClick/onChange handlers. No external API calls."
+    },
+    {
+      "component": "EmployeesDenseTable",
+      "file": "artifacts/mockup-sandbox/src/components/mockups/teamframe/EmployeesDenseTable.tsx",
+      "used_in_app": true,
+      "mounted_path": "{BASE_PATH}/preview/teamframe/EmployeesDenseTable",
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "mounted_in_runtime",
+      "notes": "Pure render component. Reads SEED directly. No state, no event handlers."
+    },
+    {
+      "component": "EmployeesRichGrid",
+      "file": "artifacts/mockup-sandbox/src/components/mockups/teamframe/EmployeesRichGrid.tsx",
+      "used_in_app": true,
+      "mounted_path": "{BASE_PATH}/preview/teamframe/EmployeesRichGrid",
+      "event_handlers_connected": true,
+      "state_connected": true,
+      "classification": "mounted_in_runtime",
+      "notes": "useState: hovered. onMouseEnter/onMouseLeave connected to hover state."
+    },
+    {
+      "component": "EmployeesStatusGrouped",
+      "file": "artifacts/mockup-sandbox/src/components/mockups/teamframe/EmployeesStatusGrouped.tsx",
+      "used_in_app": true,
+      "mounted_path": "{BASE_PATH}/preview/teamframe/EmployeesStatusGrouped",
+      "event_handlers_connected": true,
+      "state_connected": true,
+      "classification": "mounted_in_runtime",
+      "notes": "useState: open (Record<string, boolean>). onClick connected to accordion toggle."
+    }
+  ],
+  "shadcn_ui_library_components": [
+    {
+      "component": "accordion",
+      "file": "artifacts/mockup-sandbox/src/components/ui/accordion.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported by any mockup component or App.tsx."
+    },
+    {
+      "component": "alert-dialog",
+      "file": "artifacts/mockup-sandbox/src/components/ui/alert-dialog.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported by any mockup component or App.tsx."
+    },
+    {
+      "component": "alert",
+      "file": "artifacts/mockup-sandbox/src/components/ui/alert.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported by any mockup component or App.tsx."
+    },
+    {
+      "component": "aspect-ratio",
+      "file": "artifacts/mockup-sandbox/src/components/ui/aspect-ratio.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "avatar",
+      "file": "artifacts/mockup-sandbox/src/components/ui/avatar.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "TeamFrame.tsx defines its own internal Avatar component using inline styles — it does NOT import this shadcn Avatar."
+    },
+    {
+      "component": "badge",
+      "file": "artifacts/mockup-sandbox/src/components/ui/badge.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported by any mockup component."
+    },
+    {
+      "component": "breadcrumb",
+      "file": "artifacts/mockup-sandbox/src/components/ui/breadcrumb.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "button-group",
+      "file": "artifacts/mockup-sandbox/src/components/ui/button-group.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "button",
+      "file": "artifacts/mockup-sandbox/src/components/ui/button.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported by any mockup component. TeamFrame uses <button> HTML elements with inline styles."
+    },
+    {
+      "component": "calendar",
+      "file": "artifacts/mockup-sandbox/src/components/ui/calendar.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "card",
+      "file": "artifacts/mockup-sandbox/src/components/ui/card.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "carousel",
+      "file": "artifacts/mockup-sandbox/src/components/ui/carousel.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "chart",
+      "file": "artifacts/mockup-sandbox/src/components/ui/chart.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "checkbox",
+      "file": "artifacts/mockup-sandbox/src/components/ui/checkbox.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "collapsible",
+      "file": "artifacts/mockup-sandbox/src/components/ui/collapsible.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "command",
+      "file": "artifacts/mockup-sandbox/src/components/ui/command.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "context-menu",
+      "file": "artifacts/mockup-sandbox/src/components/ui/context-menu.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "dialog",
+      "file": "artifacts/mockup-sandbox/src/components/ui/dialog.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "drawer",
+      "file": "artifacts/mockup-sandbox/src/components/ui/drawer.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "dropdown-menu",
+      "file": "artifacts/mockup-sandbox/src/components/ui/dropdown-menu.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "empty",
+      "file": "artifacts/mockup-sandbox/src/components/ui/empty.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "field",
+      "file": "artifacts/mockup-sandbox/src/components/ui/field.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "form",
+      "file": "artifacts/mockup-sandbox/src/components/ui/form.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "hover-card",
+      "file": "artifacts/mockup-sandbox/src/components/ui/hover-card.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "input-group",
+      "file": "artifacts/mockup-sandbox/src/components/ui/input-group.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "input-otp",
+      "file": "artifacts/mockup-sandbox/src/components/ui/input-otp.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "input",
+      "file": "artifacts/mockup-sandbox/src/components/ui/input.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree. TeamFrame uses <input> HTML element with inline styles."
+    },
+    {
+      "component": "item",
+      "file": "artifacts/mockup-sandbox/src/components/ui/item.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "kbd",
+      "file": "artifacts/mockup-sandbox/src/components/ui/kbd.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "label",
+      "file": "artifacts/mockup-sandbox/src/components/ui/label.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "menubar",
+      "file": "artifacts/mockup-sandbox/src/components/ui/menubar.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "navigation-menu",
+      "file": "artifacts/mockup-sandbox/src/components/ui/navigation-menu.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "pagination",
+      "file": "artifacts/mockup-sandbox/src/components/ui/pagination.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "popover",
+      "file": "artifacts/mockup-sandbox/src/components/ui/popover.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "progress",
+      "file": "artifacts/mockup-sandbox/src/components/ui/progress.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "radio-group",
+      "file": "artifacts/mockup-sandbox/src/components/ui/radio-group.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "resizable",
+      "file": "artifacts/mockup-sandbox/src/components/ui/resizable.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "scroll-area",
+      "file": "artifacts/mockup-sandbox/src/components/ui/scroll-area.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "select",
+      "file": "artifacts/mockup-sandbox/src/components/ui/select.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "separator",
+      "file": "artifacts/mockup-sandbox/src/components/ui/separator.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "sheet",
+      "file": "artifacts/mockup-sandbox/src/components/ui/sheet.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "sidebar",
+      "file": "artifacts/mockup-sandbox/src/components/ui/sidebar.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported by App.tsx or any mockup. Imports use-mobile.tsx internally — making use-mobile.tsx also dead code at runtime."
+    },
+    {
+      "component": "skeleton",
+      "file": "artifacts/mockup-sandbox/src/components/ui/skeleton.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "slider",
+      "file": "artifacts/mockup-sandbox/src/components/ui/slider.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "sonner",
+      "file": "artifacts/mockup-sandbox/src/components/ui/sonner.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "spinner",
+      "file": "artifacts/mockup-sandbox/src/components/ui/spinner.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "switch",
+      "file": "artifacts/mockup-sandbox/src/components/ui/switch.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "table",
+      "file": "artifacts/mockup-sandbox/src/components/ui/table.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree. EmployeesDenseTable uses raw <table> HTML."
+    },
+    {
+      "component": "tabs",
+      "file": "artifacts/mockup-sandbox/src/components/ui/tabs.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "textarea",
+      "file": "artifacts/mockup-sandbox/src/components/ui/textarea.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "toast",
+      "file": "artifacts/mockup-sandbox/src/components/ui/toast.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "toaster",
+      "file": "artifacts/mockup-sandbox/src/components/ui/toaster.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Imports use-toast.ts internally. Neither is used in App.tsx or any mockup."
+    },
+    {
+      "component": "toggle-group",
+      "file": "artifacts/mockup-sandbox/src/components/ui/toggle-group.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "toggle",
+      "file": "artifacts/mockup-sandbox/src/components/ui/toggle.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    },
+    {
+      "component": "tooltip",
+      "file": "artifacts/mockup-sandbox/src/components/ui/tooltip.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Not imported anywhere in runtime tree."
+    }
+  ],
+  "hooks": [
+    {
+      "component": "useIsMobile",
+      "file": "artifacts/mockup-sandbox/src/hooks/use-mobile.tsx",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Imported only by sidebar.tsx. sidebar.tsx is not imported by any active component."
+    },
+    {
+      "component": "useToast / toast",
+      "file": "artifacts/mockup-sandbox/src/hooks/use-toast.ts",
+      "used_in_app": false,
+      "mounted_path": null,
+      "event_handlers_connected": false,
+      "state_connected": false,
+      "classification": "dead_code",
+      "notes": "Imported only by toaster.tsx. toaster.tsx is not imported by any active component."
+    }
+  ],
+  "summary": {
+    "total_ui_files": 62,
+    "mounted_in_runtime": 7,
+    "dead_code": 55,
+    "dead_code_breakdown": {
+      "shadcn_ui_library": 50,
+      "hooks": 2,
+      "generated_api_client": 1,
+      "other": 2
+    }
+  }
+}
