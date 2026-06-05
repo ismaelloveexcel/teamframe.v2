@@ -1,0 +1,276 @@
+{
+  "_meta": {
+    "generated_at": "2026-06-05T16:35:00Z",
+    "extraction_method": "static_code_analysis",
+    "repository_root": "/workspace",
+    "total_features_found": 9
+  },
+  "features": [
+    {
+      "feature_name": "HTTP Server Startup",
+      "type": "backend",
+      "location_files": [
+        "artifacts/api-server/src/index.ts"
+      ],
+      "entry_points": [
+        "artifacts/api-server/src/index.ts (process entry)"
+      ],
+      "core_services_used": [
+        "express (via app.ts)",
+        "pino logger"
+      ],
+      "state_sources": [
+        "process.env.PORT"
+      ],
+      "events_used": [],
+      "ui_components": [],
+      "api_routes": []
+    },
+    {
+      "feature_name": "Health Check Endpoint",
+      "type": "backend",
+      "location_files": [
+        "artifacts/api-server/src/routes/health.ts",
+        "artifacts/api-server/src/routes/index.ts",
+        "artifacts/api-server/src/app.ts"
+      ],
+      "entry_points": [
+        "GET /api/healthz"
+      ],
+      "core_services_used": [
+        "@workspace/api-zod (HealthCheckResponse.parse)",
+        "express Router"
+      ],
+      "state_sources": [],
+      "events_used": [],
+      "ui_components": [],
+      "api_routes": [
+        "GET /api/healthz"
+      ]
+    },
+    {
+      "feature_name": "HTTP Middleware Pipeline",
+      "type": "backend",
+      "location_files": [
+        "artifacts/api-server/src/app.ts",
+        "artifacts/api-server/src/lib/logger.ts"
+      ],
+      "entry_points": [
+        "artifacts/api-server/src/app.ts (app.use chain)"
+      ],
+      "core_services_used": [
+        "pino-http",
+        "cors",
+        "express.json",
+        "express.urlencoded"
+      ],
+      "state_sources": [
+        "process.env.LOG_LEVEL",
+        "process.env.NODE_ENV"
+      ],
+      "events_used": [],
+      "ui_components": [],
+      "api_routes": []
+    },
+    {
+      "feature_name": "Component Preview Server (Mockup Sandbox)",
+      "type": "frontend",
+      "location_files": [
+        "artifacts/mockup-sandbox/src/App.tsx",
+        "artifacts/mockup-sandbox/src/main.tsx",
+        "artifacts/mockup-sandbox/vite.config.ts",
+        "artifacts/mockup-sandbox/mockupPreviewPlugin.ts",
+        "artifacts/mockup-sandbox/src/.generated/mockup-components.ts"
+      ],
+      "entry_points": [
+        "artifacts/mockup-sandbox/src/main.tsx (React root)",
+        "URL: {BASE_PATH}/preview/{componentPath}"
+      ],
+      "core_services_used": [
+        "Vite dev server",
+        "chokidar (file watcher in plugin)",
+        "dynamic import()"
+      ],
+      "state_sources": [
+        "window.location.pathname",
+        "process.env.PORT",
+        "process.env.BASE_PATH",
+        "import.meta.env.BASE_URL"
+      ],
+      "events_used": [
+        "chokidar add/unlink file events (in mockupPreviewPlugin)",
+        "Vite configureServer hook"
+      ],
+      "ui_components": [
+        "App",
+        "PreviewRenderer",
+        "Gallery"
+      ],
+      "api_routes": []
+    },
+    {
+      "feature_name": "TeamFrame UI Simulation Engine",
+      "type": "frontend",
+      "location_files": [
+        "artifacts/mockup-sandbox/src/teamframe/engine/compute.ts",
+        "artifacts/mockup-sandbox/src/teamframe/data/seed.ts"
+      ],
+      "entry_points": [
+        "computeUIState(seed, controlState) — called via useMemo in TeamFrame.tsx"
+      ],
+      "core_services_used": [],
+      "state_sources": [
+        "SEED constant (hardcoded in seed.ts)",
+        "ControlState (React useState in TeamFrame.tsx)"
+      ],
+      "events_used": [],
+      "ui_components": [],
+      "api_routes": []
+    },
+    {
+      "feature_name": "TeamFrame Interactive Dashboard Mockup",
+      "type": "frontend",
+      "location_files": [
+        "artifacts/mockup-sandbox/src/components/mockups/teamframe/TeamFrame.tsx"
+      ],
+      "entry_points": [
+        "URL: {BASE_PATH}/preview/teamframe/TeamFrame",
+        "React component export: TeamFrame()"
+      ],
+      "core_services_used": [
+        "computeUIState (engine/compute.ts)",
+        "SEED (data/seed.ts)"
+      ],
+      "state_sources": [
+        "useState: activeNav (string)",
+        "useState: controlState (ControlState)",
+        "useState: expandedAction (string | null)",
+        "useState: employeeSearch (string)",
+        "useState: showJson (boolean)",
+        "useState: editingPosition (string | null)",
+        "useMemo: uiState = computeUIState(SEED, controlState)"
+      ],
+      "events_used": [],
+      "ui_components": [
+        "TeamFrame (main)",
+        "Avatar (internal)",
+        "StatusDot (internal)",
+        "SignalBadge (internal)",
+        "OrgNodeCard (internal)",
+        "OrgLevel (internal)",
+        "OrgTreeView (internal)",
+        "RiskHeatmapView (internal)",
+        "PositionForm (internal)",
+        "RightPanel (internal)",
+        "JsonInspectorPanel (internal)"
+      ],
+      "api_routes": []
+    },
+    {
+      "feature_name": "Employees Dense Table Mockup",
+      "type": "frontend",
+      "location_files": [
+        "artifacts/mockup-sandbox/src/components/mockups/teamframe/EmployeesDenseTable.tsx"
+      ],
+      "entry_points": [
+        "URL: {BASE_PATH}/preview/teamframe/EmployeesDenseTable",
+        "React component export: EmployeesDenseTable()"
+      ],
+      "core_services_used": [],
+      "state_sources": [
+        "SEED.employees (direct import, no local state)"
+      ],
+      "events_used": [],
+      "ui_components": [
+        "EmployeesDenseTable",
+        "Avatar (internal)",
+        "StatusPill (internal)"
+      ],
+      "api_routes": []
+    },
+    {
+      "feature_name": "Employees Rich Grid Mockup",
+      "type": "frontend",
+      "location_files": [
+        "artifacts/mockup-sandbox/src/components/mockups/teamframe/EmployeesRichGrid.tsx"
+      ],
+      "entry_points": [
+        "URL: {BASE_PATH}/preview/teamframe/EmployeesRichGrid",
+        "React component export: EmployeesRichGrid()"
+      ],
+      "core_services_used": [],
+      "state_sources": [
+        "SEED.employees (direct import)",
+        "useState: hovered (string | null)"
+      ],
+      "events_used": [],
+      "ui_components": [
+        "EmployeesRichGrid"
+      ],
+      "api_routes": []
+    },
+    {
+      "feature_name": "Employees Status Grouped Mockup",
+      "type": "frontend",
+      "location_files": [
+        "artifacts/mockup-sandbox/src/components/mockups/teamframe/EmployeesStatusGrouped.tsx"
+      ],
+      "entry_points": [
+        "URL: {BASE_PATH}/preview/teamframe/EmployeesStatusGrouped",
+        "React component export: EmployeesStatusGrouped()"
+      ],
+      "core_services_used": [],
+      "state_sources": [
+        "SEED.employees (direct import)",
+        "useState: open (Record<string, boolean>)"
+      ],
+      "events_used": [],
+      "ui_components": [
+        "EmployeesStatusGrouped"
+      ],
+      "api_routes": []
+    }
+  ],
+  "explicitly_absent_features": [
+    {
+      "name": "Event Store",
+      "evidence": "No event store files found anywhere in src/. Referenced only in attached_assets/ design docs."
+    },
+    {
+      "name": "Command Handlers / CQRS",
+      "evidence": "No command handler files or patterns found in any source directory."
+    },
+    {
+      "name": "Projectors / Projection System",
+      "evidence": "No projector files found. lib/db/src/schema/index.ts exports only {}."
+    },
+    {
+      "name": "Replay System",
+      "evidence": "No replay infrastructure files exist."
+    },
+    {
+      "name": "Outbox System",
+      "evidence": "No outbox pattern files found."
+    },
+    {
+      "name": "Quarantine System",
+      "evidence": "No quarantine files found."
+    },
+    {
+      "name": "Database Tables",
+      "evidence": "lib/db/src/schema/index.ts is empty (export {}). Zero tables defined."
+    },
+    {
+      "name": "Authentication / Authorization",
+      "evidence": "No auth middleware in artifacts/api-server/src/middlewares/ (only .gitkeep). No JWT/session logic anywhere."
+    },
+    {
+      "name": "Frontend API Integration",
+      "evidence": "mockup-sandbox has no imports of @workspace/api-client-react. No fetch() calls in any .tsx file."
+    },
+    {
+      "name": "Real-time / WebSocket",
+      "evidence": "No ws/socket.io/SSE imports in any file."
+    }
+  ]
+}

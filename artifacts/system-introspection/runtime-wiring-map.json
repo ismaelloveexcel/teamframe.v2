@@ -1,0 +1,337 @@
+{
+  "_meta": {
+    "generated_at": "2026-06-05T16:35:00Z",
+    "extraction_method": "static_code_analysis — import graph traversal",
+    "note": "wired_into_runtime = imported by a file reachable from the process entry point. reachable_from_api = request can reach this component via a declared HTTP route. used_in_production_flows = actually invoked during a real user/client action."
+  },
+  "backend_components": [
+    {
+      "system_component": "Express HTTP Server",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": true,
+      "used_in_production_flows": true,
+      "evidence_files": [
+        "artifacts/api-server/src/index.ts (app.listen)",
+        "artifacts/api-server/src/app.ts (express())"
+      ]
+    },
+    {
+      "system_component": "CORS Middleware",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": true,
+      "used_in_production_flows": true,
+      "evidence_files": [
+        "artifacts/api-server/src/app.ts:28 (app.use(cors()))"
+      ]
+    },
+    {
+      "system_component": "Pino HTTP Request Logging Middleware",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": true,
+      "used_in_production_flows": true,
+      "evidence_files": [
+        "artifacts/api-server/src/app.ts:9-27 (app.use(pinoHttp(...)))",
+        "artifacts/api-server/src/lib/logger.ts"
+      ]
+    },
+    {
+      "system_component": "JSON Body Parser Middleware",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": true,
+      "used_in_production_flows": true,
+      "evidence_files": [
+        "artifacts/api-server/src/app.ts:29 (app.use(express.json()))"
+      ]
+    },
+    {
+      "system_component": "URL-Encoded Body Parser Middleware",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": true,
+      "used_in_production_flows": false,
+      "notes": "Registered but no form-encoded endpoints exist; never receives real data",
+      "evidence_files": [
+        "artifacts/api-server/src/app.ts:30 (app.use(express.urlencoded(...)))"
+      ]
+    },
+    {
+      "system_component": "API Router (/api prefix)",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": true,
+      "used_in_production_flows": true,
+      "evidence_files": [
+        "artifacts/api-server/src/app.ts:32 (app.use('/api', router))",
+        "artifacts/api-server/src/routes/index.ts"
+      ]
+    },
+    {
+      "system_component": "Health Check Route Handler (GET /api/healthz)",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": true,
+      "used_in_production_flows": true,
+      "evidence_files": [
+        "artifacts/api-server/src/routes/health.ts:6-9",
+        "artifacts/api-server/src/routes/index.ts:6 (router.use(healthRouter))"
+      ]
+    },
+    {
+      "system_component": "Zod Response Validation (HealthCheckResponse)",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": true,
+      "used_in_production_flows": true,
+      "evidence_files": [
+        "artifacts/api-server/src/routes/health.ts:2 (import { HealthCheckResponse })",
+        "artifacts/api-server/src/routes/health.ts:7 (HealthCheckResponse.parse(...))",
+        "lib/api-zod/src/generated/api.ts:14-16 (HealthCheckResponse definition)"
+      ]
+    },
+    {
+      "system_component": "Drizzle ORM / PostgreSQL Database",
+      "implemented": true,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "@workspace/db is listed in api-server/package.json devDependencies but is NEVER imported in any src/ file. lib/db/src/schema/index.ts exports only {}.",
+      "evidence_files": [
+        "lib/db/src/index.ts (db connection setup exists)",
+        "lib/db/src/schema/index.ts (empty: export {})",
+        "artifacts/api-server/package.json (dependency listed but not used)"
+      ]
+    },
+    {
+      "system_component": "Custom Middleware Directory",
+      "implemented": false,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "artifacts/api-server/src/middlewares/ contains only .gitkeep. Zero custom middleware files.",
+      "evidence_files": [
+        "artifacts/api-server/src/middlewares/.gitkeep"
+      ]
+    },
+    {
+      "system_component": "Event Store",
+      "implemented": false,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "No event store files anywhere in src/. Referenced only in attached_assets/ design documents.",
+      "evidence_files": []
+    },
+    {
+      "system_component": "Command Handlers / CQRS",
+      "implemented": false,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "No command handler pattern files exist in codebase.",
+      "evidence_files": []
+    },
+    {
+      "system_component": "Projectors / Read Model Projection",
+      "implemented": false,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "No projector files exist.",
+      "evidence_files": []
+    },
+    {
+      "system_component": "Replay System",
+      "implemented": false,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "No replay infrastructure files exist.",
+      "evidence_files": []
+    },
+    {
+      "system_component": "Outbox System",
+      "implemented": false,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "No outbox pattern files exist.",
+      "evidence_files": []
+    },
+    {
+      "system_component": "Quarantine System",
+      "implemented": false,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "No quarantine files exist.",
+      "evidence_files": []
+    },
+    {
+      "system_component": "Authentication Middleware",
+      "implemented": false,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "No auth middleware. cookie-parser listed in package.json but not imported in src/.",
+      "evidence_files": [
+        "artifacts/api-server/package.json (cookie-parser listed, not imported)"
+      ]
+    }
+  ],
+  "frontend_components": [
+    {
+      "system_component": "Vite Dev Server",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": false,
+      "used_in_production_flows": true,
+      "evidence_files": [
+        "artifacts/mockup-sandbox/vite.config.ts"
+      ]
+    },
+    {
+      "system_component": "Mockup Auto-Discovery Plugin (mockupPreviewPlugin)",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": false,
+      "used_in_production_flows": true,
+      "evidence_files": [
+        "artifacts/mockup-sandbox/mockupPreviewPlugin.ts",
+        "artifacts/mockup-sandbox/vite.config.ts (plugin registered)"
+      ]
+    },
+    {
+      "system_component": "React App Root (main.tsx)",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": false,
+      "used_in_production_flows": true,
+      "evidence_files": [
+        "artifacts/mockup-sandbox/src/main.tsx"
+      ]
+    },
+    {
+      "system_component": "App Router (App.tsx)",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": false,
+      "used_in_production_flows": true,
+      "evidence_files": [
+        "artifacts/mockup-sandbox/src/App.tsx"
+      ]
+    },
+    {
+      "system_component": "TeamFrame Engine (computeUIState)",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": false,
+      "used_in_production_flows": true,
+      "notes": "Called via useMemo in TeamFrame.tsx on every controlState change",
+      "evidence_files": [
+        "artifacts/mockup-sandbox/src/teamframe/engine/compute.ts",
+        "artifacts/mockup-sandbox/src/components/mockups/teamframe/TeamFrame.tsx (useMemo import)"
+      ]
+    },
+    {
+      "system_component": "SEED Data (seed.ts)",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": false,
+      "used_in_production_flows": true,
+      "notes": "Imported by TeamFrame.tsx, EmployeesDenseTable.tsx, EmployeesRichGrid.tsx, EmployeesStatusGrouped.tsx",
+      "evidence_files": [
+        "artifacts/mockup-sandbox/src/teamframe/data/seed.ts"
+      ]
+    },
+    {
+      "system_component": "Generated API Client (useHealthCheck, lib/api-client-react)",
+      "implemented": true,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "Library is generated and exists. Zero imports of @workspace/api-client-react in mockup-sandbox or api-server src/. No QueryClient configured. Never invoked.",
+      "evidence_files": [
+        "lib/api-client-react/src/generated/api.ts (exists)",
+        "lib/api-client-react/src/index.ts (exports useHealthCheck)"
+      ]
+    },
+    {
+      "system_component": "shadcn/ui Component Library (50 components in src/components/ui/)",
+      "implemented": true,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "All 50 components exist in artifacts/mockup-sandbox/src/components/ui/. None are imported by any mockup component (TeamFrame, EmployeesDenseTable, EmployeesRichGrid, EmployeesStatusGrouped use inline styles instead).",
+      "evidence_files": [
+        "artifacts/mockup-sandbox/src/components/ui/ (directory with 50 files)",
+        "artifacts/mockup-sandbox/components.json (shadcn config)"
+      ]
+    },
+    {
+      "system_component": "useIsMobile hook",
+      "implemented": true,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "Imported only by src/components/ui/sidebar.tsx. sidebar.tsx itself is not imported by any mockup.",
+      "evidence_files": [
+        "artifacts/mockup-sandbox/src/hooks/use-mobile.tsx",
+        "artifacts/mockup-sandbox/src/components/ui/sidebar.tsx (only importer)"
+      ]
+    },
+    {
+      "system_component": "useToast hook",
+      "implemented": true,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "Imported only by src/components/ui/toaster.tsx. toaster.tsx itself is not imported by any mockup.",
+      "evidence_files": [
+        "artifacts/mockup-sandbox/src/hooks/use-toast.ts",
+        "artifacts/mockup-sandbox/src/components/ui/toaster.tsx (only importer)"
+      ]
+    }
+  ],
+  "shared_libraries": [
+    {
+      "system_component": "lib/api-spec (openapi.yaml + orval.config.ts)",
+      "implemented": true,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "Build-time codegen tool only. Generates lib/api-zod and lib/api-client-react. Not imported at runtime.",
+      "evidence_files": [
+        "lib/api-spec/openapi.yaml",
+        "lib/api-spec/orval.config.ts"
+      ]
+    },
+    {
+      "system_component": "lib/api-zod (HealthCheckResponse Zod schema)",
+      "implemented": true,
+      "wired_into_runtime": true,
+      "reachable_from_api": true,
+      "used_in_production_flows": true,
+      "notes": "Imported by api-server/src/routes/health.ts. Used on every GET /api/healthz request.",
+      "evidence_files": [
+        "lib/api-zod/src/generated/api.ts:14-16",
+        "artifacts/api-server/src/routes/health.ts:2,7"
+      ]
+    },
+    {
+      "system_component": "lib/db (Drizzle + pg Pool)",
+      "implemented": true,
+      "wired_into_runtime": false,
+      "reachable_from_api": false,
+      "used_in_production_flows": false,
+      "notes": "lib/db/src/index.ts sets up pg.Pool and Drizzle. Never imported by api-server src/. Schema is empty.",
+      "evidence_files": [
+        "lib/db/src/index.ts",
+        "lib/db/src/schema/index.ts (export {})"
+      ]
+    }
+  ]
+}

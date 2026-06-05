@@ -1,0 +1,326 @@
+{
+  "_meta": {
+    "generated_at": "2026-06-05T16:35:00Z",
+    "extraction_method": "static_code_analysis",
+    "note": "All flows traced from actual code paths only. No intended/designed flows included."
+  },
+  "flows": [
+    {
+      "feature": "Health Check Endpoint",
+      "flow_steps": [
+        {
+          "step": 1,
+          "component": "artifacts/api-server/src/index.ts",
+          "action": "Process starts. Reads process.env.PORT. Throws Error if missing or non-numeric. Calls app.listen(port).",
+          "data_in": "process.env.PORT (string)",
+          "data_out": "Express server bound to port",
+          "side_effects": "logger.info({ port }) on success; process.exit(1) on error"
+        },
+        {
+          "step": 2,
+          "component": "artifacts/api-server/src/app.ts — pinoHttp middleware",
+          "action": "Incoming request is logged. Serializer strips query string from URL; captures method and status code.",
+          "data_in": "HTTP Request",
+          "data_out": "Logged req {id, method, url} via pino",
+          "side_effects": "stdout log line"
+        },
+        {
+          "step": 3,
+          "component": "artifacts/api-server/src/app.ts — cors() middleware",
+          "action": "CORS headers added to response. No configuration — uses cors() defaults (all origins).",
+          "data_in": "HTTP Request",
+          "data_out": "Response with Access-Control-Allow-Origin: * headers",
+          "side_effects": "none"
+        },
+        {
+          "step": 4,
+          "component": "artifacts/api-server/src/app.ts — express.json() + express.urlencoded()",
+          "action": "Body parsed. For GET /healthz this is a no-op (no body).",
+          "data_in": "HTTP Request body",
+          "data_out": "req.body populated (empty for GET)",
+          "side_effects": "none"
+        },
+        {
+          "step": 5,
+          "component": "artifacts/api-server/src/routes/index.ts",
+          "action": "Router receives request at /api prefix. Delegates to healthRouter (no sub-path prefix).",
+          "data_in": "Express Request matched /api/*",
+          "data_out": "Request forwarded to healthRouter",
+          "side_effects": "none"
+        },
+        {
+          "step": 6,
+          "component": "artifacts/api-server/src/routes/health.ts",
+          "action": "Handler matches GET /healthz. Calls HealthCheckResponse.parse({ status: 'ok' }). If Zod parse fails (it won't with hardcoded input), throws ZodError. On success, calls res.json(data).",
+          "data_in": "{ status: 'ok' } (hardcoded literal)",
+          "data_out": "HTTP 200 JSON: { \"status\": \"ok\" }",
+          "side_effects": "none"
+        }
+      ],
+      "event_chain": [],
+      "database_effects": [],
+      "projection_updates": [],
+      "failure_points": [
+        "Step 1: process.exit(1) if PORT env var is absent or non-numeric",
+        "Step 6: ZodError if HealthCheckResponse schema changes to require additional fields (currently unreachable with hardcoded input)"
+      ]
+    },
+    {
+      "feature": "Component Preview Server — URL Routing",
+      "flow_steps": [
+        {
+          "step": 1,
+          "component": "artifacts/mockup-sandbox/src/main.tsx",
+          "action": "React app bootstraps. createRoot().render(<App />) called.",
+          "data_in": "DOM element #root",
+          "data_out": "React tree mounted",
+          "side_effects": "none"
+        },
+        {
+          "step": 2,
+          "component": "artifacts/mockup-sandbox/src/App.tsx — getBasePath()",
+          "action": "Reads import.meta.env.BASE_URL. Strips trailing slash.",
+          "data_in": "import.meta.env.BASE_URL (set by Vite from BASE_PATH env var)",
+          "data_out": "basePath string (e.g. '/__mockup')",
+          "side_effects": "none"
+        },
+        {
+          "step": 3,
+          "component": "artifacts/mockup-sandbox/src/App.tsx — getPreviewPath()",
+          "action": "Reads window.location.pathname. Strips basePath prefix. Applies regex /^\\/preview\\/(.+)$/. Returns capture group or null.",
+          "data_in": "window.location.pathname (e.g. '/__mockup/preview/teamframe/TeamFrame')",
+          "data_out": "componentPath string (e.g. 'teamframe/TeamFrame') or null",
+          "side_effects": "none"
+        },
+        {
+          "step": 4,
+          "component": "artifacts/mockup-sandbox/src/App.tsx — App()",
+          "action": "If componentPath is non-null, renders PreviewRenderer. Otherwise renders Gallery.",
+          "data_in": "componentPath (string | null)",
+          "data_out": "React element: PreviewRenderer or Gallery",
+          "side_effects": "none"
+        },
+        {
+          "step": 5,
+          "component": "artifacts/mockup-sandbox/src/App.tsx — PreviewRenderer useEffect",
+          "action": "Effect fires on componentPath or modules change. Constructs key './components/mockups/{componentPath}.tsx'. Looks up loader function in discoveredModules map. If not found, sets error state. If found, calls loader() (dynamic import). On module resolution calls _resolveComponent(mod, name).",
+          "data_in": "componentPath (e.g. 'teamframe/TeamFrame'), discoveredModules map",
+          "data_out": "React ComponentType or error string",
+          "side_effects": "setComponent() or setError() state updates trigger re-render"
+        },
+        {
+          "step": 6,
+          "component": "artifacts/mockup-sandbox/src/App.tsx — _resolveComponent()",
+          "action": "Checks mod.default, then mod.Preview, then mod[name], then last exported function. Returns first match.",
+          "data_in": "ES module object, component name string",
+          "data_out": "React ComponentType or undefined",
+          "side_effects": "none"
+        },
+        {
+          "step": 7,
+          "component": "artifacts/mockup-sandbox/src/App.tsx — PreviewRenderer render",
+          "action": "Renders resolved ComponentType with no props.",
+          "data_in": "Component (ComponentType)",
+          "data_out": "Rendered component UI",
+          "side_effects": "none"
+        }
+      ],
+      "event_chain": [],
+      "database_effects": [],
+      "projection_updates": [],
+      "failure_points": [
+        "Step 5: Key not in discoveredModules → sets error 'No component found at {path}.tsx'",
+        "Step 5: dynamic import() rejects → sets error 'Failed to load preview. {message}'",
+        "Step 6: No exported function found → sets error 'No exported React component found in ...'",
+        "Step 2: Vite server not running → entire flow fails before React mounts"
+      ]
+    },
+    {
+      "feature": "TeamFrame Interactive Dashboard Mockup",
+      "flow_steps": [
+        {
+          "step": 1,
+          "component": "artifacts/mockup-sandbox/src/components/mockups/teamframe/TeamFrame.tsx — initial render",
+          "action": "Component mounts. Initial state set: activeNav='org', controlState={scenarioId:'DEFAULT_VIEW', selectedPositionId:'1-001', selectedEmployeeId:'e-001', resolvedActions:[], positionEdits:[], onboardingCompleted:[]}.",
+          "data_in": "No props (renders with no arguments)",
+          "data_out": "Initial React state established",
+          "side_effects": "none"
+        },
+        {
+          "step": 2,
+          "component": "artifacts/mockup-sandbox/src/teamframe/engine/compute.ts — computeUIState()",
+          "action": "useMemo computes uiState. Calls applyPositionEdits(SEED, []) → returns SEED unchanged. Merges controlState with SCENARIOS['DEFAULT_VIEW']. Calls computeSignals(), buildOrgTree(), computeActions(), computeRisks(). Returns UIState object.",
+          "data_in": "SEED (26 positions, 14 employees, 7 compliance items), controlState",
+          "data_out": "UIState { selectedPosition, selectedEmployee, orgTree, signals, actions, complianceView, directReports, stats, signalSummary, risks, riskScore, riskBreakdown }",
+          "side_effects": "none (pure function)"
+        },
+        {
+          "step": 3,
+          "component": "TeamFrame.tsx — Scenario selector UI",
+          "action": "User clicks scenario button. setControlState called with new scenarioId. useMemo recomputes uiState.",
+          "data_in": "onClick event, SCENARIOS key string",
+          "data_out": "Updated controlState.scenarioId → new UIState",
+          "side_effects": "React re-render"
+        },
+        {
+          "step": 4,
+          "component": "TeamFrame.tsx — Sidebar navigation",
+          "action": "User clicks nav item. setActiveNav(section) called. Renders different view panel (org tree, risk heatmap, employees, compliance, actions).",
+          "data_in": "onClick event, section string ('org' | 'risk' | 'employees' | 'compliance' | 'actions')",
+          "data_out": "Updated activeNav → conditional render of view panel",
+          "side_effects": "React re-render"
+        },
+        {
+          "step": 5,
+          "component": "TeamFrame.tsx — Position selection (OrgNodeCard)",
+          "action": "User clicks org node card. setControlState called with new selectedPositionId. useMemo recomputes uiState with new selectedPosition, directReports, complianceView.",
+          "data_in": "onClick, position.id string",
+          "data_out": "Updated controlState.selectedPositionId → new UIState.selectedPosition",
+          "side_effects": "React re-render, RightPanel updates"
+        },
+        {
+          "step": 6,
+          "component": "TeamFrame.tsx — Action resolve (RightPanel)",
+          "action": "User clicks 'Resolve' on action. setControlState called with resolvedActions: [...prev, actionId]. useMemo recomputes: resolved actions are excluded from signals/actions output.",
+          "data_in": "onClick, action.id string",
+          "data_out": "Updated controlState.resolvedActions → signals and actions filtered in new UIState",
+          "side_effects": "React re-render, action disappears from list"
+        },
+        {
+          "step": 7,
+          "component": "TeamFrame.tsx — Position edit (PositionForm)",
+          "action": "User sets editingPosition. PositionForm renders. User submits form. setControlState called with positionEdits: [...prev, { id, title, department }]. useMemo recomputes: applyPositionEdits applies edits to SEED copy.",
+          "data_in": "Form submit event, PositionEdit { id, title, department }",
+          "data_out": "Updated controlState.positionEdits → mutated SEED copy in compute, updated position titles in OrgTree",
+          "side_effects": "React re-render, position title changes in org tree display"
+        },
+        {
+          "step": 8,
+          "component": "TeamFrame.tsx — Employee search",
+          "action": "User types in search input. setEmployeeSearch(value) called. Employees list filtered client-side by name match.",
+          "data_in": "onChange event, search string",
+          "data_out": "Filtered employees list rendered",
+          "side_effects": "React re-render"
+        },
+        {
+          "step": 9,
+          "component": "TeamFrame.tsx — JSON inspector toggle",
+          "action": "User clicks JSON toggle. setShowJson(!showJson). JsonInspectorPanel renders with JSON.stringify(uiState, null, 2).",
+          "data_in": "onClick event",
+          "data_out": "showJson boolean toggle → JsonInspectorPanel visible/hidden",
+          "side_effects": "React re-render"
+        }
+      ],
+      "event_chain": [],
+      "database_effects": [],
+      "projection_updates": [],
+      "failure_points": [
+        "No failure points under normal operation — pure in-memory state machine",
+        "computeUIState could return incorrect stats if SEED.employees data is malformed (no runtime validation)"
+      ]
+    },
+    {
+      "feature": "Employees Dense Table Mockup",
+      "flow_steps": [
+        {
+          "step": 1,
+          "component": "artifacts/mockup-sandbox/src/components/mockups/teamframe/EmployeesDenseTable.tsx",
+          "action": "Component renders. Reads SEED.employees directly (module-level import). Maps over employees array. Renders table rows with avatar initials, name, status, email, phone, location.",
+          "data_in": "SEED.employees (14 employees, static import)",
+          "data_out": "Rendered HTML table",
+          "side_effects": "none"
+        }
+      ],
+      "event_chain": [],
+      "database_effects": [],
+      "projection_updates": [],
+      "failure_points": []
+    },
+    {
+      "feature": "Employees Rich Grid Mockup",
+      "flow_steps": [
+        {
+          "step": 1,
+          "component": "artifacts/mockup-sandbox/src/components/mockups/teamframe/EmployeesRichGrid.tsx",
+          "action": "Component renders with hovered=null. Maps SEED.employees to card grid.",
+          "data_in": "SEED.employees (14 employees, static import)",
+          "data_out": "Rendered card grid",
+          "side_effects": "none"
+        },
+        {
+          "step": 2,
+          "component": "EmployeesRichGrid.tsx — hover interaction",
+          "action": "User hovers card. setHovered(employee.id) on mouseEnter. setHovered(null) on mouseLeave. Card style conditionally changes.",
+          "data_in": "onMouseEnter/onMouseLeave events",
+          "data_out": "hovered state update → card visual state change",
+          "side_effects": "React re-render"
+        }
+      ],
+      "event_chain": [],
+      "database_effects": [],
+      "projection_updates": [],
+      "failure_points": []
+    },
+    {
+      "feature": "Employees Status Grouped Mockup",
+      "flow_steps": [
+        {
+          "step": 1,
+          "component": "artifacts/mockup-sandbox/src/components/mockups/teamframe/EmployeesStatusGrouped.tsx",
+          "action": "Component renders. Groups SEED.employees by status ('active', 'on_leave', 'offboarding'). Renders accordion sections per status group.",
+          "data_in": "SEED.employees (14 employees, static import)",
+          "data_out": "Rendered grouped accordion list",
+          "side_effects": "none"
+        },
+        {
+          "step": 2,
+          "component": "EmployeesStatusGrouped.tsx — accordion toggle",
+          "action": "User clicks section header. setOpen called with toggled boolean for that status key.",
+          "data_in": "onClick event, status string key",
+          "data_out": "open state update → section expanded/collapsed",
+          "side_effects": "React re-render"
+        }
+      ],
+      "event_chain": [],
+      "database_effects": [],
+      "projection_updates": [],
+      "failure_points": []
+    },
+    {
+      "feature": "Mockup Auto-Discovery Plugin",
+      "flow_steps": [
+        {
+          "step": 1,
+          "component": "artifacts/mockup-sandbox/mockupPreviewPlugin.ts — configureServer hook",
+          "action": "Vite dev server starts. Plugin scans src/components/mockups/**/*.tsx (excludes _ prefixed). Generates src/.generated/mockup-components.ts with module map of dynamic imports.",
+          "data_in": "File system: src/components/mockups/ directory",
+          "data_out": "src/.generated/mockup-components.ts written to disk",
+          "side_effects": "File write to .generated/"
+        },
+        {
+          "step": 2,
+          "component": "mockupPreviewPlugin.ts — chokidar watcher",
+          "action": "chokidar watches src/components/mockups/**/*.tsx. On add or unlink event, re-scans and rewrites module map.",
+          "data_in": "File system change event",
+          "data_out": "Updated src/.generated/mockup-components.ts",
+          "side_effects": "File write, Vite HMR invalidation"
+        },
+        {
+          "step": 3,
+          "component": "mockupPreviewPlugin.ts — middleware 404 handler",
+          "action": "If request matches /preview/* and returns 404, plugin triggers rescan.",
+          "data_in": "HTTP 404 response on /preview/* path",
+          "data_out": "Re-generated module map",
+          "side_effects": "File write"
+        }
+      ],
+      "event_chain": [],
+      "database_effects": [],
+      "projection_updates": [],
+      "failure_points": [
+        "Step 1: PORT or BASE_PATH env vars absent → vite.config.ts throws before plugin runs",
+        "Step 2: File system permissions issue → watcher fails silently or throws"
+      ]
+    }
+  ]
+}
