@@ -1,4 +1,8 @@
 import { useEffect, useMemo, useState } from "react";
+import { AppShell, type NavId as ShellNavId } from "./AppShell";
+import { LoadingScreen } from "./LoadingScreen";
+import { EmptyOrgGuide } from "./EmptyOrgGuide";
+import { OrgReadyBanner } from "./OrgReadyBanner";
 import {
   ApiError,
   ActionStatus,
@@ -46,20 +50,11 @@ import {
 } from "@workspace/api-client-react";
 import { UI_TERMS } from "./ui-terms";
 
-type NavId = "org" | "actions" | "team" | "policies" | "templates" | "administration";
+type NavId = ShellNavId;
 type OwnerType = "person" | "position";
 type PositionLevel = "Executive" | "Director" | "Manager" | "IC";
 type PositionPanelTab = "position" | "assignment" | "documents";
 type AssignmentRuntimeStatus = "active" | "scheduled" | "ended";
-
-const NAV_ITEMS: Array<{ id: NavId; label: string }> = [
-  { id: "org", label: UI_TERMS.nav.orgChart },
-  { id: "actions", label: UI_TERMS.nav.actions },
-  { id: "team", label: UI_TERMS.nav.team },
-  { id: "policies", label: UI_TERMS.nav.policies },
-  { id: "templates", label: UI_TERMS.nav.templates },
-  { id: "administration", label: UI_TERMS.nav.administration },
-];
 
 const ACTOR = {
   userId: "11111111-1111-4111-8111-111111111111",
@@ -815,6 +810,9 @@ export function TeamFrame() {
   const [feedbackToast, setFeedbackToast] = useState<
     { message: string; tone: "success" | "error" | "info" } | null
   >(null);
+  const [showOrgReadyBanner, setShowOrgReadyBanner] = useState(false);
+  const [prevPositionCount, setPrevPositionCount] = useState(0);
+  const [prevFilledCount, setPrevFilledCount] = useState(0);
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
@@ -2217,79 +2215,74 @@ export function TeamFrame() {
     URL.revokeObjectURL(href);
   }
 
+  // Trigger org-ready banner when first position or first assignment is created
+  useEffect(() => {
+    const currentFilled = positionAssignmentById.size;
+    const currentPositions = positions.length;
+    const justAddedFirstPosition = prevPositionCount === 0 && currentPositions === 1;
+    const justFilledFirstPosition = prevFilledCount === 0 && currentFilled === 1;
+    if (justAddedFirstPosition || justFilledFirstPosition) {
+      setShowOrgReadyBanner(true);
+    }
+    setPrevPositionCount(currentPositions);
+    setPrevFilledCount(currentFilled);
+  }, [positions.length, positionAssignmentById.size]);
+
   if (loading) {
-    return (
-      <div style={STYLE.page}>
-        <div style={{ padding: 24 }}>Loading TeamFrame workspace…</div>
-      </div>
-    );
+    return <LoadingScreen />;
   }
 
-  return (
-    <div style={STYLE.page}>
-      <div style={STYLE.shell}>
-        <aside style={STYLE.sidebar}>
-          <div style={{ fontSize: 15, fontWeight: 800, marginBottom: 10, color: "#F8FAFC" }}>TeamFrame V1 · Execution</div>
-          {NAV_ITEMS.map((item) => (
-            <button
-              key={item.id}
-              onClick={() => setActiveNav(item.id)}
-              style={{
-                width: "100%",
-                textAlign: "left",
-                border: "1px solid #1F2937",
-                borderRadius: 8,
-                padding: "8px 10px",
-                marginBottom: 6,
-                background: activeNav === item.id ? "#1E293B" : "#0F172A",
-                color: activeNav === item.id ? "#E2E8F0" : "#94A3B8",
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
-            >
-              {item.label}
-            </button>
-          ))}
-        </aside>
+  const openActions = actions.filter((item) => item.status !== ActionStatus.done).length;
+  const needsAttention = overdueActions + blockedActions;
 
-        <main style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          <section style={{ ...STYLE.panel, padding: "8px 10px" }}>
-            <div style={{ fontSize: 11, color: "#334155", display: "flex", flexWrap: "wrap", gap: 12 }}>
-              <span>
-                Positions <strong>{positions.length}</strong>
-              </span>
-              <span>
-                Filled <strong>{positionAssignmentById.size}</strong>
-              </span>
-              <span>
-                Open actions{" "}
-                <strong>{actions.filter((item) => item.status !== ActionStatus.done).length}</strong>
-              </span>
-              <span>
-                {UI_TERMS.entities.needsAttention} <strong>{overdueActions + blockedActions}</strong>
-              </span>
-            </div>
-            {mutationStatusText ? (
-              <div style={{ marginTop: 6, fontSize: 11, color: "#1D4ED8" }}>{mutationStatusText}</div>
-            ) : null}
-            {error ? (
-              <div
-                style={{
-                  marginTop: 6,
-                  color: isLocalDemoMode ? "#92400E" : "#B91C1C",
-                  fontSize: 11,
-                }}
-              >
-                {error}
-              </div>
-            ) : null}
-          </section>
+  return (
+    <AppShell
+      activeNav={activeNav}
+      onNavChange={setActiveNav}
+      health={[
+        { label: "positions", value: positions.length },
+        { label: "filled", value: positionAssignmentById.size },
+        { label: "open actions", value: openActions },
+        { label: "needs attention", value: needsAttention, urgent: true },
+      ]}
+      statusMessage={mutationStatusText}
+      errorMessage={error}
+      isDemoMode={isLocalDemoMode}
+    >
+      {showOrgReadyBanner && (
+        <OrgReadyBanner
+          positionCount={positions.length}
+          filledCount={positionAssignmentById.size}
+          onAssignPerson={() => {
+            setActiveNav("org");
+            setShowOrgReadyBanner(false);
+          }}
+          onDismiss={() => setShowOrgReadyBanner(false)}
+        />
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
 
           {activeNav === "org" && (
             <section style={STYLE.panel}>
-              <div style={{ ...STYLE.title, fontSize: 17 }}>Org Chart</div>
-              <div style={{ fontSize: 12, color: "#475569", marginBottom: 10 }}>
-                Select a node to manage assignment and job description.
+              <div
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 12,
+                }}
+              >
+                <div>
+                  <div style={{ ...STYLE.title, fontSize: 17, marginBottom: 2 }}>
+                    {positions.length === 0 ? "Build your org chart" : "Org Chart"}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748B" }}>
+                    {positions.length === 0
+                      ? "Map your team structure and track every position."
+                      : `${positions.length} position${positions.length === 1 ? "" : "s"} · ${positionAssignmentById.size} filled`}
+                  </div>
+                </div>
               </div>
 
               <div
@@ -2330,7 +2323,13 @@ export function TeamFrame() {
                     }}
                   >
                     {rootPositions.length === 0 ? (
-                      <div style={{ fontSize: 12, color: "#64748B" }}>No positions yet. Create a root position to start.</div>
+                      <EmptyOrgGuide
+                        disabled={isLocalDemoMode || busy}
+                        onCreatePosition={() => {
+                          const titleEl = document.querySelector<HTMLInputElement>('input[placeholder="Position title"]');
+                          if (titleEl) titleEl.focus();
+                        }}
+                      />
                     ) : (
                       <div
                         style={{
@@ -2351,7 +2350,48 @@ export function TeamFrame() {
                 <div style={{ ...STYLE.panel, border: "1px solid #D8E0EC", position: "sticky", top: 12 }}>
                   <div style={{ ...STYLE.subTitle, marginBottom: 8 }}>{UI_TERMS.panel.positionPanel}</div>
                   {!selectedPosition ? (
-                    <div style={{ fontSize: 12, color: "#64748B" }}>Select a position from the org chart.</div>
+                    <div
+                      style={{
+                        padding: "24px 16px",
+                        textAlign: "center",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 10,
+                          background: "#F1F5F9",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginBottom: 4,
+                        }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                          <rect x="7" y="2" width="4" height="4" rx="1.5" fill="#94A3B8" />
+                          <rect x="2" y="12" width="4" height="4" rx="1.5" fill="#CBD5E1" />
+                          <rect x="7" y="12" width="4" height="4" rx="1.5" fill="#CBD5E1" />
+                          <rect x="12" y="12" width="4" height="4" rx="1.5" fill="#CBD5E1" />
+                          <line x1="9" y1="6" x2="9" y2="12" stroke="#E2E8F0" strokeWidth="1.5" />
+                          <line x1="4" y1="9" x2="14" y2="9" stroke="#E2E8F0" strokeWidth="1.5" />
+                          <line x1="4" y1="9" x2="4" y2="12" stroke="#E2E8F0" strokeWidth="1.5" />
+                          <line x1="14" y1="9" x2="14" y2="12" stroke="#E2E8F0" strokeWidth="1.5" />
+                        </svg>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>
+                        {positions.length === 0 ? "No positions yet" : "No position selected"}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#94A3B8", lineHeight: 1.5 }}>
+                        {positions.length === 0
+                          ? "Create your first position to get started."
+                          : "Click any node in the chart to manage it."}
+                      </div>
+                    </div>
                   ) : (
                     <>
                       <div style={{ marginBottom: 10 }}>
@@ -3016,27 +3056,26 @@ export function TeamFrame() {
               </div>
             </section>
           )}
-        </main>
-        {feedbackToast ? (
-          <div
-            style={{
-              position: "fixed",
-              right: 20,
-              bottom: 20,
-              background: feedbackToast.tone === "error" ? "#7F1D1D" : "#0F172A",
-              color: "#F8FAFC",
-              borderRadius: 10,
-              padding: "10px 12px",
-              fontSize: 12,
-              boxShadow: "0 14px 28px rgba(2, 6, 23, 0.25)",
-              zIndex: 40,
-            }}
-          >
-            {feedbackToast.message}
-          </div>
-        ) : null}
-      </div>
+      {feedbackToast ? (
+        <div
+          style={{
+            position: "fixed",
+            right: 20,
+            bottom: 20,
+            background: feedbackToast.tone === "error" ? "#7F1D1D" : "#0F172A",
+            color: "#F8FAFC",
+            borderRadius: 10,
+            padding: "10px 12px",
+            fontSize: 12,
+            boxShadow: "0 14px 28px rgba(2, 6, 23, 0.25)",
+            zIndex: 40,
+          }}
+        >
+          {feedbackToast.message}
+        </div>
+      ) : null}
     </div>
+    </AppShell>
   );
 }
 

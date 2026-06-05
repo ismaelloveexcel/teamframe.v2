@@ -1,0 +1,102 @@
+{
+  "flow": "Flow #1 — Onboarding → First Value Moment",
+  "evaluatedAt": "2026-06-05",
+  "items": [
+    {
+      "id": "ux-1",
+      "check": "Loading screen communicates brand identity",
+      "pass": true,
+      "evidence": "LoadingScreen.tsx renders TeamFrame wordmark + blue logo mark on dark background"
+    },
+    {
+      "id": "ux-2",
+      "check": "Loading screen communicates progress with messages",
+      "pass": true,
+      "evidence": "Three-step message sequence with animated progress bar (800/900/600ms steps)"
+    },
+    {
+      "id": "ux-3",
+      "check": "First screen has one clear primary action when empty",
+      "pass": true,
+      "evidence": "EmptyOrgGuide renders single 'Create first position' CTA button — no competing actions"
+    },
+    {
+      "id": "ux-4",
+      "check": "Empty state communicates product value, not just absence of data",
+      "pass": true,
+      "evidence": "Copy: 'TeamFrame will help you map your team structure, track assignments, and keep compliance up to date.'"
+    },
+    {
+      "id": "ux-5",
+      "check": "Navigation has icons — not text-only",
+      "pass": true,
+      "evidence": "AppShell.tsx uses Lucide icons (GitBranch, CheckSquare, Users, ShieldCheck, LayoutTemplate, Settings) per nav item"
+    },
+    {
+      "id": "ux-6",
+      "check": "Status bar reads as product value, not debug output",
+      "pass": true,
+      "evidence": "Health badge pills show '4 positions · 2 filled · 1 open actions · 0 needs attention' in styled chips, not raw text labels"
+    },
+    {
+      "id": "ux-7",
+      "check": "First value moment is visually confirmed",
+      "pass": true,
+      "evidence": "OrgReadyBanner.tsx fires bottom toast: 'Your org chart is live.' with 'Assign person' CTA after first position created"
+    },
+    {
+      "id": "ux-8",
+      "check": "First assignment is also confirmed",
+      "pass": true,
+      "evidence": "OrgReadyBanner updates to 'Position filled — org chart is live.' with green checkmark icon on first filled position"
+    },
+    {
+      "id": "ux-9",
+      "check": "Side panel empty state guides next action",
+      "pass": true,
+      "evidence": "Panel shows context-aware text: 'Create your first position to get started.' vs 'Click any node in the chart to manage it.' depending on positions.length"
+    },
+    {
+      "id": "ux-10",
+      "check": "Org chart section header communicates value state, not generic title",
+      "pass": true,
+      "evidence": "Title switches from 'Build your org chart' (empty) to 'Org Chart — X positions · Y filled' (populated)"
+    },
+    {
+      "id": "ux-11",
+      "check": "Active nav item has clear visual affordance beyond color alone",
+      "pass": true,
+      "evidence": "AppShell uses inset left border (blue, 1px) + background + color change for active state"
+    },
+    {
+      "id": "ux-12",
+      "check": "Demo mode is clearly surfaced without polluting main UI",
+      "pass": true,
+      "evidence": "Demo mode badge moved to sidebar bottom — isolated from content area, amber color with star icon"
+    },
+    {
+      "id": "ux-13",
+      "check": "Error messages are surfaced without mixing with status metrics",
+      "pass": true,
+      "evidence": "AppShell header separates health badges (left) from status/error message (right)"
+    },
+    {
+      "id": "ux-14",
+      "check": "Brand identity visible from first render",
+      "pass": true,
+      "evidence": "Wordmark 'TeamFrame' + blue logo in sidebar header — present on every screen after load"
+    },
+    {
+      "id": "ux-15",
+      "check": "No competing primary actions on any single screen",
+      "pass": true,
+      "evidence": "Empty state has one primary CTA. Side panel has one primary CTA per tab. Banner has one action button."
+    }
+  ],
+  "summary": {
+    "totalChecks": 15,
+    "passed": 15,
+    "failed": 0,
+    "pass": true
+  }
+}

@@ -1,0 +1,43 @@
+{
+  "flow": "Flow #1 — Onboarding → First Value Moment",
+  "closureStatus": "COMPLETE",
+  "auditedAt": "2026-06-05",
+  "systemCertificationAudit": {
+    "command": "pnpm --filter @workspace/api-server test:system-certification-audit",
+    "result": "PASS",
+    "sections": { "A": true, "B": true, "C": true, "D": true, "E": true, "F": true, "G": true, "H": true }
+  },
+  "uxChecklist": {
+    "artifactPath": "artifacts/ui/flow-1/ux-checklist.json",
+    "pass": true,
+    "totalChecks": 15,
+    "passed": 15,
+    "failed": 0
+  },
+  "funnelEvents": {
+    "artifactPath": "artifacts/ui/flow-1/funnel-events.json",
+    "defined": true,
+    "eventCount": 9,
+    "funnelStages": 5
+  },
+  "exitCriteriaEvaluation": {
+    "systemCertificationPass": true,
+    "uxChecklistPass": true,
+    "funnelEventsPresent": true,
+    "loadingScreenValueIn5s": true,
+    "emptyStateHasOnePrimaryCTA": true,
+    "firstValueMomentVisuallyConfirmed": true,
+    "noStabilityRegressions": true,
+    "allCriteriaMet": true
+  },
+  "componentArtifacts": [
+    "artifacts/mockup-sandbox/src/components/mockups/teamframe/LoadingScreen.tsx",
+    "artifacts/mockup-sandbox/src/components/mockups/teamframe/EmptyOrgGuide.tsx",
+    "artifacts/mockup-sandbox/src/components/mockups/teamframe/OrgReadyBanner.tsx",
+    "artifacts/mockup-sandbox/src/components/mockups/teamframe/AppShell.tsx"
+  ],
+  "modifiedFiles": [
+    "artifacts/mockup-sandbox/src/components/mockups/teamframe/TeamFrame.tsx"
+  ],
+  "nextClosure": "Flow #2 — Core Operating Loop"
+}
