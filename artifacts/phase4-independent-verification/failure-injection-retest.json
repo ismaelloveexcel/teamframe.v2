@@ -1,0 +1,30 @@
+{
+  "gate": {
+    "name": "Failure Injection Re-Test",
+    "pass": true,
+    "details": [
+      "pendingBefore=8",
+      "duplicateSideEffects=0",
+      "quarantined=true",
+      "blocked=true",
+      "driftDetected=true",
+      "repairApplied=true",
+      "repairLoopDetected=false",
+      "finalReplayMatches=true"
+    ],
+    "errors": []
+  },
+  "metrics": {
+    "pendingBefore": 8,
+    "replayDuringLagMatches": true,
+    "replayAfterLagMatches": true,
+    "duplicateSideEffects": [],
+    "quarantined": true,
+    "blocked": true,
+    "replayAfterRecoveryMatches": true,
+    "driftDetected": true,
+    "repairApplied": true,
+    "repairLoopDetected": false,
+    "finalReplayMatches": true
+  }
+}

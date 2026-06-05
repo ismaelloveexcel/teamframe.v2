@@ -93,25 +93,34 @@ export class ProjectionBuilderService {
 
     if (include.positions) {
       const snapshots = derivePositionsFromEvents(events);
-      await tx.delete(positionsTable).where(eq(positionsTable.organizationId, input.organizationId));
       for (const snapshot of snapshots) {
-        await tx.insert(positionsTable).values({
-          id: snapshot.positionId,
-          organizationId: input.organizationId,
-          teamId: snapshot.teamId ?? null,
-          title: snapshot.title,
-          reportsToPositionId: snapshot.reportsToPositionId ?? null,
-          lifecycleStatus: snapshot.lifecycleStatus,
-          updatedAt: new Date(),
-        });
+        await tx
+          .insert(positionsTable)
+          .values({
+            id: snapshot.positionId,
+            organizationId: input.organizationId,
+            teamId: snapshot.teamId ?? null,
+            title: snapshot.title,
+            reportsToPositionId: snapshot.reportsToPositionId ?? null,
+            lifecycleStatus: snapshot.lifecycleStatus,
+            updatedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: [positionsTable.id],
+            set: {
+              organizationId: input.organizationId,
+              teamId: snapshot.teamId ?? null,
+              title: snapshot.title,
+              reportsToPositionId: snapshot.reportsToPositionId ?? null,
+              lifecycleStatus: snapshot.lifecycleStatus,
+              updatedAt: new Date(),
+            },
+          });
       }
     }
 
     if (include.assignments) {
       const assignments = deriveAssignments(events);
-      await tx
-        .delete(personPositionAssignmentsTable)
-        .where(eq(personPositionAssignmentsTable.organizationId, input.organizationId));
       for (const assignment of assignments) {
         if (
           !isUsableId(assignment.assignmentId) ||
@@ -120,16 +129,30 @@ export class ProjectionBuilderService {
         ) {
           continue;
         }
-        await tx.insert(personPositionAssignmentsTable).values({
-          id: assignment.assignmentId,
-          organizationId: input.organizationId,
-          personId: assignment.employeeId,
-          positionId: assignment.positionId,
-          startedAt: new Date(assignment.effectiveFrom),
-          endedAt: assignment.effectiveTo ? new Date(assignment.effectiveTo) : null,
-          status: assignment.status === "ended" ? "ended" : "active",
-          updatedAt: new Date(),
-        });
+        await tx
+          .insert(personPositionAssignmentsTable)
+          .values({
+            id: assignment.assignmentId,
+            organizationId: input.organizationId,
+            personId: assignment.employeeId,
+            positionId: assignment.positionId,
+            startedAt: new Date(assignment.effectiveFrom),
+            endedAt: assignment.effectiveTo ? new Date(assignment.effectiveTo) : null,
+            status: assignment.status === "ended" ? "ended" : "active",
+            updatedAt: new Date(),
+          })
+          .onConflictDoUpdate({
+            target: [personPositionAssignmentsTable.id],
+            set: {
+              organizationId: input.organizationId,
+              personId: assignment.employeeId,
+              positionId: assignment.positionId,
+              startedAt: new Date(assignment.effectiveFrom),
+              endedAt: assignment.effectiveTo ? new Date(assignment.effectiveTo) : null,
+              status: assignment.status === "ended" ? "ended" : "active",
+              updatedAt: new Date(),
+            },
+          });
       }
     }
 

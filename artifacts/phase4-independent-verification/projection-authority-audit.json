@@ -1,0 +1,9 @@
+{
+  "name": "Projection Authority Audit",
+  "pass": true,
+  "details": [
+    "Unauthorized writers: 0"
+  ],
+  "errors": [],
+  "unauthorizedWriters": []
+}
