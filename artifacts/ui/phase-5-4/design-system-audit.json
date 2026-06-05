@@ -1,0 +1,177 @@
+{
+  "auditedAt": "2026-06-05",
+  "files": {
+    "AppShell.tsx": {
+      "fontSizes": [11, 12, 13, 15],
+      "colors": ["#0B1220","#0F172A","#111827","#1D4ED8","#1E293B","#2563EB","#3B82F6","#475569","#64748B","#B45309","#BFDBFE","#CA8A04","#CBD5E1","#DC2626","#E2E8F0","#E5E7EB","#F1F5F9","#F8FAFC","#FECACA","#FEF2F2","#FFFFFF","linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)","rgba(15,23,42,0.10)","rgba(234,179,8,0.1)","rgba(234,179,8,0.2)","rgba(255,255,255,0.04)","rgba(59,130,246,0.25)","white"],
+      "borderRadii": [8, 20],
+      "paddingValues": ["20px 12px","4px 8px 20px","8px 10px","0 24px","4px 10px","20"],
+      "useTailwind": false,
+      "hoverMechanism": "onMouseEnter/Leave inline",
+      "hasFocusStates": false,
+      "hasDisabledStates": true,
+      "notes": "All styling is inline. No className, no CSS variables from index.css. Nav hover #111827/#CBD5E1; health badge disabled: cursor default only, no visual distinction."
+    },
+    "LoadingScreen.tsx": {
+      "fontSizes": [13, 22],
+      "colors": ["#080E1A","#1D4ED8","#3B82F6","#60A5FA","#94A3B8","#F8FAFC","linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)","linear-gradient(90deg, #3B82F6, #60A5FA)","rgba(255,255,255,0.07)","rgba(59,130,246,0.35)","white"],
+      "borderRadii": [10, 99],
+      "paddingValues": [],
+      "useTailwind": false,
+      "hoverMechanism": "none",
+      "hasFocusStates": false,
+      "hasDisabledStates": false,
+      "notes": "Dark bg #080E1A diverges from AppShell page #F1F5F9. Logo borderRadius 10 vs AppShell 8. Wordmark fontSize 22 vs AppShell 15."
+    },
+    "EmptyOrgGuide.tsx": {
+      "fontSizes": [12, 14, 20],
+      "colors": ["#0F172A","#1D4ED8","#2563EB","#3B82F6","#64748B","#93C5FD","#94A3B8","#BFDBFE","#DBEAFE","#EFF6FF","#FFFFFF","linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)","linear-gradient(135deg, #EFF6FF 0%, #DBEAFE 100%)","rgba(37,99,235,0.35)","rgba(37,99,235,0.45)"],
+      "borderRadii": [10, 20],
+      "paddingValues": ["48px 32px","12px 24px"],
+      "useTailwind": false,
+      "hoverMechanism": "onMouseEnter/Leave inline — CTA boxShadow intensifies",
+      "hasFocusStates": false,
+      "hasDisabledStates": true,
+      "notes": "CTA: gradient, borderRadius 10, padding 12px 24px, fontSize 14, hover boxShadow. Disabled: flat #94A3B8 + cursor:not-allowed."
+    },
+    "OrgReadyBanner.tsx": {
+      "fontSizes": [12, 13],
+      "colors": ["#047857","#059669","#0F172A","#1D293B","#1D4ED8","#2563EB","#3B82F6","#475569","#94A3B8","#F8FAFC","#FFFFFF","linear-gradient(135deg, #059669 0%, #047857 100%)","linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)","rgba(255,255,255,0.04)","rgba(2,6,23,0.5)","rgba(5,150,105,0.3)","rgba(59,130,246,0.3)"],
+      "borderRadii": [6, 8, 9, 14],
+      "paddingValues": ["14px 20px","8px 14px","4"],
+      "useTailwind": false,
+      "hoverMechanism": "none — assign and dismiss buttons have no hover handlers",
+      "hasFocusStates": false,
+      "hasDisabledStates": false,
+      "notes": "Fixed bottom toast bg #0F172A, borderRadius 14. CTA flat #2563EB (not gradient), borderRadius 8, fontSize 12 — differs from EmptyOrgGuide CTA. Icon borderRadius 9 is unique value."
+    },
+    "OrgHealthSummary.tsx": {
+      "fontSizes": [10, 11, 12, 13, 22],
+      "colors": ["#059669","#0F172A","#22C55E","#334155","#3B82F6","#475569","#64748B","#6EE7B7","#BBF7D0","#B45309","#D97706","#DC2626","#E2E8F0","#E5E7EB","#EF4444","#F0FDF4","#F59E0B","#F8FAFC","#FECACA","#FDE68A","#FEF2F2","#FFFBEB","#FFFFFF"],
+      "borderRadii": [10, 12, "50%", 99],
+      "paddingValues": ["10px 12px","16px 20px"],
+      "useTailwind": false,
+      "hoverMechanism": "onMouseEnter/Leave inline — MetricCard boxShadow",
+      "hasFocusStates": false,
+      "hasDisabledStates": true,
+      "notes": "MetricCard fontSize 22 for values. Warning tone uses #B45309 (value) and #D97706 (label) — two amber hues for same semantic tone."
+    },
+    "DrillDownPanel.tsx": {
+      "fontSizes": [10, 11, 13, 14, 16],
+      "colors": ["#0F172A","#64748B","#93C5FD","#92400E","#94A3B8","#DC2626","#E2E8F0","#E5E7EB","#F1F5F9","#FAFAFA","#F8FAFC","#FECACA","#FEE2E2","#FEF2F2","#FEF3C7","#FFFBEB","#FDE68A","#FFFFFF","rgba(15,23,42,0.10)","rgba(15,23,42,0.35)"],
+      "borderRadii": [5, 6, 8, 10],
+      "paddingValues": ["16px 20px","12px 20px","24px 0","12px 14px","2px 7px","2px 6px"],
+      "useTailwind": false,
+      "hoverMechanism": "onMouseEnter/Leave inline — rows borderColor change; action divs have no hover",
+      "hasFocusStates": false,
+      "hasDisabledStates": false,
+      "notes": "Close button uses literal '×' char, fontSize 16. Badge borderRadii 5 and 6 coexist for same badge type. Warning color #92400E differs from OrgHealthSummary warning #B45309."
+    },
+    "SetupProgressCard.tsx": {
+      "fontSizes": [9, 11, 12, 16],
+      "colors": ["#047857","#059669","#0F172A","#1D4ED8","#1E293B","#22C55E","#2563EB","#3B82F6","#475569","#64748B","#6EE7B7","#94A3B8","#CBD5E1","#F8FAFC","#FFFFFF","linear-gradient(135deg, #2563EB, #1D4ED8)","linear-gradient(135deg,#059669,#047857)","rgba(255,255,255,0.07)","rgba(2,6,23,0.45)","rgba(37,99,235,0.3)"],
+      "borderRadii": [9, 14, 99, "50%"],
+      "paddingValues": ["16px 18px","0 0 0 8px","9px 0"],
+      "useTailwind": false,
+      "hoverMechanism": "none — CTA and dismiss buttons have no hover handlers",
+      "hasFocusStates": false,
+      "hasDisabledStates": false,
+      "notes": "fontSize 9 on step labels — smallest in Phase 5. Dark toast #0F172A borderRadius 14 parallels OrgReadyBanner but padding differs. CTA borderRadius 9 (unique). Dismiss uses literal '×' char."
+    },
+    "index.css": {
+      "notes": "Tailwind v4 @import + @theme with HSL CSS variables (--background, --foreground, --radius, --font-sans: Inter). None of these tokens referenced by teamframe/* components.",
+      "useTailwind": true
+    }
+  },
+  "crossFileSummary": {
+    "fontSizeSpread": [9, 10, 11, 12, 13, 14, 15, 16, 20, 22],
+    "colorSpread": ["#0F172A","#64748B","#FFFFFF","#E2E8F0","#94A3B8","#475569","#2563EB","#3B82F6","#1D4ED8","#0B1220","#F8FAFC","#E5E7EB","#DC2626","#059669","#1E293B","#F1F5F9","#334155","#BFDBFE","#FEF2F2","#FFFBEB"],
+    "borderRadiusSpread": [5, 6, 8, 9, 10, 12, 14, 20, 99, 999, "50%"],
+    "primaryBackgrounds": "#F1F5F9 (AppShell main), #EEF2F7 (TeamFrame STYLE.page — legacy conflict), #080E1A (LoadingScreen), #0B1220 (sidebar), #FFFFFF (cards/panels/header), #0F172A (dark toasts), #FAFAFA (DrillDownPanel rows)",
+    "tailwindUsage": "none",
+    "hoverConsistency": "inconsistent",
+    "focusStatesCoverage": "none",
+    "mostFragmentedArea": "Primary action buttons — gradient vs solid fills, borderRadius 8/9/10, fontSize 12/14, hover via boxShadow vs borderColor vs background vs none"
+  },
+  "topInconsistencies": [
+    {
+      "rank": 1,
+      "issue": "Tailwind + CSS token infrastructure exists in index.css but zero components use it",
+      "files": ["all Phase 5 components", "index.css"],
+      "example": "index.css defines --radius: .5rem and --color-primary. AppShell uses borderRadius: 8 and color: #2563EB inline with no className anywhere in teamframe/",
+      "perceivedQualityImpact": "HIGH"
+    },
+    {
+      "rank": 2,
+      "issue": "Competing page background colors — new AppShell (#F1F5F9) vs legacy TeamFrame STYLE.page (#EEF2F7)",
+      "files": ["AppShell.tsx", "TeamFrame.tsx"],
+      "example": "AppShell main grid area: #F1F5F9. TeamFrame STYLE.page: background #EEF2F7. Visible mismatch on scroll edges and before AppShell fully renders.",
+      "perceivedQualityImpact": "HIGH"
+    },
+    {
+      "rank": 3,
+      "issue": "Primary button styling varies across 3 components with no shared definition",
+      "files": ["EmptyOrgGuide.tsx", "OrgReadyBanner.tsx", "SetupProgressCard.tsx"],
+      "example": "EmptyOrgGuide: gradient #2563EB→#1D4ED8, br 10, padding 12px 24px, fontSize 14, hover boxShadow | OrgReadyBanner: flat #2563EB, br 8, padding 8px 14px, fontSize 12, no hover | SetupProgressCard: gradient, br 9, padding 9px 0, fontSize 12, no hover",
+      "perceivedQualityImpact": "HIGH"
+    },
+    {
+      "rank": 4,
+      "issue": "10 distinct font sizes with no scale object or token — 9, 10, 11, 12, 13, 14, 15, 16, 20, 22",
+      "files": ["all Phase 5 components"],
+      "example": "SetupProgressCard step labels: 9. OrgHealthSummary metric values: 22. AppShell nav: 13. No file shares a typography constant.",
+      "perceivedQualityImpact": "HIGH"
+    },
+    {
+      "rank": 5,
+      "issue": "Zero keyboard focus styling across all interactive elements",
+      "files": ["all Phase 5 components with interactive elements"],
+      "example": "No onFocus, :focus, outline, or focus-visible anywhere in teamframe/*.tsx. Nav buttons, MetricCards, CTAs all lack focus affordance.",
+      "perceivedQualityImpact": "HIGH"
+    }
+  ],
+  "designTokenCandidates": {
+    "typography": {
+      "xs": "10px — badge labels, status dots",
+      "sm": "11–12px — meta text, CTAs, nav",
+      "base": "13–14px — body, row titles, panel content",
+      "md": "15–16px — panel headings, section titles",
+      "lg": "20px — page section headlines",
+      "xl": "22px — hero metric values"
+    },
+    "colors": {
+      "surface-page": "#F1F5F9",
+      "surface-card": "#FFFFFF",
+      "surface-sidebar": "#0B1220",
+      "surface-dark": "#0F172A",
+      "text-primary": "#0F172A",
+      "text-secondary": "#64748B",
+      "text-muted": "#94A3B8",
+      "border-default": "#E2E8F0",
+      "border-subtle": "#E5E7EB",
+      "brand": "#2563EB",
+      "brand-dark": "#1D4ED8",
+      "success": "#059669",
+      "warning": "#B45309",
+      "danger": "#DC2626",
+      "accent": "#3B82F6"
+    },
+    "radii": {
+      "xs": 6,
+      "sm": 8,
+      "md": 10,
+      "lg": 12,
+      "xl": 14,
+      "pill": 999,
+      "full": "50%"
+    },
+    "spacing": {
+      "1": "4px", "2": "8px", "3": "12px", "4": "16px",
+      "5": "20px", "6": "24px", "8": "32px", "12": "48px",
+      "button-sm": "8px 14px",
+      "button-md": "12px 24px",
+      "card": "16px 20px",
+      "page": "20px"
+    }
+  }
+}
