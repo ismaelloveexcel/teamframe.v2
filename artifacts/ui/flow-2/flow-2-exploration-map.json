@@ -1,0 +1,632 @@
+{
+  "flow": "Flow #2 — Core Operating Loop",
+  "exploredAt": "2026-06-05",
+  "entryPoints": [
+    {
+      "id": "ep-1",
+      "screen": "App shell — default landing",
+      "triggerAction": "App loads with activeNav initialized to \"org\" (Org Chart is the default view)",
+      "lineRef": "798"
+    },
+    {
+      "id": "ep-2",
+      "screen": "Org Chart section — sidebar navigation",
+      "triggerAction": "User clicks \"Org Chart\" in AppShell sidebar to enter or return to the org operating surface",
+      "lineRef": "2239-2241"
+    },
+    {
+      "id": "ep-3",
+      "screen": "Org Chart — empty state (EmptyOrgGuide)",
+      "triggerAction": "When rootPositions.length === 0, user clicks \"Create first position\" CTA which focuses the Structure controls position title input",
+      "lineRef": "2325-2331"
+    },
+    {
+      "id": "ep-4",
+      "screen": "Org Chart — Structure controls (collapsed details)",
+      "triggerAction": "User expands \"Structure controls\" disclosure and uses the \"Create Position\" form (title, department, reports-to, Add Position button)",
+      "lineRef": "2676-2767"
+    },
+    {
+      "id": "ep-5",
+      "screen": "Org Chart — node hover action bar",
+      "triggerAction": "User hovers an org chart node and clicks \"Add related position\" to quick-insert a child position via window.prompt",
+      "lineRef": "1616-1670"
+    },
+    {
+      "id": "ep-6",
+      "screen": "Position panel — Position tab structural actions",
+      "triggerAction": "With a position selected, user clicks \"Add above\", \"Add below\", or \"Add parallel\" to insert related positions",
+      "lineRef": "2476-2485"
+    },
+    {
+      "id": "ep-7",
+      "screen": "Org Chart — node selection",
+      "triggerAction": "User clicks an org chart node card (or hover \"View details\") to open the position panel for that node",
+      "lineRef": "251-254,1597-1599"
+    },
+    {
+      "id": "ep-8",
+      "screen": "Position panel — Assignment tab",
+      "triggerAction": "User clicks the \"Assignment\" tab in the position panel tab row to enter assignment management",
+      "lineRef": "2416-2425"
+    },
+    {
+      "id": "ep-9",
+      "screen": "Structure controls — Person Setup",
+      "triggerAction": "User expands Structure controls and creates a person (optionally with an initial position assignment) as a prerequisite for assignment dropdown population",
+      "lineRef": "2771-2820"
+    },
+    {
+      "id": "ep-10",
+      "screen": "OrgReadyBanner — post-creation nudge",
+      "triggerAction": "After first position is created or first assignment is filled, banner appears; user clicks \"Assign person\" to return to org view",
+      "lineRef": "2218-2261"
+    },
+    {
+      "id": "ep-11",
+      "screen": "Position panel — Documents tab",
+      "triggerAction": "User clicks the \"Documents\" tab to enter evidence/document management for the selected position",
+      "lineRef": "2427-2437"
+    }
+  ],
+  "stateTransitions": [
+    {
+      "id": "st-1",
+      "from": "Bootstrap loading",
+      "to": "Org Chart ready (positions loaded or empty)",
+      "trigger": "useEffect bootstrap completes: organization context loaded, positions/assignments fetched from API",
+      "lineRef": "1315-1343",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "state change"
+    },
+    {
+      "id": "st-2",
+      "from": "Empty org (0 positions)",
+      "to": "Position exists in org chart",
+      "trigger": "User submits Structure controls \"Add Position\" form → handleCreatePosition → createPosition API",
+      "lineRef": "1865-1890",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "toast"
+    },
+    {
+      "id": "st-3",
+      "from": "Existing position selected or targeted",
+      "to": "New related position inserted in hierarchy",
+      "trigger": "User confirms window.prompt title in handleQuickInsertPosition (above/below/parallel) → createPosition (+ optional updatePosition rewire for \"above\" mode)",
+      "lineRef": "1381-1448",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "toast"
+    },
+    {
+      "id": "st-4",
+      "from": "Quick-insert success",
+      "to": "New position focused in position panel on Position tab",
+      "trigger": "Automatic setFocusPositionId(inserted.id) and setPositionPanelTab(\"position\") inside handleQuickInsertPosition mutation callback",
+      "lineRef": "1435-1436",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "state change"
+    },
+    {
+      "id": "st-5",
+      "from": "No focused position (focusPositionId null)",
+      "to": "Root or focused position selected in panel",
+      "trigger": "Default selection logic: focusPositionId ?? first root position; user click on org node sets focusPositionId",
+      "lineRef": "991,1597-1599",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "state change"
+    },
+    {
+      "id": "st-6",
+      "from": "Position panel on Position tab",
+      "to": "Position panel on Assignment tab with draft fields hydrated",
+      "trigger": "User clicks Assignment tab → useEffect populates assignmentDraft* from selectedAssignment runtime",
+      "lineRef": "1105-1112,2416-2425",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "state change"
+    },
+    {
+      "id": "st-7",
+      "from": "Vacant position (no active assignment)",
+      "to": "Person assigned via new startAssignment",
+      "trigger": "User selects person and clicks \"Assign person\" / \"Create assignment\" → handleSaveAssignment → startAssignment when person has no active assignment",
+      "lineRef": "1773-1784,2550-2555",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "toast"
+    },
+    {
+      "id": "st-8",
+      "from": "Person assigned elsewhere",
+      "to": "Person transferred to selected position",
+      "trigger": "handleSaveAssignment detects activePersonAssignment on different position → transferAssignment API",
+      "lineRef": "1757-1770",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "toast"
+    },
+    {
+      "id": "st-9",
+      "from": "Position occupied by person A",
+      "to": "Position reassigned to person B",
+      "trigger": "handleSaveAssignment ends current occupant via endAssignment then starts/transfers new person",
+      "lineRef": "1743-1754",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "toast"
+    },
+    {
+      "id": "st-10",
+      "from": "Filled position",
+      "to": "Vacant position (assignment ended)",
+      "trigger": "User clicks \"Vacate position\" (Position tab) or \"End assignment\" / \"Mark as vacant\" (Assignment tab) → handleVacateSelectedPosition → endAssignment",
+      "lineRef": "1805-1838,2490-2494,2556-2567",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "toast"
+    },
+    {
+      "id": "st-11",
+      "from": "Assignment saved (API success)",
+      "to": "Local assignmentRuntimeByPosition updated with draft status/dates/salary",
+      "trigger": "Post-mutation setAssignmentRuntimeByPosition in handleSaveAssignment (client-only runtime overlay)",
+      "lineRef": "1794-1802",
+      "hasVisualConfirmation": false,
+      "feedbackMechanism": "none"
+    },
+    {
+      "id": "st-12",
+      "from": "Position panel on Assignment tab",
+      "to": "Position panel on Documents tab",
+      "trigger": "User clicks Documents tab",
+      "lineRef": "2427-2437",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "state change"
+    },
+    {
+      "id": "st-13",
+      "from": "No uploaded document for position",
+      "to": "Document uploaded in draft state",
+      "trigger": "User selects file in Documents tab file input → handleUploadPositionDocument creates objectUrl and sets state \"draft\"",
+      "lineRef": "1004-1020,2642-2650",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "state change"
+    },
+    {
+      "id": "st-14",
+      "from": "Document in draft/in_review/signed/outdated",
+      "to": "Document in new lifecycle state",
+      "trigger": "User changes document state select → updatePositionDocumentState (local state only)",
+      "lineRef": "1023-1037,2611-2624",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "state change"
+    },
+    {
+      "id": "st-15",
+      "from": "Org node computed state \"vacant\"",
+      "to": "Org node computed state \"filled\"",
+      "trigger": "After assignment refresh, resolvePositionNodeState finds active assignment → card shows person name and \"Active\" badge",
+      "lineRef": "1130-1134,1559-1567,1580-1593",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "state change"
+    },
+    {
+      "id": "st-16",
+      "from": "0 filled positions",
+      "to": "OrgReadyBanner shown (first position or first fill milestone)",
+      "trigger": "useEffect detects justAddedFirstPosition or justFilledFirstPosition → setShowOrgReadyBanner(true)",
+      "lineRef": "2218-2228",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "state change"
+    },
+    {
+      "id": "st-17",
+      "from": "Mutation in progress",
+      "to": "Mutation complete with refreshed server state",
+      "trigger": "runMutation sets mutationStatusText during API call, refreshState reloads data, optional success toast",
+      "lineRef": "1345-1378",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "status text"
+    },
+    {
+      "id": "st-18",
+      "from": "Any successful/failed mutation",
+      "to": "Fixed-position toast visible then auto-dismissed",
+      "trigger": "setFeedbackToast on success/error; 2600ms timeout clears toast",
+      "lineRef": "1307-1313,3059-3076",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "toast"
+    },
+    {
+      "id": "st-19",
+      "from": "Document signature status unset",
+      "to": "Signature status displays Signed (completion signal for evidence loop)",
+      "trigger": "User sets uploaded document state to \"signed\" via state select; signatureStatus field reads documentStateLabel",
+      "lineRef": "2601-2603,2623",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "state change"
+    },
+    {
+      "id": "st-20",
+      "from": "Header health badges before assignment",
+      "to": "Header \"filled\" count increments",
+      "trigger": "refreshState after assignment updates positionAssignmentById.size reflected in AppShell health prop",
+      "lineRef": "2242-2247,913-916",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "state change"
+    },
+    {
+      "id": "st-21",
+      "from": "Person created without position",
+      "to": "Person created with immediate assignment",
+      "trigger": "Structure controls Person Setup with newPersonPositionId set → handleCreatePerson → startAssignment after createPerson",
+      "lineRef": "1910-1921",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "toast"
+    },
+    {
+      "id": "st-22",
+      "from": "Position with broken reporting line or ended-runtime mismatch",
+      "to": "Org node \"needs_attention\" state",
+      "trigger": "hasPositionStructuralIssue returns true → resolvePositionNodeState → card shows Needs attention label",
+      "lineRef": "1114-1131,1588-1591",
+      "hasVisualConfirmation": true,
+      "feedbackMechanism": "state change"
+    }
+  ],
+  "userDecisionNodes": [
+    {
+      "id": "dn-1",
+      "screen": "Structure controls — Create Position",
+      "decision": "How to define the new position's place in the org",
+      "options": ["Set department (team)", "Set reports-to manager", "Leave as root with no manager"],
+      "currentUX": "Three stacked controls (title input, department select, reports-to select) inside collapsed \"Structure controls\" details element with no inline guidance on hierarchy impact",
+      "clarityScore": 3,
+      "lineRef": "2731-2767"
+    },
+    {
+      "id": "dn-2",
+      "screen": "Org chart node hover / Position tab",
+      "decision": "Where to insert a related position in the hierarchy",
+      "options": ["Add above", "Add below", "Add parallel", "Add related position (hover — below only)"],
+      "currentUX": "Position tab exposes three explicit buttons; hover bar exposes only \"Add related position\" (below mode). All use browser window.prompt for title with no visual preview of resulting tree shape",
+      "clarityScore": 2,
+      "lineRef": "1654-1670,2476-2485"
+    },
+    {
+      "id": "dn-3",
+      "screen": "Position panel — tab row",
+      "decision": "Which aspect of the position to manage",
+      "options": ["Position (structure)", "Assignment (person)", "Documents (evidence)"],
+      "currentUX": "Three equal-weight buttons in a 3-column grid; active tab indicated only by #E2E8F0 background vs white, no icons or descriptions of tab purpose",
+      "clarityScore": 2,
+      "lineRef": "2404-2437"
+    },
+    {
+      "id": "dn-4",
+      "screen": "Position panel — Assignment tab",
+      "decision": "Which person to assign to this position",
+      "options": ["Select from existing people dropdown", "Create new person first via Structure controls"],
+      "currentUX": "Single select dropdown labeled \"Person\" with \"Select person\" placeholder; no inline create-person shortcut; helper text only when selected person has no active assignment",
+      "clarityScore": 3,
+      "lineRef": "2501-2513,2575-2591"
+    },
+    {
+      "id": "dn-5",
+      "screen": "Position panel — Assignment tab",
+      "decision": "What assignment type and dates apply",
+      "options": ["Active assignment", "Starts on date (scheduled)", "Ended assignment"],
+      "currentUX": "Assignment type select plus start/end date inputs and a separate non-functional \"Change assignment type\" button; no explanation that type/dates are not persisted to API",
+      "clarityScore": 1,
+      "lineRef": "2515-2572"
+    },
+    {
+      "id": "dn-6",
+      "screen": "Position panel — Assignment tab action row",
+      "decision": "How to finalize or end the assignment",
+      "options": ["Assign person / Reassign person", "End assignment", "Mark as vacant", "Change assignment type"],
+      "currentUX": "Four adjacent buttons where End assignment and Mark as vacant invoke the same handler; button labels change based on selectedAssignment but semantics overlap",
+      "clarityScore": 2,
+      "lineRef": "2549-2572"
+    },
+    {
+      "id": "dn-7",
+      "screen": "Position panel — Documents tab",
+      "decision": "How to provide role evidence",
+      "options": ["Upload existing file", "Download and fill Job Description template", "Manually advance document state"],
+      "currentUX": "Static read-only labels for Role description/Key responsibilities/KPIs; only file upload and template download are interactive; responsibilities/KPIs cannot be edited in-app",
+      "clarityScore": 2,
+      "lineRef": "2596-2667"
+    },
+    {
+      "id": "dn-8",
+      "screen": "Position panel — Documents tab",
+      "decision": "What document lifecycle state to mark",
+      "options": ["Draft", "In review", "Signed", "Outdated"],
+      "currentUX": "Select dropdown on uploaded document card; signature status field above reflects selection. No workflow gates — user can jump directly to Signed",
+      "clarityScore": 3,
+      "lineRef": "2601-2624"
+    },
+    {
+      "id": "dn-9",
+      "screen": "Position panel — Position tab",
+      "decision": "Whether/how to fix reporting line issues",
+      "options": ["Update reporting line (ID-prefix prompt)", "Ignore warning banners"],
+      "currentUX": "Warning banners for missing reporting line and structural issues; \"Update reporting line\" opens window.prompt listing raw position ID prefixes — not human-readable manager names in the prompt itself",
+      "clarityScore": 2,
+      "lineRef": "1451-1522,2458-2488"
+    },
+    {
+      "id": "dn-10",
+      "screen": "OrgReadyBanner",
+      "decision": "Whether to proceed to assignment after first position creation",
+      "options": ["Assign person (CTA)", "Dismiss banner"],
+      "currentUX": "Fixed bottom banner with \"Assign person\" button that navigates to org view but does not auto-open Assignment tab or pre-select the new position's assignment flow",
+      "clarityScore": 3,
+      "lineRef": "2252-2261"
+    }
+  ],
+  "frictionPoints": [
+    {
+      "id": "fp-1",
+      "severity": "CRITICAL",
+      "screen": "Position panel — Assignment tab",
+      "issue": "Assignment type, start date, end date, and actual salary are captured in UI but never sent to the API in handleSaveAssignment — only person-to-position linking (start/transfer/end) is persisted",
+      "impact": "User believes they configured scheduled/ended assignments and date ranges, but only person assignment is saved; completion signals based on assignment type are unreliable",
+      "lineRef": "1732-1802,2515-2546"
+    },
+    {
+      "id": "fp-2",
+      "severity": "CRITICAL",
+      "screen": "Position panel — Assignment tab",
+      "issue": "\"Change assignment type\" button is a stub that only calls setError(\"Assignment type updated.\") with no state or API mutation",
+      "impact": "User clicks a primary-sounding action expecting assignment type to change; receives an error banner instead of a meaningful state transition",
+      "lineRef": "2568-2572"
+    },
+    {
+      "id": "fp-3",
+      "severity": "CRITICAL",
+      "screen": "Position panel — Assignment tab",
+      "issue": "setAssignmentRuntimeByPosition runs unconditionally after runMutation in handleSaveAssignment/handleVacateSelectedPosition, even when runMutation returns early (e.g., local demo mode) or fails",
+      "impact": "UI runtime overlay can desync from server assignment state, showing ended/scheduled status locally while API state differs",
+      "lineRef": "1794-1802,1830-1838"
+    },
+    {
+      "id": "fp-4",
+      "severity": "HIGH",
+      "screen": "Position panel — Documents tab",
+      "issue": "Uploaded documents and their lifecycle states live only in component state (positionDocuments); no API persistence, lost on refresh",
+      "impact": "Evidence/completion signal (Signed document) is ephemeral; user cannot treat document upload as durable compliance evidence",
+      "lineRef": "826-827,1004-1037"
+    },
+    {
+      "id": "fp-5",
+      "severity": "HIGH",
+      "screen": "Position panel — Assignment tab",
+      "issue": "\"End assignment\" and \"Mark as vacant\" are duplicate buttons both calling handleVacateSelectedPosition with identical disabled logic",
+      "impact": "User cannot distinguish two ostensibly different outcomes; increases cognitive load without providing distinct behavior",
+      "lineRef": "2556-2567"
+    },
+    {
+      "id": "fp-6",
+      "severity": "HIGH",
+      "screen": "Org Chart — quick insert",
+      "issue": "Position creation via handleQuickInsertPosition uses window.prompt for title input instead of in-app form with validation preview",
+      "impact": "Jarring modal breaks flow continuity; no visibility into department/reports-to inheritance before creation (only inherited silently from target)",
+      "lineRef": "1396-1417"
+    },
+    {
+      "id": "fp-7",
+      "severity": "HIGH",
+      "screen": "Position panel — Position tab",
+      "issue": "Update reporting line uses window.prompt with raw position ID prefixes rather than a searchable manager picker",
+      "impact": "User must know or copy UUID prefixes to set reporting lines; high error rate for non-technical operators",
+      "lineRef": "1456-1488"
+    },
+    {
+      "id": "fp-8",
+      "severity": "HIGH",
+      "screen": "Structure controls — Create Position",
+      "issue": "handleCreatePosition does not setFocusPositionId on the newly created position (unlike handleQuickInsertPosition)",
+      "impact": "After form-based creation user may not see the new position selected in the panel; must manually find and click the node in the chart",
+      "lineRef": "1865-1890"
+    },
+    {
+      "id": "fp-9",
+      "severity": "MEDIUM",
+      "screen": "Position panel — tab row",
+      "issue": "Three tabs (Position, Assignment, Documents) have identical visual weight with minimal active-state differentiation (background color only) and no tab descriptions",
+      "impact": "New users cannot infer the intended operating sequence (structure → assign → document) from the tab chrome alone",
+      "lineRef": "2404-2437"
+    },
+    {
+      "id": "fp-10",
+      "severity": "MEDIUM",
+      "screen": "Org Chart — Structure controls",
+      "issue": "Primary position/person creation flows are hidden inside a collapsed <details> \"Structure controls\" element below the chart",
+      "impact": "First-time users landing on populated or empty chart may not discover creation forms without scrolling and expanding; EmptyOrgGuide only focuses an input, does not expand details",
+      "lineRef": "2328-2331,2676-2687"
+    },
+    {
+      "id": "fp-11",
+      "severity": "MEDIUM",
+      "screen": "Position panel — Position tab",
+      "issue": "Notes textarea (\"Add context\") has no onChange handler, state binding, or save action",
+      "impact": "User enters contextual notes believing they are saved; data is silently discarded on any navigation",
+      "lineRef": "2473-2474"
+    },
+    {
+      "id": "fp-12",
+      "severity": "MEDIUM",
+      "screen": "Position panel — Documents tab",
+      "issue": "Role description, Key responsibilities, and KPIs render as static bold labels with no input fields; only file upload populates evidence",
+      "impact": "User sees form-like field names but cannot enter structured role content in-app; unclear whether upload is required to satisfy those fields",
+      "lineRef": "2598-2600"
+    },
+    {
+      "id": "fp-13",
+      "severity": "MEDIUM",
+      "screen": "Org Chart — node status badge",
+      "issue": "Vacant positions display status label \"Open\" which conflates position vacancy with action workflow \"Open\" state",
+      "impact": "Operator may interpret vacant positions as having open actions rather than being unfilled roles",
+      "lineRef": "1559-1561"
+    },
+    {
+      "id": "fp-14",
+      "severity": "MEDIUM",
+      "screen": "OrgReadyBanner",
+      "issue": "onAssignPerson callback only sets activeNav to org and dismisses banner — does not switch positionPanelTab to \"assignment\" or guide user to Assignment tab",
+      "impact": "Post-creation nudge fails to carry user into the next loop step; assignment discovery still depends on finding the tab manually",
+      "lineRef": "2256-2259"
+    },
+    {
+      "id": "fp-15",
+      "severity": "LOW",
+      "screen": "Org Chart — computed metrics",
+      "issue": "positionActionStats and positionComplianceAlerts are computed but never rendered anywhere in the org UI",
+      "impact": "Compliance gaps and action load per position are invisible during the core operating loop despite being calculated",
+      "lineRef": "954-988"
+    },
+    {
+      "id": "fp-16",
+      "severity": "LOW",
+      "screen": "Org Chart — subtree focus",
+      "issue": "focusedSubtreeRootId state is never set to a non-null value; only reset-to-null button exists",
+      "impact": "Subtree focus feature appears partially implemented; \"Reset view\" button never shows under normal use",
+      "lineRef": "829,1715-1719,2309-2311"
+    }
+  ],
+  "deadEnds": [
+    {
+      "id": "de-1",
+      "screen": "Position panel — Assignment tab",
+      "description": "\"Change assignment type\" button leads to error message only with no forward path or state change",
+      "lineRef": "2568-2572"
+    },
+    {
+      "id": "de-2",
+      "screen": "Position panel — Position tab",
+      "description": "Notes textarea accepts input but has no save mechanism — user input is a dead end",
+      "lineRef": "2473-2474"
+    },
+    {
+      "id": "de-3",
+      "screen": "Position panel — Assignment tab",
+      "description": "When people array is empty, person select only shows \"Select person\" — user must discover collapsed Structure controls Person Setup with no direct link",
+      "lineRef": "2502-2513,2771-2820"
+    },
+    {
+      "id": "de-4",
+      "screen": "Position panel — Documents tab",
+      "description": "Role description / Key responsibilities / KPIs labels are display-only — user cannot complete structured evidence in-app without uploading a file",
+      "lineRef": "2598-2600"
+    },
+    {
+      "id": "de-5",
+      "screen": "Global — local demo mode",
+      "description": "If activated, runMutation blocks all writes with readonly error — core loop cannot complete",
+      "lineRef": "1197-1205,1353-1357"
+    },
+    {
+      "id": "de-6",
+      "screen": "Position panel — Documents tab",
+      "description": "Uploaded documents exist only in memory; page refresh returns to empty state with signature status showing Draft despite prior Signed completion",
+      "lineRef": "826-827,2601-2603"
+    }
+  ],
+  "repeatedLogicPaths": [
+    {
+      "id": "rl-1",
+      "description": "handleVacateSelectedPosition invoked from three separate buttons with two different labels (Vacate position, End assignment, Mark as vacant) performing identical endAssignment mutation",
+      "locations": ["2490-2494", "2556-2567"]
+    },
+    {
+      "id": "rl-2",
+      "description": "handleSaveAssignment wired to both primary assign button and conditional secondary \"Create assignment\" button for unassigned persons",
+      "locations": ["2550-2555", "2585-2590"]
+    },
+    {
+      "id": "rl-3",
+      "description": "Position creation implemented twice: form-based handleCreatePosition (Structure controls) and prompt-based handleQuickInsertPosition (org chart hover + Position tab buttons) with different post-create focus behavior",
+      "locations": ["1381-1448", "1865-1890"]
+    },
+    {
+      "id": "rl-4",
+      "description": "downloadJobDescriptionTemplate available from both Documents tab and Templates nav section",
+      "locations": ["2652-2667", "2891-2899"]
+    },
+    {
+      "id": "rl-5",
+      "description": "Assignment draft hydration useEffect and Assignment tab empty/conditional helper blocks repeat the same unassigned-position messaging patterns",
+      "locations": ["1105-1112", "2468-2471", "2575-2591"]
+    },
+    {
+      "id": "rl-6",
+      "description": "Person-to-position assignment can be initiated from three paths: Assignment tab handleSaveAssignment, Person Setup handleCreatePerson with newPersonPositionId, and transfer via reassignment logic",
+      "locations": ["1732-1802", "1910-1921"]
+    }
+  ],
+  "unclearIntentZones": [
+    {
+      "id": "ui-1",
+      "screen": "Position panel — Assignment tab action row",
+      "description": "End assignment vs Mark as vacant vs Vacate position (on Position tab) use overlapping language but identical or near-identical handlers — unclear which to use when offboarding vs temporary vacancy",
+      "lineRef": "2490-2494,2556-2567"
+    },
+    {
+      "id": "ui-2",
+      "screen": "Position panel — Assignment tab",
+      "description": "Assignment type dropdown coexists with a separate \"Change assignment type\" button — unclear whether type is edited via select + save or via the button; button does not interact with dropdown",
+      "lineRef": "2515-2572"
+    },
+    {
+      "id": "ui-3",
+      "screen": "Position panel — Documents tab",
+      "description": "Signature status displays \"Draft\" when no document is uploaded, implying a document exists in draft rather than being absent",
+      "lineRef": "2601-2603"
+    },
+    {
+      "id": "ui-4",
+      "screen": "Org Chart — node card status badge",
+      "description": "Vacant positions labeled \"Open\" while filled positions labeled \"Active\" — \"Open\" reads as action/workflow status not role vacancy",
+      "lineRef": "1559-1567,1591"
+    },
+    {
+      "id": "ui-5",
+      "screen": "Position panel — Assignment tab",
+      "description": "Conditional \"Create assignment\" block appears only when selected person has no activeAssignmentByPersonId — unclear relationship to main \"Assign person\" button which performs the same save action",
+      "lineRef": "2550-2555,2580-2591"
+    },
+    {
+      "id": "ui-6",
+      "screen": "Org Chart — Structure controls",
+      "description": "Collapsed details element separates \"Department + Position Setup\" from \"Person Setup\" without indicating these are sequential prerequisites for the assignment step in the core loop",
+      "lineRef": "2676-2826"
+    },
+    {
+      "id": "ui-7",
+      "screen": "Org Chart — node card person line",
+      "description": "When structural issue detected, person line shows \"Needs attention\" instead of assigned person name — obscures who occupies the role while flagging structure problems",
+      "lineRef": "1588-1591"
+    },
+    {
+      "id": "ui-8",
+      "screen": "Position panel — Documents tab",
+      "description": "Document state select allows direct jump to Signed with no review workflow enforcement — unclear whether Signed is an operator assertion or a validated completion gate",
+      "lineRef": "2611-2624"
+    }
+  ],
+  "primaryLoopSummary": {
+    "stepCount": 11,
+    "happyPath": [
+      "Land on Org Chart (default activeNav 'org')",
+      "Expand Structure controls and complete Create Position form (title, department, reports-to)",
+      "Click Add Position and wait for success toast",
+      "Click the new position node in the org chart to open the position panel",
+      "Switch to Assignment tab",
+      "Select a person from the dropdown (create person first via Person Setup if needed)",
+      "Click Assign person and confirm success toast; org node updates to Active with person name",
+      "Switch to Documents tab",
+      "Upload a role description file",
+      "Set document state to Signed via the state select",
+      "Observe completion signals: org node Active badge, header filled count increment, signature status Signed"
+    ],
+    "biggestFrictionPoint": "fp-1",
+    "recommendedInterventionSurface": "Position panel — Assignment tab (lines 2499-2593): unify assign/save/end actions, remove stub 'Change assignment type' button, fix OrgReadyBanner CTA to open Assignment tab directly on the selected position"
+  }
+}
