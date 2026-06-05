@@ -1,0 +1,16 @@
+{
+  "id": "E",
+  "name": "Outbox Recovery",
+  "pass": false,
+  "details": [
+    "pendingBefore=7",
+    "run1Delivered=39",
+    "run2Delivered=0",
+    "dedupeTriggered=true",
+    "crashInjected=true",
+    "compareAfterMatches=false"
+  ],
+  "errors": [
+    "Replay/live mismatch after outbox recovery scenarios."
+  ]
+}

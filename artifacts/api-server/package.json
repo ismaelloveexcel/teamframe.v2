@@ -16,7 +16,8 @@
     "test:system-stability-audit": "tsx ./src/system-stability-audit.ts",
     "test:phase4-stabilization": "tsx ./src/phase4-stabilization.ts",
     "test:determinism-enforcement": "tsx ./src/determinism-enforcement.test.ts",
-    "test:phase4-independent-verify": "tsx ./src/phase4-independent-verification.ts"
+    "test:phase4-independent-verify": "tsx ./src/phase4-independent-verification.ts",
+    "test:system-certification-audit": "tsx ./src/system-certification-audit.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
