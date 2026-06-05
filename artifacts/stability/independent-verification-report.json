@@ -1,0 +1,67 @@
+{
+  "generatedAt": "2026-06-05T11:58:25.929445+00:00",
+  "reviewerMode": "independent-fresh-pass",
+  "frozenHarness": {
+    "baselineHarnessCommit": "a15ffc4dd292ded4480cb001dbddd6d9a83a436e",
+    "baselineHarnessHash": "e3d81881b739a1a0ddfd0fb172966ab38e8c568a62eea646ea01accd1348d4ab",
+    "currentHarnessHash": "e3d81881b739a1a0ddfd0fb172966ab38e8c568a62eea646ea01accd1348d4ab",
+    "matchesBaselineHash": true
+  },
+  "databaseSnapshot": {
+    "baselineSnapshotId": "55a35ca83f7704ea162ca5cbfd9da9d2de8fe97117779cbaa27597305ccbc639",
+    "currentSnapshotId": "2a1486fc7a4c5e8dd52ece0445ee1ccbc081f88774e5fd3d250fdb689b431642",
+    "matchesBaselineSnapshot": false,
+    "baselineFingerprint": {
+      "orgCount": 25,
+      "orgEventsCount": 310,
+      "orgEventsHash": "d73e6357af4dce3352794490b72f836c",
+      "positionsHash": "a53ff02519e2096d90ee175355d38406",
+      "assignmentsHash": "64d34fb0abf069b9edb27fcd0e4767ef",
+      "evidenceByAssignmentHash": "27d07e51df9f75db3c6f84a58fadb2fe",
+      "evidenceByPositionHash": "72370e509bf56be9453acaf29ed23761",
+      "compensationCurrentHash": "57534677080e5e0b1effbdbc57b6134a"
+    },
+    "currentFingerprint": {
+      "orgCount": 53,
+      "orgEventsCount": 845,
+      "orgEventsHash": "29eb658b3875f3d7ca57552e2ed8f5d9",
+      "positionsHash": "7f077b6b463bf76f37ae7067631b9a21",
+      "assignmentsHash": "4ef127d2b0e4996d1cd2acd62c892e3b",
+      "evidenceByAssignmentHash": "a6b75c085db0a5376be948688e1bc8d5",
+      "evidenceByPositionHash": "b37f46098f30a3cc7e35bb8c83ab2145",
+      "compensationCurrentHash": "5f913da16cd7f67c23f6120cdaf9b355"
+    }
+  },
+  "rerunCommands": [
+    "pnpm --filter @workspace/api-server test:system-certification-audit",
+    "pnpm --filter @workspace/api-server exec tsx ./src/stability-closure1-replay.ts",
+    "pnpm --filter @workspace/api-server test:stability-closure3",
+    "pnpm --filter @workspace/api-server test:stability-closure4"
+  ],
+  "results": {
+    "sections": {
+      "A": true,
+      "B": true,
+      "C": true,
+      "D": true,
+      "E": true,
+      "F": true,
+      "G": true,
+      "H": true
+    },
+    "A_PASS": true,
+    "B_PASS": true,
+    "C_PASS": true,
+    "D_PASS": true,
+    "E_PASS": true,
+    "F_PASS": true,
+    "G_PASS": true,
+    "H_PASS": true,
+    "replayMismatchedOrgs": 0,
+    "globalMismatchedOrgs": 0,
+    "repairFailures": 0,
+    "outboxDivergences": 0,
+    "projectorCrashes": 0
+  },
+  "hashManifestFile": "artifacts/stability/independent-verification-hash-manifest.json"
+}
