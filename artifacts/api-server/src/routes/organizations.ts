@@ -49,6 +49,16 @@ import {
   ResetOrganizationDemoStateResponse,
   ListPeopleParams,
   ListPeopleResponse,
+  ListAssignmentsParams,
+  ListAssignmentsResponse,
+  StartAssignmentBody,
+  StartAssignmentParams,
+  EndAssignmentBody,
+  EndAssignmentParams,
+  EndAssignmentResponse,
+  TransferAssignmentBody,
+  TransferAssignmentParams,
+  TransferAssignmentResponse,
   ListPoliciesParams,
   ListPoliciesResponse,
   ListPositionsParams,
@@ -85,6 +95,7 @@ import { buildActionService } from "../services/action-service";
 import { buildPolicyService } from "../services/policy-service";
 import { buildOwnershipService } from "../services/ownership-service";
 import { buildDemoService } from "../services/demo-service";
+import { buildAssignmentService } from "../services/assignment-service";
 
 const organizations = buildOrganizationService();
 const teams = buildTeamService();
@@ -94,6 +105,7 @@ const actions = buildActionService();
 const policies = buildPolicyService();
 const ownership = buildOwnershipService();
 const demo = buildDemoService();
+const assignments = buildAssignmentService();
 
 function actorFromReq(req: { actor?: ActorContext }): ActorContext {
   if (!req.actor) {
@@ -338,6 +350,63 @@ router.delete(
     const params = GetPersonParams.parse(req.params);
     await people.delete(actorFromReq(req), params.organizationId, params.personId);
     res.status(204).send();
+  }),
+);
+
+router.get(
+  "/organizations/:organizationId/assignments",
+  asyncHandler(async (req, res) => {
+    const params = ListAssignmentsParams.parse(req.params);
+    const items = await assignments.list(actorFromReq(req), params.organizationId);
+    res.json(ListAssignmentsResponse.parse({ items }));
+  }),
+);
+
+router.post(
+  "/organizations/:organizationId/assignments",
+  asyncHandler(async (req, res) => {
+    const params = StartAssignmentParams.parse(req.params);
+    const body = StartAssignmentBody.parse(req.body);
+    const created = await assignments.start(actorFromReq(req), params.organizationId, {
+      personId: body.personId,
+      positionId: body.positionId,
+      startedAt: body.startedAt?.toISOString(),
+      idempotencyKey: body.idempotencyKey,
+    });
+    res.status(201).json(EndAssignmentResponse.parse(created));
+  }),
+);
+
+router.post(
+  "/organizations/:organizationId/assignments/:assignmentId/end",
+  asyncHandler(async (req, res) => {
+    const params = EndAssignmentParams.parse(req.params);
+    const body = EndAssignmentBody.parse(req.body);
+    const ended = await assignments.end(
+      actorFromReq(req),
+      params.organizationId,
+      params.assignmentId,
+      {
+        endedAt: body.endedAt?.toISOString(),
+        idempotencyKey: body.idempotencyKey,
+      },
+    );
+    res.json(EndAssignmentResponse.parse(ended));
+  }),
+);
+
+router.post(
+  "/organizations/:organizationId/assignments/transfer",
+  asyncHandler(async (req, res) => {
+    const params = TransferAssignmentParams.parse(req.params);
+    const body = TransferAssignmentBody.parse(req.body);
+    const transferred = await assignments.transfer(actorFromReq(req), params.organizationId, {
+      personId: body.personId,
+      toPositionId: body.toPositionId,
+      effectiveAt: body.effectiveAt?.toISOString(),
+      idempotencyKey: body.idempotencyKey,
+    });
+    res.json(TransferAssignmentResponse.parse(transferred));
   }),
 );
 

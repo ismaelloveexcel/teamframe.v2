@@ -25,6 +25,9 @@ import type {
   ActionDetailsUpdateRequest,
   ActionStatusTransitionRequest,
   AssignOwnershipRequest,
+  AssignmentCollection,
+  AssignmentCommandResult,
+  AssignmentTransferResult,
   CreateActionRequest,
   CreateOrganizationRequest,
   CreatePersonRequest,
@@ -32,6 +35,7 @@ import type {
   CreatePositionRequest,
   CreateTeamRequest,
   DemoResetResponse,
+  EndAssignmentRequest,
   ErrorResponse,
   HealthStatus,
   Organization,
@@ -47,10 +51,12 @@ import type {
   PositionExecutionSummary,
   PositionOwnership,
   PositionOwnershipCollection,
+  StartAssignmentRequest,
   Team,
   TeamCollection,
   TeamOwnership,
   TeamOwnershipCollection,
+  TransferAssignmentRequest,
   UpdatePersonRequest,
   UpdatePositionRequest,
   UpdateTeamRequest
@@ -1506,7 +1512,7 @@ export const getListPeopleUrl = (organizationId: string,) => {
 }
 
 /**
- * @summary List people for an organization
+ * @summary List employees for an organization
  */
 export const listPeople = async (organizationId: string, options?: RequestInit): Promise<PeopleCollection> => {
 
@@ -1553,7 +1559,7 @@ export type ListPeopleQueryError = ErrorType<unknown>
 
 
 /**
- * @summary List people for an organization
+ * @summary List employees for an organization
  */
 
 export function useListPeople<TData = Awaited<ReturnType<typeof listPeople>>, TError = ErrorType<unknown>>(
@@ -1583,7 +1589,7 @@ export const getCreatePersonUrl = (organizationId: string,) => {
 }
 
 /**
- * @summary Create person
+ * @summary Create employee profile
  */
 export const createPerson = async (organizationId: string,
     createPersonRequest: CreatePersonRequest, options?: RequestInit): Promise<Person> => {
@@ -1633,7 +1639,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type CreatePersonMutationError = ErrorType<unknown>
 
     /**
- * @summary Create person
+ * @summary Create employee profile
  */
 export const useCreatePerson = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof createPerson>>, TError,{organizationId: string;data: BodyType<CreatePersonRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -1656,7 +1662,7 @@ export const getGetPersonUrl = (organizationId: string,
 }
 
 /**
- * @summary Get person
+ * @summary Get employee profile
  */
 export const getPerson = async (organizationId: string,
     personId: string, options?: RequestInit): Promise<Person> => {
@@ -1706,7 +1712,7 @@ export type GetPersonQueryError = ErrorType<unknown>
 
 
 /**
- * @summary Get person
+ * @summary Get employee profile
  */
 
 export function useGetPerson<TData = Awaited<ReturnType<typeof getPerson>>, TError = ErrorType<unknown>>(
@@ -1738,7 +1744,7 @@ export const getUpdatePersonUrl = (organizationId: string,
 }
 
 /**
- * @summary Update person
+ * @summary Update employee profile
  */
 export const updatePerson = async (organizationId: string,
     personId: string,
@@ -1789,7 +1795,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type UpdatePersonMutationError = ErrorType<unknown>
 
     /**
- * @summary Update person
+ * @summary Update employee profile
  */
 export const useUpdatePerson = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof updatePerson>>, TError,{organizationId: string;personId: string;data: BodyType<UpdatePersonRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -1812,7 +1818,7 @@ export const getDeletePersonUrl = (organizationId: string,
 }
 
 /**
- * @summary Delete person
+ * @summary Delete employee profile
  */
 export const deletePerson = async (organizationId: string,
     personId: string, options?: RequestInit): Promise<void> => {
@@ -1861,7 +1867,7 @@ const {mutation: mutationOptions, request: requestOptions} = options ?
     export type DeletePersonMutationError = ErrorType<unknown>
 
     /**
- * @summary Delete person
+ * @summary Delete employee profile
  */
 export const useDeletePerson = <TError = ErrorType<unknown>,
     TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof deletePerson>>, TError,{organizationId: string;personId: string}, TContext>, request?: SecondParameter<typeof customFetch>}
@@ -1872,6 +1878,301 @@ export const useDeletePerson = <TError = ErrorType<unknown>,
         TContext
       > => {
       return useMutation(getDeletePersonMutationOptions(options));
+    }
+
+export const getListAssignmentsUrl = (organizationId: string,) => {
+
+
+
+
+  return `/api/organizations/${organizationId}/assignments`
+}
+
+/**
+ * @summary List assignment projections for an organization
+ */
+export const listAssignments = async (organizationId: string, options?: RequestInit): Promise<AssignmentCollection> => {
+
+  return customFetch<AssignmentCollection>(getListAssignmentsUrl(organizationId),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+
+
+export const getListAssignmentsQueryKey = (organizationId: string,) => {
+    return [
+    `/api/organizations/${organizationId}/assignments`
+    ] as const;
+    }
+
+
+export const getListAssignmentsQueryOptions = <TData = Awaited<ReturnType<typeof listAssignments>>, TError = ErrorType<unknown>>(organizationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAssignments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+) => {
+
+const {query: queryOptions, request: requestOptions} = options ?? {};
+
+  const queryKey =  queryOptions?.queryKey ?? getListAssignmentsQueryKey(organizationId);
+
+
+
+    const queryFn: QueryFunction<Awaited<ReturnType<typeof listAssignments>>> = ({ signal }) => listAssignments(organizationId, { signal, ...requestOptions });
+
+
+
+
+
+   return  { queryKey, queryFn, enabled: !!(organizationId), ...queryOptions} as UseQueryOptions<Awaited<ReturnType<typeof listAssignments>>, TError, TData> & { queryKey: QueryKey }
+}
+
+export type ListAssignmentsQueryResult = NonNullable<Awaited<ReturnType<typeof listAssignments>>>
+export type ListAssignmentsQueryError = ErrorType<unknown>
+
+
+/**
+ * @summary List assignment projections for an organization
+ */
+
+export function useListAssignments<TData = Awaited<ReturnType<typeof listAssignments>>, TError = ErrorType<unknown>>(
+ organizationId: string, options?: { query?:UseQueryOptions<Awaited<ReturnType<typeof listAssignments>>, TError, TData>, request?: SecondParameter<typeof customFetch>}
+
+ ):  UseQueryResult<TData, TError> & { queryKey: QueryKey } {
+
+  const queryOptions = getListAssignmentsQueryOptions(organizationId,options)
+
+  const query = useQuery(queryOptions) as  UseQueryResult<TData, TError> & { queryKey: QueryKey };
+
+  return { ...query, queryKey: queryOptions.queryKey };
+}
+
+
+
+
+
+
+
+export const getStartAssignmentUrl = (organizationId: string,) => {
+
+
+
+
+  return `/api/organizations/${organizationId}/assignments`
+}
+
+/**
+ * @summary Assign employee to position
+ */
+export const startAssignment = async (organizationId: string,
+    startAssignmentRequest: StartAssignmentRequest, options?: RequestInit): Promise<AssignmentCommandResult> => {
+
+  return customFetch<AssignmentCommandResult>(getStartAssignmentUrl(organizationId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      startAssignmentRequest,)
+  }
+);}
+
+
+
+
+export const getStartAssignmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startAssignment>>, TError,{organizationId: string;data: BodyType<StartAssignmentRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof startAssignment>>, TError,{organizationId: string;data: BodyType<StartAssignmentRequest>}, TContext> => {
+
+const mutationKey = ['startAssignment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof startAssignment>>, {organizationId: string;data: BodyType<StartAssignmentRequest>}> = (props) => {
+          const {organizationId,data} = props ?? {};
+
+          return  startAssignment(organizationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type StartAssignmentMutationResult = NonNullable<Awaited<ReturnType<typeof startAssignment>>>
+    export type StartAssignmentMutationBody = BodyType<StartAssignmentRequest>
+    export type StartAssignmentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Assign employee to position
+ */
+export const useStartAssignment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof startAssignment>>, TError,{organizationId: string;data: BodyType<StartAssignmentRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof startAssignment>>,
+        TError,
+        {organizationId: string;data: BodyType<StartAssignmentRequest>},
+        TContext
+      > => {
+      return useMutation(getStartAssignmentMutationOptions(options));
+    }
+
+export const getEndAssignmentUrl = (organizationId: string,
+    assignmentId: string,) => {
+
+
+
+
+  return `/api/organizations/${organizationId}/assignments/${assignmentId}/end`
+}
+
+/**
+ * @summary Vacate assignment
+ */
+export const endAssignment = async (organizationId: string,
+    assignmentId: string,
+    endAssignmentRequest: EndAssignmentRequest, options?: RequestInit): Promise<AssignmentCommandResult> => {
+
+  return customFetch<AssignmentCommandResult>(getEndAssignmentUrl(organizationId,assignmentId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      endAssignmentRequest,)
+  }
+);}
+
+
+
+
+export const getEndAssignmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof endAssignment>>, TError,{organizationId: string;assignmentId: string;data: BodyType<EndAssignmentRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof endAssignment>>, TError,{organizationId: string;assignmentId: string;data: BodyType<EndAssignmentRequest>}, TContext> => {
+
+const mutationKey = ['endAssignment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof endAssignment>>, {organizationId: string;assignmentId: string;data: BodyType<EndAssignmentRequest>}> = (props) => {
+          const {organizationId,assignmentId,data} = props ?? {};
+
+          return  endAssignment(organizationId,assignmentId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type EndAssignmentMutationResult = NonNullable<Awaited<ReturnType<typeof endAssignment>>>
+    export type EndAssignmentMutationBody = BodyType<EndAssignmentRequest>
+    export type EndAssignmentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Vacate assignment
+ */
+export const useEndAssignment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof endAssignment>>, TError,{organizationId: string;assignmentId: string;data: BodyType<EndAssignmentRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof endAssignment>>,
+        TError,
+        {organizationId: string;assignmentId: string;data: BodyType<EndAssignmentRequest>},
+        TContext
+      > => {
+      return useMutation(getEndAssignmentMutationOptions(options));
+    }
+
+export const getTransferAssignmentUrl = (organizationId: string,) => {
+
+
+
+
+  return `/api/organizations/${organizationId}/assignments/transfer`
+}
+
+/**
+ * @summary Reassign employee to a new position
+ */
+export const transferAssignment = async (organizationId: string,
+    transferAssignmentRequest: TransferAssignmentRequest, options?: RequestInit): Promise<AssignmentTransferResult> => {
+
+  return customFetch<AssignmentTransferResult>(getTransferAssignmentUrl(organizationId),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...options?.headers },
+    body: JSON.stringify(
+      transferAssignmentRequest,)
+  }
+);}
+
+
+
+
+export const getTransferAssignmentMutationOptions = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferAssignment>>, TError,{organizationId: string;data: BodyType<TransferAssignmentRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+): UseMutationOptions<Awaited<ReturnType<typeof transferAssignment>>, TError,{organizationId: string;data: BodyType<TransferAssignmentRequest>}, TContext> => {
+
+const mutationKey = ['transferAssignment'];
+const {mutation: mutationOptions, request: requestOptions} = options ?
+      options.mutation && 'mutationKey' in options.mutation && options.mutation.mutationKey ?
+      options
+      : {...options, mutation: {...options.mutation, mutationKey}}
+      : {mutation: { mutationKey, }, request: undefined};
+
+
+
+
+      const mutationFn: MutationFunction<Awaited<ReturnType<typeof transferAssignment>>, {organizationId: string;data: BodyType<TransferAssignmentRequest>}> = (props) => {
+          const {organizationId,data} = props ?? {};
+
+          return  transferAssignment(organizationId,data,requestOptions)
+        }
+
+
+
+
+
+
+  return  { mutationFn, ...mutationOptions }}
+
+    export type TransferAssignmentMutationResult = NonNullable<Awaited<ReturnType<typeof transferAssignment>>>
+    export type TransferAssignmentMutationBody = BodyType<TransferAssignmentRequest>
+    export type TransferAssignmentMutationError = ErrorType<unknown>
+
+    /**
+ * @summary Reassign employee to a new position
+ */
+export const useTransferAssignment = <TError = ErrorType<unknown>,
+    TContext = unknown>(options?: { mutation?:UseMutationOptions<Awaited<ReturnType<typeof transferAssignment>>, TError,{organizationId: string;data: BodyType<TransferAssignmentRequest>}, TContext>, request?: SecondParameter<typeof customFetch>}
+ ): UseMutationResult<
+        Awaited<ReturnType<typeof transferAssignment>>,
+        TError,
+        {organizationId: string;data: BodyType<TransferAssignmentRequest>},
+        TContext
+      > => {
+      return useMutation(getTransferAssignmentMutationOptions(options));
     }
 
 export const getListActionsUrl = (organizationId: string,) => {

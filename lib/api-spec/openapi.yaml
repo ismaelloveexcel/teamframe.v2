@@ -18,6 +18,8 @@ tags:
     description: Position and reporting structure operations
   - name: people
     description: People directory operations
+  - name: assignments
+    description: Assignment command operations
   - name: ownership
     description: Explicit ownership assignment operations
   - name: actions
@@ -350,7 +352,7 @@ paths:
     get:
       operationId: listPeople
       tags: [people]
-      summary: List people for an organization
+      summary: List employees for an organization
       parameters:
         - $ref: "#/components/parameters/OrganizationIdParam"
       responses:
@@ -363,7 +365,7 @@ paths:
     post:
       operationId: createPerson
       tags: [people]
-      summary: Create person
+      summary: Create employee profile
       parameters:
         - $ref: "#/components/parameters/OrganizationIdParam"
       requestBody:
@@ -384,7 +386,7 @@ paths:
     get:
       operationId: getPerson
       tags: [people]
-      summary: Get person
+      summary: Get employee profile
       parameters:
         - $ref: "#/components/parameters/OrganizationIdParam"
         - $ref: "#/components/parameters/PersonIdParam"
@@ -398,7 +400,7 @@ paths:
     patch:
       operationId: updatePerson
       tags: [people]
-      summary: Update person
+      summary: Update employee profile
       parameters:
         - $ref: "#/components/parameters/OrganizationIdParam"
         - $ref: "#/components/parameters/PersonIdParam"
@@ -418,13 +420,90 @@ paths:
     delete:
       operationId: deletePerson
       tags: [people]
-      summary: Delete person
+      summary: Delete employee profile
       parameters:
         - $ref: "#/components/parameters/OrganizationIdParam"
         - $ref: "#/components/parameters/PersonIdParam"
       responses:
         "204":
           description: Person deleted
+
+  /organizations/{organizationId}/assignments:
+    get:
+      operationId: listAssignments
+      tags: [assignments]
+      summary: List assignment projections for an organization
+      parameters:
+        - $ref: "#/components/parameters/OrganizationIdParam"
+      responses:
+        "200":
+          description: Assignments
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentCollection"
+    post:
+      operationId: startAssignment
+      tags: [assignments]
+      summary: Assign employee to position
+      parameters:
+        - $ref: "#/components/parameters/OrganizationIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/StartAssignmentRequest"
+      responses:
+        "201":
+          description: Assignment started
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentCommandResult"
+
+  /organizations/{organizationId}/assignments/{assignmentId}/end:
+    post:
+      operationId: endAssignment
+      tags: [assignments]
+      summary: Vacate assignment
+      parameters:
+        - $ref: "#/components/parameters/OrganizationIdParam"
+        - $ref: "#/components/parameters/AssignmentIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/EndAssignmentRequest"
+      responses:
+        "200":
+          description: Assignment ended
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentCommandResult"
+
+  /organizations/{organizationId}/assignments/transfer:
+    post:
+      operationId: transferAssignment
+      tags: [assignments]
+      summary: Reassign employee to a new position
+      parameters:
+        - $ref: "#/components/parameters/OrganizationIdParam"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/TransferAssignmentRequest"
+      responses:
+        "200":
+          description: Assignment transferred
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/AssignmentTransferResult"
 
   /organizations/{organizationId}/actions:
     get:
@@ -713,6 +792,13 @@ components:
       schema:
         type: string
         format: uuid
+    AssignmentIdParam:
+      name: assignmentId
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
     ActionIdParam:
       name: actionId
       in: path
@@ -768,6 +854,9 @@ components:
     PositionLifecycleStatus:
       type: string
       enum: [filled, vacant, frozen]
+    AssignmentStatus:
+      type: string
+      enum: [active, ended]
     PolicyScope:
       type: string
       enum: [organization, team, position]
@@ -952,10 +1041,6 @@ components:
         phone:
           type: string
           nullable: true
-        positionId:
-          type: string
-          format: uuid
-          nullable: true
         employmentStatus:
           $ref: "#/components/schemas/EmploymentStatus"
         createdAt:
@@ -984,9 +1069,6 @@ components:
           format: email
         phone:
           type: string
-        positionId:
-          type: string
-          format: uuid
         employmentStatus:
           $ref: "#/components/schemas/EmploymentStatus"
       required: [fullName]
@@ -1004,10 +1086,6 @@ components:
         phone:
           type: string
           nullable: true
-        positionId:
-          type: string
-          format: uuid
-          nullable: true
         employmentStatus:
           $ref: "#/components/schemas/EmploymentStatus"
     PeopleCollection:
@@ -1018,6 +1096,117 @@ components:
           items:
             $ref: "#/components/schemas/Person"
       required: [items]
+    Assignment:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        organizationId:
+          type: string
+          format: uuid
+        personId:
+          type: string
+          format: uuid
+        positionId:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
+        endedAt:
+          type: string
+          format: date-time
+          nullable: true
+        status:
+          $ref: "#/components/schemas/AssignmentStatus"
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+      required:
+        [
+          id,
+          organizationId,
+          personId,
+          positionId,
+          startedAt,
+          status,
+          createdAt,
+          updatedAt,
+        ]
+    AssignmentCollection:
+      type: object
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Assignment"
+      required: [items]
+    AssignmentCommandResult:
+      type: object
+      properties:
+        assignment:
+          $ref: "#/components/schemas/Assignment"
+        replayed:
+          type: boolean
+      required: [assignment, replayed]
+    AssignmentTransferResult:
+      type: object
+      properties:
+        assignment:
+          $ref: "#/components/schemas/Assignment"
+        endedAssignmentId:
+          type: string
+          format: uuid
+          nullable: true
+        replayed:
+          type: boolean
+      required: [assignment, replayed]
+    StartAssignmentRequest:
+      type: object
+      properties:
+        personId:
+          type: string
+          format: uuid
+        positionId:
+          type: string
+          format: uuid
+        startedAt:
+          type: string
+          format: date-time
+        idempotencyKey:
+          type: string
+          minLength: 8
+      required: [personId, positionId, idempotencyKey]
+    EndAssignmentRequest:
+      type: object
+      properties:
+        endedAt:
+          type: string
+          format: date-time
+        idempotencyKey:
+          type: string
+          minLength: 8
+      required: [idempotencyKey]
+    TransferAssignmentRequest:
+      type: object
+      properties:
+        personId:
+          type: string
+          format: uuid
+        toPositionId:
+          type: string
+          format: uuid
+        effectiveAt:
+          type: string
+          format: date-time
+        idempotencyKey:
+          type: string
+          minLength: 8
+      required: [personId, toPositionId, idempotencyKey]
     OwnershipAssignmentInput:
       type: object
       properties:

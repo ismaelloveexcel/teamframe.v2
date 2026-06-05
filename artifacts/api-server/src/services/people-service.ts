@@ -1,5 +1,5 @@
 import type { ActorContext } from "../lib/request-context";
-import { badRequest, notFound } from "../lib/http-error";
+import { notFound } from "../lib/http-error";
 import { OrganizationAccessControl } from "../access/organization-access";
 import {
   ActionRepository,
@@ -7,14 +7,12 @@ import {
   OrganizationRepository,
   PeopleRepository,
   PersonPositionAssignmentRepository,
-  PositionRepository,
 } from "../persistence/repositories";
 
 export class PeopleService {
   constructor(
     private readonly access: OrganizationAccessControl,
     private readonly people: PeopleRepository,
-    private readonly positions: PositionRepository,
     private readonly actions: ActionRepository,
     private readonly assignments: PersonPositionAssignmentRepository,
   ) {}
@@ -38,15 +36,10 @@ export class PeopleService {
       fullName: string;
       email?: string;
       phone?: string;
-      positionId?: string;
       employmentStatus?: "active" | "on_leave" | "offboarding";
     },
   ) {
     await this.access.requireMembership(organizationId, actor.userId, "admin");
-    if (input.positionId) {
-      const position = await this.positions.getById(organizationId, input.positionId);
-      if (!position) badRequest("positionId must belong to the same organization");
-    }
     return this.people.create(organizationId, input);
   }
 
@@ -58,15 +51,10 @@ export class PeopleService {
       fullName?: string;
       email?: string | null;
       phone?: string | null;
-      positionId?: string | null;
       employmentStatus?: "active" | "on_leave" | "offboarding";
     },
   ) {
     await this.access.requireMembership(organizationId, actor.userId, "admin");
-    if (typeof input.positionId !== "undefined" && input.positionId !== null) {
-      const position = await this.positions.getById(organizationId, input.positionId);
-      if (!position) badRequest("positionId must belong to the same organization");
-    }
     const person = await this.people.update(organizationId, personId, input);
     if (!person) notFound("Person not found");
     return person;
@@ -99,7 +87,6 @@ export function buildPeopleService() {
   return new PeopleService(
     access,
     new PeopleRepository(),
-    new PositionRepository(),
     new ActionRepository(),
     new PersonPositionAssignmentRepository(),
   );

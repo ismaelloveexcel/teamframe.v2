@@ -12,6 +12,5 @@ export interface CreatePersonRequest {
   fullName: string;
   email?: string;
   phone?: string;
-  positionId?: string;
   employmentStatus?: EmploymentStatus;
 }

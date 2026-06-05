@@ -364,7 +364,6 @@ export class PeopleRepository {
       fullName: string;
       email?: string;
       phone?: string;
-      positionId?: string;
       employmentStatus?: "active" | "on_leave" | "offboarding";
     },
   ) {
@@ -375,7 +374,6 @@ export class PeopleRepository {
         fullName: input.fullName,
         email: input.email ?? null,
         phone: input.phone ?? null,
-        positionId: input.positionId ?? null,
         employmentStatus: input.employmentStatus ?? "active",
         updatedAt: new Date(),
       })
@@ -390,7 +388,6 @@ export class PeopleRepository {
       fullName?: string;
       email?: string | null;
       phone?: string | null;
-      positionId?: string | null;
       employmentStatus?: "active" | "on_leave" | "offboarding";
     },
   ) {
@@ -400,7 +397,6 @@ export class PeopleRepository {
     if (typeof input.fullName !== "undefined") setValues.fullName = input.fullName;
     if (typeof input.email !== "undefined") setValues.email = input.email;
     if (typeof input.phone !== "undefined") setValues.phone = input.phone;
-    if (typeof input.positionId !== "undefined") setValues.positionId = input.positionId;
     if (typeof input.employmentStatus !== "undefined") {
       setValues.employmentStatus = input.employmentStatus;
     }
@@ -423,6 +419,13 @@ export class PeopleRepository {
 }
 
 export class PersonPositionAssignmentRepository {
+  async listByOrganization(organizationId: string) {
+    return db
+      .select()
+      .from(personPositionAssignmentsTable)
+      .where(eq(personPositionAssignmentsTable.organizationId, organizationId));
+  }
+
   async getById(organizationId: string, assignmentId: string) {
     const [assignment] = await db
       .select()
@@ -449,6 +452,69 @@ export class PersonPositionAssignmentRepository {
         ),
       )
       .limit(1);
+    return assignment ?? null;
+  }
+
+  async getActiveByPositionId(organizationId: string, positionId: string) {
+    const [assignment] = await db
+      .select()
+      .from(personPositionAssignmentsTable)
+      .where(
+        and(
+          eq(personPositionAssignmentsTable.organizationId, organizationId),
+          eq(personPositionAssignmentsTable.positionId, positionId),
+          eq(personPositionAssignmentsTable.status, "active"),
+        ),
+      )
+      .limit(1);
+    return assignment ?? null;
+  }
+
+  async create(
+    organizationId: string,
+    input: {
+      personId: string;
+      positionId: string;
+      startedAt: Date;
+    },
+  ) {
+    const [assignment] = await db
+      .insert(personPositionAssignmentsTable)
+      .values({
+        organizationId,
+        personId: input.personId,
+        positionId: input.positionId,
+        startedAt: input.startedAt,
+        status: "active",
+        updatedAt: new Date(),
+      })
+      .returning();
+
+    return assignment;
+  }
+
+  async end(
+    organizationId: string,
+    assignmentId: string,
+    input: {
+      endedAt: Date;
+    },
+  ) {
+    const [assignment] = await db
+      .update(personPositionAssignmentsTable)
+      .set({
+        status: "ended",
+        endedAt: input.endedAt,
+        updatedAt: new Date(),
+      })
+      .where(
+        and(
+          eq(personPositionAssignmentsTable.organizationId, organizationId),
+          eq(personPositionAssignmentsTable.id, assignmentId),
+        ),
+      )
+      .returning();
+
     return assignment ?? null;
   }
 

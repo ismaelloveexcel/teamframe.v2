@@ -27,12 +27,16 @@ import {
   listPositions,
   listTeamOwnerships,
   listTeams,
+  listAssignments,
+  startAssignment,
+  endAssignment,
+  transferAssignment,
   resetOrganizationDemoState,
   setBaseUrl,
   transitionActionStatus,
-  updatePerson,
   updatePosition,
   type Action,
+  type Assignment,
   type Person,
   type Policy,
   type Position,
@@ -119,6 +123,14 @@ function defaultOrgSlug(): string {
   return `teamframe-v1-${Date.now()}`;
 }
 
+function createIdempotencyKey(prefix: string): string {
+  const nonce =
+    typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.randomUUID === "function"
+      ? globalThis.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${prefix}-${nonce}`;
+}
+
 function initials(fullName: string): string {
   const parts = fullName
     .split(" ")
@@ -172,7 +184,8 @@ type LocalDemoState = {
   organizationId: string;
   teams: Team[];
   positions: Position[];
-  people: Person[];
+  people: Array<Person & { positionId?: string | null }>;
+  assignments: Assignment[];
   actions: Action[];
   policies: Policy[];
   teamOwnerships: TeamOwnership[];
@@ -503,6 +516,96 @@ const LOCAL_DEMO_STATE: LocalDemoState = {
       updatedAt: "2026-01-01T00:00:00.000Z",
     },
   ],
+  assignments: [
+    {
+      id: "31000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000001",
+      positionId: "20000000-0000-4000-8000-000000000001",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000002",
+      positionId: "20000000-0000-4000-8000-000000000002",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000003",
+      positionId: "20000000-0000-4000-8000-000000000003",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000004",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000004",
+      positionId: "20000000-0000-4000-8000-000000000004",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000005",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000005",
+      positionId: "20000000-0000-4000-8000-000000000005",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000006",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000006",
+      positionId: "20000000-0000-4000-8000-000000000006",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000007",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000007",
+      positionId: "20000000-0000-4000-8000-000000000007",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000008",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000008",
+      positionId: "20000000-0000-4000-8000-000000000008",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
   teamOwnerships: [
     {
       id: "40000000-0000-4000-8000-000000000001",
@@ -688,6 +791,7 @@ function cloneLocalDemoState(): LocalDemoState {
     teams: LOCAL_DEMO_STATE.teams.map((item) => ({ ...item })),
     positions: LOCAL_DEMO_STATE.positions.map((item) => ({ ...item })),
     people: LOCAL_DEMO_STATE.people.map((item) => ({ ...item })),
+    assignments: LOCAL_DEMO_STATE.assignments.map((item) => ({ ...item })),
     actions: LOCAL_DEMO_STATE.actions.map((item) => ({ ...item })),
     policies: LOCAL_DEMO_STATE.policies.map((item) => ({ ...item })),
     teamOwnerships: LOCAL_DEMO_STATE.teamOwnerships.map((item) => ({ ...item })),
@@ -714,7 +818,8 @@ export function TeamFrame() {
 
   const [teams, setTeams] = useState<Team[]>([]);
   const [positions, setPositions] = useState<Position[]>([]);
-  const [people, setPeople] = useState<Person[]>([]);
+  const [people, setPeople] = useState<Array<Person & { positionId?: string | null }>>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [actions, setActions] = useState<Action[]>([]);
   const [policies, setPolicies] = useState<Policy[]>([]);
   const [teamOwnerships, setTeamOwnerships] = useState<TeamOwnership[]>([]);
@@ -807,32 +912,46 @@ export function TeamFrame() {
     return map;
   }, [positions]);
 
+  const activeAssignments = useMemo(
+    () => assignments.filter((item) => item.status === "active"),
+    [assignments],
+  );
+
+  const activeAssignmentByPersonId = useMemo(() => {
+    const map = new Map<string, Assignment>();
+    for (const assignment of activeAssignments) {
+      map.set(assignment.personId, assignment);
+    }
+    return map;
+  }, [activeAssignments]);
+
   const peopleByPosition = useMemo(() => {
     const map = new Map<string, Person[]>();
-    for (const person of people) {
-      if (!person.positionId) continue;
-      const bucket = map.get(person.positionId) ?? [];
+    for (const assignment of activeAssignments) {
+      const person = personMap.get(assignment.personId);
+      if (!person) continue;
+      const bucket = map.get(assignment.positionId) ?? [];
       bucket.push(person);
-      map.set(person.positionId, bucket);
+      map.set(assignment.positionId, bucket);
     }
     return map;
-  }, [people]);
+  }, [activeAssignments, personMap]);
 
   const positionAssignmentById = useMemo(() => {
-    const map = new Map<string, { person: Person; runtime: AssignmentRuntime }>();
-    for (const [positionId, assignedPeople] of peopleByPosition.entries()) {
-      const person = assignedPeople[0];
+    const map = new Map<string, { person: Person; assignment: Assignment; runtime: AssignmentRuntime }>();
+    for (const assignment of activeAssignments) {
+      const person = personMap.get(assignment.personId);
       if (!person) continue;
-      const runtime = assignmentRuntimeByPosition[positionId] ?? {
-        status: "active",
-        startDate: formatDateLabel(person.createdAt),
-        endDate: "",
+      const runtime = assignmentRuntimeByPosition[assignment.positionId] ?? {
+        status: assignment.status,
+        startDate: formatDateLabel(assignment.startedAt?.toString()),
+        endDate: formatDateLabel(assignment.endedAt?.toString() ?? ""),
         actualSalary: "",
       };
-      map.set(positionId, { person, runtime });
+      map.set(assignment.positionId, { person, assignment, runtime });
     }
     return map;
-  }, [assignmentRuntimeByPosition, peopleByPosition]);
+  }, [activeAssignments, assignmentRuntimeByPosition, personMap]);
 
   const positionActionStats = useMemo(() => {
     const map = new Map<string, { open: number; overdue: number; blocked: number }>();
@@ -1070,6 +1189,7 @@ export function TeamFrame() {
     setTeams(snapshot.teams);
     setPositions(snapshot.positions);
     setPeople(snapshot.people);
+    setAssignments(snapshot.assignments);
     setActions(snapshot.actions);
     setPolicies(snapshot.policies);
     setTeamOwnerships(snapshot.teamOwnerships);
@@ -1083,7 +1203,7 @@ export function TeamFrame() {
     setIsLocalDemoMode(true);
     setError(message);
     setDemoResetSummary(
-      `Local demo snapshot loaded: ${snapshot.teams.length} teams, ${snapshot.positions.length} positions, ${snapshot.people.length} people, ${snapshot.actions.length} actions, ${snapshot.policies.length} policies.`,
+      `Local demo snapshot loaded: ${snapshot.teams.length} teams, ${snapshot.positions.length} positions, ${snapshot.people.length} people, ${snapshot.assignments.length} assignments, ${snapshot.actions.length} actions, ${snapshot.policies.length} policies.`,
     );
   }
 
@@ -1135,11 +1255,12 @@ export function TeamFrame() {
   }
 
   async function loadOrganizationState(targetOrganizationId: string) {
-    const [teamData, positionData, peopleData, actionData, policyData, teamOwnerData, positionOwnerData] =
+    const [teamData, positionData, peopleData, assignmentData, actionData, policyData, teamOwnerData, positionOwnerData] =
       await Promise.all([
         executeApiCall("Load teams", (options) => listTeams(targetOrganizationId, options)),
         executeApiCall("Load positions", (options) => listPositions(targetOrganizationId, options)),
         executeApiCall("Load people", (options) => listPeople(targetOrganizationId, options)),
+        executeApiCall("Load assignments", (options) => listAssignments(targetOrganizationId, options)),
         executeApiCall("Load actions", (options) => listActions(targetOrganizationId, options)),
         executeApiCall("Load policies", (options) => listPolicies(targetOrganizationId, options)),
         executeApiCall("Load team ownership", (options) =>
@@ -1154,6 +1275,7 @@ export function TeamFrame() {
       teams: teamData.items,
       positions: positionData.items,
       people: peopleData.items,
+      assignments: assignmentData.items,
       actions: actionData.items,
       policies: policyData.items,
       teamOwnerships: teamOwnerData.items,
@@ -1208,7 +1330,8 @@ export function TeamFrame() {
         await loadOrganizationState(orgId);
       } catch (error) {
         if (!cancelled) {
-          loadLocalDemoSnapshot("API unavailable. Loaded local demo snapshot for visual review.");
+          setError(describeError("Bootstrap", error));
+          setDemoResetSummary("");
         }
       } finally {
         if (!cancelled) setLoading(false);
@@ -1619,43 +1742,49 @@ export function TeamFrame() {
 
     await runMutation(
       async () => {
-        const currentOccupant = positionAssignmentById.get(selectedPositionId)?.person;
-        if (currentOccupant && currentOccupant.id !== assignmentDraftEmployeeId) {
-          await executeApiCall("Unassign current occupant", (options) =>
-            updatePerson(
+        const currentOccupant = positionAssignmentById.get(selectedPositionId);
+        if (currentOccupant && currentOccupant.person.id !== assignmentDraftEmployeeId) {
+          await executeApiCall("Vacate current occupant", (options) =>
+            endAssignment(
               organizationId,
-              currentOccupant.id,
+              currentOccupant.assignment.id,
               {
-                positionId: null,
+                idempotencyKey: createIdempotencyKey("assignment-vacate"),
               },
               options,
             ),
           );
         }
 
-        if (selectedEmployee.positionId && selectedEmployee.positionId !== selectedPositionId) {
-          await executeApiCall("Clear person previous assignment", (options) =>
-            updatePerson(
+        const activePersonAssignment = activeAssignmentByPersonId.get(selectedEmployee.id);
+        if (activePersonAssignment && activePersonAssignment.positionId !== selectedPositionId) {
+          await executeApiCall("Transfer assignment", (options) =>
+            transferAssignment(
               organizationId,
-              selectedEmployee.id,
               {
-                positionId: null,
+                personId: selectedEmployee.id,
+                toPositionId: selectedPositionId,
+                idempotencyKey: createIdempotencyKey("assignment-transfer"),
+              },
+              options,
+            ),
+          );
+          return;
+        }
+
+        if (!activePersonAssignment) {
+          await executeApiCall("Start assignment", (options) =>
+            startAssignment(
+              organizationId,
+              {
+                personId: selectedEmployee.id,
+                positionId: selectedPositionId,
+                idempotencyKey: createIdempotencyKey("assignment-start"),
               },
               options,
             ),
           );
         }
-
-        await executeApiCall("Assign person to position", (options) =>
-          updatePerson(
-            organizationId,
-            selectedEmployee.id,
-            {
-              positionId: selectedPositionId,
-            },
-            options,
-          ),
-        );
       },
       {
         loadingMessage: UI_TERMS.feedback.loading.savingAssignment,
@@ -1677,17 +1806,17 @@ export function TeamFrame() {
 
   async function handleVacateSelectedPosition() {
     if (!organizationId || !selectedPositionId) return;
-    const occupant = positionAssignmentById.get(selectedPositionId)?.person;
+    const occupant = positionAssignmentById.get(selectedPositionId);
     if (!occupant) return;
 
     await runMutation(
       async () => {
         await executeApiCall("Vacate position", (options) =>
-          updatePerson(
+          endAssignment(
             organizationId,
-            occupant.id,
+            occupant.assignment.id,
             {
-              positionId: null,
+              idempotencyKey: createIdempotencyKey("assignment-vacate"),
             },
             options,
           ),
@@ -1767,19 +1896,33 @@ export function TeamFrame() {
     if (!organizationId || !newPersonName.trim()) return;
     await runMutation(
       async () => {
-        await executeApiCall("Create person", (options) =>
+        const created = await executeApiCall("Create person", (options) =>
           createPerson(
             organizationId,
             {
               fullName: newPersonName.trim(),
               email: newPersonEmail || undefined,
               phone: newPersonPhone || undefined,
-              positionId: newPersonPositionId || undefined,
               employmentStatus: newPersonStatus,
             },
             options,
           ),
         );
+
+        if (newPersonPositionId) {
+          await executeApiCall("Start assignment", (options) =>
+            startAssignment(
+              organizationId,
+              {
+                personId: created.id,
+                positionId: newPersonPositionId,
+                idempotencyKey: createIdempotencyKey("assignment-start"),
+              },
+              options,
+            ),
+          );
+        }
+
         setNewPersonName("");
         setNewPersonEmail("");
         setNewPersonPhone("");
@@ -2005,7 +2148,7 @@ export function TeamFrame() {
     if (!organizationId) return;
 
     if (isLocalDemoMode) {
-      loadLocalDemoSnapshot("Local demo snapshot reset for visual review.");
+      setError("Local demo snapshot mode is disabled. Connect API to continue.");
       return;
     }
 
@@ -2045,7 +2188,8 @@ export function TeamFrame() {
 
   function downloadPayrollCsv() {
     const rows = people.map((person) => {
-      const position = person.positionId ? positionMap.get(person.positionId) : null;
+      const assignment = activeAssignmentByPersonId.get(person.id);
+      const position = assignment ? positionMap.get(assignment.positionId) : null;
       const team = position?.teamId ? teamMap.get(position.teamId) : null;
       return [
         person.id,
@@ -2393,7 +2537,7 @@ export function TeamFrame() {
                               No one is assigned to this position yet.
                             </div>
                           ) : null}
-                          {assignmentDraftEmployeeId && !personMap.get(assignmentDraftEmployeeId)?.positionId ? (
+                          {assignmentDraftEmployeeId && !activeAssignmentByPersonId.get(assignmentDraftEmployeeId) ? (
                             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
                               <div style={{ fontSize: 11, color: "#64748B" }}>
                                 This person is not currently assigned to a position.
@@ -2733,7 +2877,8 @@ export function TeamFrame() {
                 </thead>
                 <tbody>
                   {people.map((person) => {
-                    const position = person.positionId ? positionMap.get(person.positionId) : null;
+                    const assignment = activeAssignmentByPersonId.get(person.id);
+                    const position = assignment ? positionMap.get(assignment.positionId) : null;
                     const team = position?.teamId ? teamMap.get(position.teamId) : null;
                     return (
                       <tr key={person.id} style={{ borderBottom: "1px solid #F1F5F9" }}>

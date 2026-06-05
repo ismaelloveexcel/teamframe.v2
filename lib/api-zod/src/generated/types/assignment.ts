@@ -5,15 +5,16 @@
  * API specification
  * OpenAPI spec version: 0.1.0
  */
-import type { EmploymentStatus } from './employmentStatus';
+import type { AssignmentStatus } from './assignmentStatus';
 
-export interface Person {
+export interface Assignment {
   id: string;
   organizationId: string;
-  fullName: string;
-  email?: string | null;
-  phone?: string | null;
-  employmentStatus: EmploymentStatus;
+  personId: string;
+  positionId: string;
+  startedAt: Date;
+  endedAt?: Date | null;
+  status: AssignmentStatus;
   createdAt: Date;
   updatedAt: Date;
 }

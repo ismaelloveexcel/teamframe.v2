@@ -12,6 +12,5 @@ export interface UpdatePersonRequest {
   fullName?: string;
   email?: string | null;
   phone?: string | null;
-  positionId?: string | null;
   employmentStatus?: EmploymentStatus;
 }

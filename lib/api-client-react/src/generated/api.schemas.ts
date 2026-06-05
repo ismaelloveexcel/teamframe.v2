@@ -49,6 +49,14 @@ export const PositionLifecycleStatus = {
   frozen: 'frozen',
 } as const;
 
+export type AssignmentStatus = typeof AssignmentStatus[keyof typeof AssignmentStatus];
+
+
+export const AssignmentStatus = {
+  active: 'active',
+  ended: 'ended',
+} as const;
+
 export type PolicyScope = typeof PolicyScope[keyof typeof PolicyScope];
 
 
@@ -142,7 +150,6 @@ export interface Person {
   fullName: string;
   email?: string | null;
   phone?: string | null;
-  positionId?: string | null;
   employmentStatus: EmploymentStatus;
   createdAt: string;
   updatedAt: string;
@@ -153,7 +160,6 @@ export interface CreatePersonRequest {
   fullName: string;
   email?: string;
   phone?: string;
-  positionId?: string;
   employmentStatus?: EmploymentStatus;
 }
 
@@ -162,12 +168,60 @@ export interface UpdatePersonRequest {
   fullName?: string;
   email?: string | null;
   phone?: string | null;
-  positionId?: string | null;
   employmentStatus?: EmploymentStatus;
 }
 
 export interface PeopleCollection {
   items: Person[];
+}
+
+export interface Assignment {
+  id: string;
+  organizationId: string;
+  personId: string;
+  positionId: string;
+  startedAt: string;
+  endedAt?: string | null;
+  status: AssignmentStatus;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface AssignmentCollection {
+  items: Assignment[];
+}
+
+export interface AssignmentCommandResult {
+  assignment: Assignment;
+  replayed: boolean;
+}
+
+export interface AssignmentTransferResult {
+  assignment: Assignment;
+  endedAssignmentId?: string | null;
+  replayed: boolean;
+}
+
+export interface StartAssignmentRequest {
+  personId: string;
+  positionId: string;
+  startedAt?: string;
+  /** @minLength 8 */
+  idempotencyKey: string;
+}
+
+export interface EndAssignmentRequest {
+  endedAt?: string;
+  /** @minLength 8 */
+  idempotencyKey: string;
+}
+
+export interface TransferAssignmentRequest {
+  personId: string;
+  toPositionId: string;
+  effectiveAt?: string;
+  /** @minLength 8 */
+  idempotencyKey: string;
 }
 
 export type OwnershipAssignmentInput = (unknown & {

@@ -369,7 +369,7 @@ export const ListPositionOwnershipsResponse = zod.object({
 
 
 /**
- * @summary List people for an organization
+ * @summary List employees for an organization
  */
 export const ListPeopleParams = zod.object({
   "organizationId": zod.coerce.string().uuid()
@@ -382,7 +382,6 @@ export const ListPeopleResponse = zod.object({
   "fullName": zod.string(),
   "email": zod.string().email().nullish(),
   "phone": zod.string().nullish(),
-  "positionId": zod.string().uuid().nullish(),
   "employmentStatus": zod.enum(['active', 'on_leave', 'offboarding']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
@@ -391,7 +390,7 @@ export const ListPeopleResponse = zod.object({
 
 
 /**
- * @summary Create person
+ * @summary Create employee profile
  */
 export const CreatePersonParams = zod.object({
   "organizationId": zod.coerce.string().uuid()
@@ -404,13 +403,12 @@ export const CreatePersonBody = zod.object({
   "fullName": zod.string().min(1),
   "email": zod.string().email().optional(),
   "phone": zod.string().optional(),
-  "positionId": zod.string().uuid().optional(),
   "employmentStatus": zod.enum(['active', 'on_leave', 'offboarding']).optional()
 })
 
 
 /**
- * @summary Get person
+ * @summary Get employee profile
  */
 export const GetPersonParams = zod.object({
   "organizationId": zod.coerce.string().uuid(),
@@ -423,7 +421,6 @@ export const GetPersonResponse = zod.object({
   "fullName": zod.string(),
   "email": zod.string().email().nullish(),
   "phone": zod.string().nullish(),
-  "positionId": zod.string().uuid().nullish(),
   "employmentStatus": zod.enum(['active', 'on_leave', 'offboarding']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
@@ -431,7 +428,7 @@ export const GetPersonResponse = zod.object({
 
 
 /**
- * @summary Update person
+ * @summary Update employee profile
  */
 export const UpdatePersonParams = zod.object({
   "organizationId": zod.coerce.string().uuid(),
@@ -445,7 +442,6 @@ export const UpdatePersonBody = zod.object({
   "fullName": zod.string().min(1).optional(),
   "email": zod.string().email().nullish(),
   "phone": zod.string().nullish(),
-  "positionId": zod.string().uuid().nullish(),
   "employmentStatus": zod.enum(['active', 'on_leave', 'offboarding']).optional()
 })
 
@@ -455,7 +451,6 @@ export const UpdatePersonResponse = zod.object({
   "fullName": zod.string(),
   "email": zod.string().email().nullish(),
   "phone": zod.string().nullish(),
-  "positionId": zod.string().uuid().nullish(),
   "employmentStatus": zod.enum(['active', 'on_leave', 'offboarding']),
   "createdAt": zod.coerce.date(),
   "updatedAt": zod.coerce.date()
@@ -463,11 +458,120 @@ export const UpdatePersonResponse = zod.object({
 
 
 /**
- * @summary Delete person
+ * @summary Delete employee profile
  */
 export const DeletePersonParams = zod.object({
   "organizationId": zod.coerce.string().uuid(),
   "personId": zod.coerce.string().uuid()
+})
+
+
+/**
+ * @summary List assignment projections for an organization
+ */
+export const ListAssignmentsParams = zod.object({
+  "organizationId": zod.coerce.string().uuid()
+})
+
+export const ListAssignmentsResponse = zod.object({
+  "items": zod.array(zod.object({
+  "id": zod.string().uuid(),
+  "organizationId": zod.string().uuid(),
+  "personId": zod.string().uuid(),
+  "positionId": zod.string().uuid(),
+  "startedAt": zod.coerce.date(),
+  "endedAt": zod.coerce.date().nullish(),
+  "status": zod.enum(['active', 'ended']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}))
+})
+
+
+/**
+ * @summary Assign employee to position
+ */
+export const StartAssignmentParams = zod.object({
+  "organizationId": zod.coerce.string().uuid()
+})
+
+export const startAssignmentBodyIdempotencyKeyMin = 8;
+
+
+
+export const StartAssignmentBody = zod.object({
+  "personId": zod.string().uuid(),
+  "positionId": zod.string().uuid(),
+  "startedAt": zod.coerce.date().optional(),
+  "idempotencyKey": zod.string().min(startAssignmentBodyIdempotencyKeyMin)
+})
+
+
+/**
+ * @summary Vacate assignment
+ */
+export const EndAssignmentParams = zod.object({
+  "organizationId": zod.coerce.string().uuid(),
+  "assignmentId": zod.coerce.string().uuid()
+})
+
+export const endAssignmentBodyIdempotencyKeyMin = 8;
+
+
+
+export const EndAssignmentBody = zod.object({
+  "endedAt": zod.coerce.date().optional(),
+  "idempotencyKey": zod.string().min(endAssignmentBodyIdempotencyKeyMin)
+})
+
+export const EndAssignmentResponse = zod.object({
+  "assignment": zod.object({
+  "id": zod.string().uuid(),
+  "organizationId": zod.string().uuid(),
+  "personId": zod.string().uuid(),
+  "positionId": zod.string().uuid(),
+  "startedAt": zod.coerce.date(),
+  "endedAt": zod.coerce.date().nullish(),
+  "status": zod.enum(['active', 'ended']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "replayed": zod.boolean()
+})
+
+
+/**
+ * @summary Reassign employee to a new position
+ */
+export const TransferAssignmentParams = zod.object({
+  "organizationId": zod.coerce.string().uuid()
+})
+
+export const transferAssignmentBodyIdempotencyKeyMin = 8;
+
+
+
+export const TransferAssignmentBody = zod.object({
+  "personId": zod.string().uuid(),
+  "toPositionId": zod.string().uuid(),
+  "effectiveAt": zod.coerce.date().optional(),
+  "idempotencyKey": zod.string().min(transferAssignmentBodyIdempotencyKeyMin)
+})
+
+export const TransferAssignmentResponse = zod.object({
+  "assignment": zod.object({
+  "id": zod.string().uuid(),
+  "organizationId": zod.string().uuid(),
+  "personId": zod.string().uuid(),
+  "positionId": zod.string().uuid(),
+  "startedAt": zod.coerce.date(),
+  "endedAt": zod.coerce.date().nullish(),
+  "status": zod.enum(['active', 'ended']),
+  "createdAt": zod.coerce.date(),
+  "updatedAt": zod.coerce.date()
+}),
+  "endedAssignmentId": zod.string().uuid().nullish(),
+  "replayed": zod.boolean()
 })
 
 
