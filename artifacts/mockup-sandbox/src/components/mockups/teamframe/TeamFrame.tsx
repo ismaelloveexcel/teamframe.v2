@@ -69,7 +69,7 @@ const ACTOR = {
 const STYLE = {
   page: {
     minHeight: "100vh",
-    background: "#EEF2F7",
+    background: "#F1F5F9",
     color: "#0F172A",
     fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
   } as const,

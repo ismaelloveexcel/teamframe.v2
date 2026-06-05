@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { COLOR, RADIUS, SHADOW, TEXT, SPACE, FOCUS_RING, Z } from "./design-tokens";
 
 export type DrillDownMode = "vacancies" | "actions" | "compliance" | null;
 
@@ -41,7 +42,7 @@ type DrillDownPanelProps = {
 function formatVacancyAge(since: string | null): string {
   if (!since) return "Unknown";
   const ms = Date.now() - new Date(since).getTime();
-  const days = Math.floor(ms / (1000 * 60 * 60 * 24));
+  const days = Math.floor(ms / 86_400_000);
   if (days === 0) return "Today";
   if (days === 1) return "1 day";
   if (days < 30) return `${days} days`;
@@ -58,30 +59,48 @@ function formatDueDate(dueDate: string | null, overdue: boolean): string {
 }
 
 const PANEL_TITLES: Record<NonNullable<DrillDownMode>, string> = {
-  vacancies: "Vacant Positions",
-  actions: "Actions Requiring Attention",
-  compliance: "Compliance Gaps",
+  vacancies:   "Vacant Positions",
+  actions:     "Actions Requiring Attention",
+  compliance:  "Compliance Gaps",
 };
 
 const PANEL_EMPTY: Record<NonNullable<DrillDownMode>, string> = {
-  vacancies: "No vacant positions.",
-  actions: "No actions require attention.",
-  compliance: "No compliance gaps detected.",
+  vacancies:   "No vacant positions.",
+  actions:     "No actions require attention.",
+  compliance:  "No compliance gaps detected.",
 };
 
-export function DrillDownPanel({
-  mode,
-  onClose,
-  vacancies,
-  actions,
-  compliance,
-  onSelectPosition,
-}: DrillDownPanelProps) {
+function Tag({ children, tone }: { children: string; tone: "warning" | "danger" }) {
+  const c = tone === "danger"
+    ? { bg: "#FEE2E2", color: COLOR.danger, border: COLOR.dangerBorder }
+    : { bg: COLOR.warningLight, color: COLOR.warning, border: COLOR.warningBorder };
+  return (
+    <span style={{ background: c.bg, border: `1px solid ${c.border}`, borderRadius: RADIUS.sm, padding: `2px ${SPACE[1]+2}px`, fontSize: TEXT.micro, color: c.color, fontWeight: 700, fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}>
+      {children}
+    </span>
+  );
+}
+
+function ClickableRow({ onClick, children }: { onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      style={{ background: COLOR.rowBg, border: `1px solid ${COLOR.borderDefault}`, borderRadius: RADIUS.md, padding: `${SPACE[3]}px ${SPACE[3]+2}px`, textAlign: "left", cursor: "pointer", width: "100%", fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif" }}
+      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#93C5FD"; }}
+      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = COLOR.borderDefault; }}
+      onFocus={(e) => { (e.currentTarget as HTMLButtonElement).style.outline = "none"; (e.currentTarget as HTMLButtonElement).style.boxShadow = FOCUS_RING; }}
+      onBlur={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = "none"; }}
+    >
+      {children}
+    </button>
+  );
+}
+
+export function DrillDownPanel({ mode, onClose, vacancies, actions, compliance, onSelectPosition }: DrillDownPanelProps) {
   useEffect(() => {
     if (!mode) return;
-    const handler = (e: KeyboardEvent) => {
-      if (e.key === "Escape") onClose();
-    };
+    const handler = (e: KeyboardEvent) => { if (e.key === "Escape") onClose(); };
     window.addEventListener("keydown", handler);
     return () => window.removeEventListener("keydown", handler);
   }, [mode, onClose]);
@@ -91,18 +110,13 @@ export function DrillDownPanel({
   const title = PANEL_TITLES[mode];
   const emptyMessage = PANEL_EMPTY[mode];
 
+  const rowCount = mode === "vacancies" ? vacancies.length : mode === "actions" ? actions.length : compliance.length;
+  const rowLabel = mode === "compliance" ? `${rowCount} position${rowCount === 1 ? "" : "s"} with gaps` : `${rowCount} ${mode === "vacancies" ? "position" : "action"}${rowCount === 1 ? "" : "s"}`;
+
   return (
     <>
       {/* Backdrop */}
-      <div
-        onClick={onClose}
-        style={{
-          position: "fixed",
-          inset: 0,
-          background: "rgba(15,23,42,0.35)",
-          zIndex: 50,
-        }}
-      />
+      <div onClick={onClose} style={{ position: "fixed", inset: 0, background: COLOR.overlayDark, zIndex: Z.overlay }} />
 
       {/* Panel */}
       <div
@@ -114,112 +128,52 @@ export function DrillDownPanel({
           right: 0,
           width: 400,
           height: "calc(100vh - 52px)",
-          background: "#FFFFFF",
-          borderLeft: "1px solid #E5E7EB",
-          zIndex: 51,
+          background: COLOR.cardBg,
+          borderLeft: `1px solid ${COLOR.borderSubtle}`,
+          zIndex: Z.panel,
           display: "flex",
           flexDirection: "column",
           fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
-          boxShadow: "-8px 0 32px rgba(15,23,42,0.10)",
+          boxShadow: `-8px 0 32px ${SHADOW.md}`,
         }}
       >
         {/* Header */}
-        <div
-          style={{
-            padding: "16px 20px",
-            borderBottom: "1px solid #F1F5F9",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            flexShrink: 0,
-          }}
-        >
+        <div style={{ padding: `${SPACE[4]}px ${SPACE[5]}px`, borderBottom: `1px solid ${COLOR.pageBg}`, display: "flex", alignItems: "center", justifyContent: "space-between", flexShrink: 0 }}>
           <div>
-            <div style={{ fontSize: 14, fontWeight: 800, color: "#0F172A" }}>{title}</div>
-            <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 2 }}>
-              {mode === "vacancies" && `${vacancies.length} position${vacancies.length === 1 ? "" : "s"}`}
-              {mode === "actions" && `${actions.length} action${actions.length === 1 ? "" : "s"}`}
-              {mode === "compliance" && `${compliance.length} position${compliance.length === 1 ? "" : "s"} with gaps`}
-            </div>
+            <div style={{ fontSize: TEXT.base, fontWeight: 800, color: COLOR.textPrimary }}>{title}</div>
+            <div style={{ fontSize: TEXT.micro, color: COLOR.textMuted, marginTop: 2 }}>{rowLabel}</div>
           </div>
           <button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            style={{
-              background: "#F8FAFC",
-              border: "1px solid #E2E8F0",
-              borderRadius: 8,
-              width: 30,
-              height: 30,
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              cursor: "pointer",
-              color: "#64748B",
-              fontSize: 16,
-            }}
+            style={{ background: COLOR.pageBg, border: `1px solid ${COLOR.borderDefault}`, borderRadius: RADIUS.sm, width: 30, height: 30, display: "flex", alignItems: "center", justifyContent: "center", cursor: "pointer", color: COLOR.textSecondary, fontSize: TEXT.md, lineHeight: 1 }}
+            onFocus={(e) => { (e.currentTarget as HTMLButtonElement).style.outline = "none"; (e.currentTarget as HTMLButtonElement).style.boxShadow = FOCUS_RING; }}
+            onBlur={(e) => { (e.currentTarget as HTMLButtonElement).style.boxShadow = "none"; }}
           >
             ×
           </button>
         </div>
 
         {/* Content */}
-        <div style={{ flex: 1, overflowY: "auto", padding: "12px 20px" }}>
+        <div style={{ flex: 1, overflowY: "auto", padding: `${SPACE[3]}px ${SPACE[5]}px` }}>
           {/* Vacancies */}
           {mode === "vacancies" && (
             vacancies.length === 0 ? (
-              <div style={{ fontSize: 13, color: "#94A3B8", padding: "24px 0" }}>{emptyMessage}</div>
+              <div style={{ fontSize: TEXT.sm, color: COLOR.textMuted, padding: `${SPACE[6]}px 0` }}>{emptyMessage}</div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: SPACE[2] }}>
                 {vacancies.map((row) => (
-                  <button
-                    key={row.positionId}
-                    type="button"
-                    onClick={() => { onSelectPosition(row.positionId); onClose(); }}
-                    style={{
-                      background: "#FAFAFA",
-                      border: "1px solid #E2E8F0",
-                      borderRadius: 10,
-                      padding: "12px 14px",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      transition: "border-color 0.12s",
-                    }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#93C5FD"; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#E2E8F0"; }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 4 }}>
-                      {row.title}
+                  <ClickableRow key={row.positionId} onClick={() => { onSelectPosition(row.positionId); onClose(); }}>
+                    <div style={{ fontSize: TEXT.sm, fontWeight: 700, color: COLOR.textPrimary, marginBottom: SPACE[1] }}>{row.title}</div>
+                    <div style={{ display: "flex", gap: SPACE[2]+4, flexWrap: "wrap" }}>
+                      {row.teamName && <span style={{ fontSize: TEXT.micro, color: COLOR.textSecondary }}>{row.teamName}</span>}
+                      {row.reportsToTitle && <span style={{ fontSize: TEXT.micro, color: COLOR.textMuted }}>→ {row.reportsToTitle}</span>}
                     </div>
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {row.teamName && (
-                        <span style={{ fontSize: 11, color: "#64748B" }}>{row.teamName}</span>
-                      )}
-                      {row.reportsToTitle && (
-                        <span style={{ fontSize: 11, color: "#94A3B8" }}>
-                          → {row.reportsToTitle}
-                        </span>
-                      )}
+                    <div style={{ marginTop: SPACE[1]+2 }}>
+                      <Tag tone="warning">{`Vacant · ${formatVacancyAge(row.vacantSince)}`}</Tag>
                     </div>
-                    <div
-                      style={{
-                        marginTop: 6,
-                        display: "inline-flex",
-                        alignItems: "center",
-                        gap: 4,
-                        background: "#FFFBEB",
-                        border: "1px solid #FDE68A",
-                        borderRadius: 6,
-                        padding: "2px 7px",
-                        fontSize: 10,
-                        color: "#92400E",
-                        fontWeight: 600,
-                      }}
-                    >
-                      Vacant · {formatVacancyAge(row.vacantSince)}
-                    </div>
-                  </button>
+                  </ClickableRow>
                 ))}
               </div>
             )
@@ -228,74 +182,20 @@ export function DrillDownPanel({
           {/* Actions */}
           {mode === "actions" && (
             actions.length === 0 ? (
-              <div style={{ fontSize: 13, color: "#94A3B8", padding: "24px 0" }}>{emptyMessage}</div>
+              <div style={{ fontSize: TEXT.sm, color: COLOR.textMuted, padding: `${SPACE[6]}px 0` }}>{emptyMessage}</div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: SPACE[2] }}>
                 {actions.map((row) => (
-                  <div
-                    key={row.actionId}
-                    style={{
-                      background: row.overdue ? "#FEF2F2" : row.blocked ? "#FFFBEB" : "#FAFAFA",
-                      border: `1px solid ${row.overdue ? "#FECACA" : row.blocked ? "#FDE68A" : "#E2E8F0"}`,
-                      borderRadius: 10,
-                      padding: "12px 14px",
-                    }}
-                  >
-                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 8, marginBottom: 6 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", flex: 1 }}>
-                        {row.title}
-                      </div>
-                      {row.overdue && (
-                        <span
-                          style={{
-                            flexShrink: 0,
-                            background: "#FEE2E2",
-                            color: "#DC2626",
-                            borderRadius: 5,
-                            padding: "2px 6px",
-                            fontSize: 10,
-                            fontWeight: 700,
-                          }}
-                        >
-                          Overdue
-                        </span>
-                      )}
-                      {!row.overdue && row.blocked && (
-                        <span
-                          style={{
-                            flexShrink: 0,
-                            background: "#FEF3C7",
-                            color: "#92400E",
-                            borderRadius: 5,
-                            padding: "2px 6px",
-                            fontSize: 10,
-                            fontWeight: 700,
-                          }}
-                        >
-                          Blocked
-                        </span>
-                      )}
+                  <div key={row.actionId} style={{ background: row.overdue ? COLOR.dangerLight : row.blocked ? COLOR.warningLight : COLOR.rowBg, border: `1px solid ${row.overdue ? COLOR.dangerBorder : row.blocked ? COLOR.warningBorder : COLOR.borderDefault}`, borderRadius: RADIUS.md, padding: `${SPACE[3]}px ${SPACE[3]+2}px` }}>
+                    <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: SPACE[2], marginBottom: SPACE[1]+2 }}>
+                      <div style={{ fontSize: TEXT.sm, fontWeight: 700, color: COLOR.textPrimary, flex: 1 }}>{row.title}</div>
+                      {row.overdue && <Tag tone="danger">Overdue</Tag>}
+                      {!row.overdue && row.blocked && <Tag tone="warning">Blocked</Tag>}
                     </div>
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
-                      {row.ownerName && (
-                        <span style={{ fontSize: 11, color: "#64748B" }}>{row.ownerName}</span>
-                      )}
-                      {row.positionTitle && (
-                        <span style={{ fontSize: 11, color: "#94A3B8" }}>
-                          via {row.positionTitle}
-                        </span>
-                      )}
-                      {row.dueDate && (
-                        <span
-                          style={{
-                            fontSize: 11,
-                            color: row.overdue ? "#DC2626" : "#64748B",
-                            fontWeight: row.overdue ? 600 : 400,
-                          }}
-                        >
-                          {formatDueDate(row.dueDate, row.overdue)}
-                        </span>
-                      )}
+                    <div style={{ display: "flex", gap: SPACE[2]+4, flexWrap: "wrap" }}>
+                      {row.ownerName && <span style={{ fontSize: TEXT.micro, color: COLOR.textSecondary }}>{row.ownerName}</span>}
+                      {row.positionTitle && <span style={{ fontSize: TEXT.micro, color: COLOR.textMuted }}>via {row.positionTitle}</span>}
+                      {row.dueDate && <span style={{ fontSize: TEXT.micro, color: row.overdue ? COLOR.danger : COLOR.textSecondary, fontWeight: row.overdue ? 600 : 400 }}>{formatDueDate(row.dueDate, row.overdue)}</span>}
                     </div>
                   </div>
                 ))}
@@ -306,65 +206,18 @@ export function DrillDownPanel({
           {/* Compliance */}
           {mode === "compliance" && (
             compliance.length === 0 ? (
-              <div style={{ fontSize: 13, color: "#94A3B8", padding: "24px 0" }}>{emptyMessage}</div>
+              <div style={{ fontSize: TEXT.sm, color: COLOR.textMuted, padding: `${SPACE[6]}px 0` }}>{emptyMessage}</div>
             ) : (
-              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+              <div style={{ display: "flex", flexDirection: "column", gap: SPACE[2] }}>
                 {compliance.map((row) => (
-                  <button
-                    key={row.positionId}
-                    type="button"
-                    onClick={() => { onSelectPosition(row.positionId); onClose(); }}
-                    style={{
-                      background: "#FAFAFA",
-                      border: "1px solid #E2E8F0",
-                      borderRadius: 10,
-                      padding: "12px 14px",
-                      textAlign: "left",
-                      cursor: "pointer",
-                      transition: "border-color 0.12s",
-                    }}
-                    onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#93C5FD"; }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.borderColor = "#E2E8F0"; }}
-                  >
-                    <div style={{ fontSize: 13, fontWeight: 700, color: "#0F172A", marginBottom: 4 }}>
-                      {row.positionTitle}
+                  <ClickableRow key={row.positionId} onClick={() => { onSelectPosition(row.positionId); onClose(); }}>
+                    <div style={{ fontSize: TEXT.sm, fontWeight: 700, color: COLOR.textPrimary, marginBottom: SPACE[1] }}>{row.positionTitle}</div>
+                    <div style={{ fontSize: TEXT.micro, color: COLOR.textSecondary, marginBottom: SPACE[1]+2 }}>{row.personName}</div>
+                    <div style={{ display: "flex", gap: SPACE[1]+2, flexWrap: "wrap" }}>
+                      {row.missingEmail && <Tag tone="warning">Missing email</Tag>}
+                      {row.missingPhone && <Tag tone="warning">Missing phone</Tag>}
                     </div>
-                    <div style={{ fontSize: 11, color: "#64748B", marginBottom: 6 }}>
-                      {row.personName}
-                    </div>
-                    <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {row.missingEmail && (
-                        <span
-                          style={{
-                            background: "#FEF3C7",
-                            border: "1px solid #FDE68A",
-                            borderRadius: 5,
-                            padding: "2px 7px",
-                            fontSize: 10,
-                            color: "#92400E",
-                            fontWeight: 600,
-                          }}
-                        >
-                          Missing email
-                        </span>
-                      )}
-                      {row.missingPhone && (
-                        <span
-                          style={{
-                            background: "#FEF3C7",
-                            border: "1px solid #FDE68A",
-                            borderRadius: 5,
-                            padding: "2px 7px",
-                            fontSize: 10,
-                            color: "#92400E",
-                            fontWeight: 600,
-                          }}
-                        >
-                          Missing phone
-                        </span>
-                      )}
-                    </div>
-                  </button>
+                  </ClickableRow>
                 ))}
               </div>
             )

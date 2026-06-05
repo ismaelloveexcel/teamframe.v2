@@ -6,6 +6,7 @@ import {
   LayoutTemplate,
   Settings,
 } from "lucide-react";
+import { COLOR, GRADIENT, RADIUS, TEXT, SPACE, SHADOW, FOCUS_RING } from "./design-tokens";
 
 export type NavId = "org" | "actions" | "team" | "policies" | "templates" | "administration";
 
@@ -54,7 +55,7 @@ export function AppShell({
     <div
       style={{
         minHeight: "100vh",
-        background: "#F1F5F9",
+        background: COLOR.pageBg,
         fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
         display: "grid",
         gridTemplateColumns: "200px 1fr",
@@ -66,11 +67,11 @@ export function AppShell({
       <aside
         style={{
           gridRow: "1 / 3",
-          background: "#0B1220",
-          borderRight: "1px solid rgba(255,255,255,0.04)",
+          background: COLOR.sidebarBg,
+          borderRight: `1px solid rgba(255,255,255,0.04)`,
           display: "flex",
           flexDirection: "column",
-          padding: "20px 12px",
+          padding: `${SPACE[5]}px ${SPACE[3]}px`,
           gap: 2,
         }}
       >
@@ -80,20 +81,20 @@ export function AppShell({
             display: "flex",
             alignItems: "center",
             gap: 9,
-            padding: "4px 8px 20px",
+            padding: `${SPACE[1]}px ${SPACE[2]}px ${SPACE[5]}px`,
           }}
         >
           <div
             style={{
               width: 28,
               height: 28,
-              borderRadius: 8,
-              background: "linear-gradient(135deg, #3B82F6 0%, #1D4ED8 100%)",
+              borderRadius: RADIUS.sm,
+              background: GRADIENT.logo,
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               flexShrink: 0,
-              boxShadow: "0 0 12px rgba(59,130,246,0.25)",
+              boxShadow: `0 0 12px ${COLOR.glowBrand}`,
             }}
           >
             <svg width="15" height="15" viewBox="0 0 15 15" fill="none">
@@ -105,9 +106,9 @@ export function AppShell({
           </div>
           <span
             style={{
-              fontSize: 15,
+              fontSize: TEXT.base,
               fontWeight: 800,
-              color: "#F8FAFC",
+              color: COLOR.textInverse,
               letterSpacing: "-0.02em",
             }}
           >
@@ -130,27 +131,34 @@ export function AppShell({
                 width: "100%",
                 textAlign: "left",
                 border: "none",
-                borderRadius: 8,
-                padding: "8px 10px",
-                background: isActive ? "#1E293B" : "transparent",
-                color: isActive ? "#E2E8F0" : "#64748B",
+                borderRadius: RADIUS.sm,
+                padding: `${SPACE[2]}px ${SPACE[2]+2}px`,
+                background: isActive ? COLOR.navActive : "transparent",
+                color: isActive ? "#E2E8F0" : COLOR.textSecondary,
                 fontWeight: isActive ? 600 : 500,
-                fontSize: 13,
+                fontSize: TEXT.sm,
                 cursor: "pointer",
                 transition: "background 0.12s, color 0.12s",
-                boxShadow: isActive ? "inset 1px 0 0 #3B82F6" : "none",
+                boxShadow: isActive ? `inset 1px 0 0 ${COLOR.navActiveLine}` : "none",
               }}
               onMouseEnter={(e) => {
                 if (!isActive) {
-                  (e.currentTarget as HTMLButtonElement).style.background = "#111827";
+                  (e.currentTarget as HTMLButtonElement).style.background = COLOR.navHover;
                   (e.currentTarget as HTMLButtonElement).style.color = "#CBD5E1";
                 }
               }}
               onMouseLeave={(e) => {
                 if (!isActive) {
                   (e.currentTarget as HTMLButtonElement).style.background = "transparent";
-                  (e.currentTarget as HTMLButtonElement).style.color = "#64748B";
+                  (e.currentTarget as HTMLButtonElement).style.color = COLOR.textSecondary;
                 }
+              }}
+              onFocus={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.outline = "none";
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = FOCUS_RING;
+              }}
+              onBlur={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.boxShadow = isActive ? `inset 1px 0 0 ${COLOR.navActiveLine}` : "none";
               }}
             >
               <span style={{ opacity: isActive ? 1 : 0.7, flexShrink: 0 }}>{item.icon}</span>
@@ -164,23 +172,20 @@ export function AppShell({
           <div
             style={{
               marginTop: "auto",
-              borderRadius: 8,
-              padding: "8px 10px",
+              borderRadius: RADIUS.sm,
+              padding: `${SPACE[2]}px ${SPACE[2]+2}px`,
               background: "rgba(234,179,8,0.1)",
               border: "1px solid rgba(234,179,8,0.2)",
-              fontSize: 11,
+              fontSize: TEXT.micro,
               color: "#CA8A04",
               fontWeight: 600,
               display: "flex",
               alignItems: "center",
-              gap: 6,
+              gap: SPACE[1]+2,
             }}
           >
             <svg width="12" height="12" viewBox="0 0 12 12" fill="none">
-              <path
-                d="M6 1l.9 2.8H10L7.6 5.6l.9 2.8L6 6.8l-2.5 1.6.9-2.8L2 3.8h3.1z"
-                fill="currentColor"
-              />
+              <path d="M6 1l.9 2.8H10L7.6 5.6l.9 2.8L6 6.8l-2.5 1.6.9-2.8L2 3.8h3.1z" fill="currentColor" />
             </svg>
             Demo mode
           </div>
@@ -190,18 +195,18 @@ export function AppShell({
       {/* Top context bar */}
       <header
         style={{
-          background: "#FFFFFF",
-          borderBottom: "1px solid #E5E7EB",
-          padding: "0 24px",
+          background: COLOR.cardBg,
+          borderBottom: `1px solid ${COLOR.borderSubtle}`,
+          padding: `0 ${SPACE[6]}px`,
           height: 52,
           display: "flex",
           alignItems: "center",
           justifyContent: "space-between",
-          gap: 16,
+          gap: SPACE[4],
         }}
       >
-        {/* Health badges — clickable when onClick provided */}
-        <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+        {/* Health badges */}
+        <div style={{ display: "flex", alignItems: "center", gap: SPACE[1]+2 }}>
           {health.map((badge) => {
             const isUrgent = badge.urgent && Number(badge.value) > 0;
             const isClickable = !!badge.onClick && Number(badge.value) > 0;
@@ -216,43 +221,38 @@ export function AppShell({
                   display: "flex",
                   alignItems: "center",
                   gap: 5,
-                  padding: "4px 10px",
-                  borderRadius: 20,
-                  background: isUrgent ? "#FEF2F2" : "#F8FAFC",
-                  border: `1px solid ${isUrgent ? "#FECACA" : "#E2E8F0"}`,
-                  fontSize: 12,
+                  padding: `${SPACE[1]}px ${SPACE[2]+2}px`,
+                  borderRadius: RADIUS.pill,
+                  background: isUrgent ? COLOR.dangerLight : COLOR.pageBg,
+                  border: `1px solid ${isUrgent ? COLOR.dangerBorder : COLOR.borderDefault}`,
+                  fontSize: TEXT.sm,
                   fontWeight: 600,
-                  color: isUrgent ? "#DC2626" : "#475569",
+                  color: isUrgent ? COLOR.danger : COLOR.textSecondary,
                   cursor: isClickable ? "pointer" : "default",
                   transition: "box-shadow 0.12s",
+                  fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
                 }}
                 onMouseEnter={(e) => {
-                  if (isClickable)
-                    (e.currentTarget as HTMLButtonElement).style.boxShadow = "0 1px 4px rgba(15,23,42,0.10)";
+                  if (isClickable) (e.currentTarget as HTMLButtonElement).style.boxShadow = SHADOW.sm;
                 }}
                 onMouseLeave={(e) => {
+                  if (isClickable) (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
+                }}
+                onFocus={(e) => {
+                  (e.currentTarget as HTMLButtonElement).style.outline = "none";
+                  (e.currentTarget as HTMLButtonElement).style.boxShadow = FOCUS_RING;
+                }}
+                onBlur={(e) => {
                   (e.currentTarget as HTMLButtonElement).style.boxShadow = "none";
                 }}
               >
-                <span style={{ fontWeight: 700, color: isUrgent ? "#DC2626" : "#0F172A" }}>
+                <span style={{ fontWeight: 700, color: isUrgent ? COLOR.danger : COLOR.textPrimary }}>
                   {badge.value}
                 </span>
                 <span style={{ fontWeight: 500 }}>{badge.label}</span>
                 {isClickable && (
-                  <svg
-                    width="9"
-                    height="9"
-                    viewBox="0 0 9 9"
-                    fill="none"
-                    style={{ opacity: 0.5, marginLeft: 1 }}
-                  >
-                    <path
-                      d="M2 4.5h5M5 2.5l2 2-2 2"
-                      stroke="currentColor"
-                      strokeWidth="1.2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    />
+                  <svg width="9" height="9" viewBox="0 0 9 9" fill="none" style={{ opacity: 0.5, marginLeft: 1 }}>
+                    <path d="M2 4.5h5M5 2.5l2 2-2 2" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round" />
                   </svg>
                 )}
               </button>
@@ -260,28 +260,19 @@ export function AppShell({
           })}
         </div>
 
-        {/* Status / error message */}
-        <div style={{ fontSize: 12, fontWeight: 500, flexShrink: 0 }}>
+        {/* Status / error */}
+        <div style={{ fontSize: TEXT.sm, fontWeight: 500, flexShrink: 0 }}>
           {statusMessage && (
-            <span style={{ color: "#2563EB", display: "flex", alignItems: "center", gap: 6 }}>
+            <span style={{ color: COLOR.brand, display: "flex", alignItems: "center", gap: SPACE[1]+2 }}>
               <svg width="12" height="12" viewBox="0 0 12 12" fill="none" style={{ animation: "spin 1s linear infinite" }}>
-                <circle cx="6" cy="6" r="5" stroke="#BFDBFE" strokeWidth="2" />
-                <path d="M6 1a5 5 0 0 1 5 5" stroke="#2563EB" strokeWidth="2" strokeLinecap="round" />
+                <circle cx="6" cy="6" r="5" stroke={COLOR.brandLight} strokeWidth="2" />
+                <path d="M6 1a5 5 0 0 1 5 5" stroke={COLOR.brand} strokeWidth="2" strokeLinecap="round" />
               </svg>
               {statusMessage}
             </span>
           )}
           {!statusMessage && errorMessage && (
-            <span
-              style={{
-                color: isDemoMode ? "#B45309" : "#DC2626",
-                maxWidth: 360,
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-                display: "block",
-              }}
-            >
+            <span style={{ color: isDemoMode ? COLOR.warning : COLOR.danger, maxWidth: 360, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", display: "block" }}>
               {errorMessage}
             </span>
           )}
@@ -289,13 +280,7 @@ export function AppShell({
       </header>
 
       {/* Main content area */}
-      <main
-        style={{
-          padding: 20,
-          overflow: "auto",
-          minHeight: 0,
-        }}
-      >
+      <main style={{ padding: SPACE[5], overflow: "auto", minHeight: 0 }}>
         {children}
       </main>
     </div>
