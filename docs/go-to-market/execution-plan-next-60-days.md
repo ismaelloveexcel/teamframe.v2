@@ -20,24 +20,39 @@ The system is production-ready. The work in this plan is not building — it is 
 
 ## Phase 1 — Client Readiness Verification (Week 1–2)
 
-**Goal:** Confirm the system works reliably as a live HR tool, not just a certified technical system.
+**Goal:** Confirm the system works reliably as a live HR tool under real conditions, including change — not just initial data entry.
 
-**Output:** A documented "client readiness checklist" confirming the system can support a live client from day one.
+**Output:** A completed production readiness checklist (see `production-readiness-checklist.md`) with all items passing.
 
-### Tasks
+### Week 1 — Simulation
 
-- [ ] Run a simulated onboarding for one fictional 25-person company
-  - Create org structure (positions, reporting lines, departments)
-  - Add 25 fictional employees with realistic data
-  - Create 5 JDs (draft → in review → signed lifecycle)
-  - Record 3 role changes over a simulated month
-  - Generate monthly org health summary from the system state
-- [ ] Identify anything that breaks, is confusing, or requires a workaround
-- [ ] Document all workarounds (these are the gaps to close later, not now)
-- [ ] Confirm document storage hybrid works (TeamFrame status + Google Drive files)
-- [ ] Confirm async communication workflow (how a client sends a request, how it is processed, how it is confirmed)
+Run a full simulated onboarding for one fictional 25-person company. Then force change through the system.
 
-**Trigger to move to Phase 2:** Simulation completed with no blockers that would prevent live client use.
+Static setup:
+- [ ] Create org structure (positions, reporting lines, departments)
+- [ ] Add 25 fictional employees with realistic data
+- [ ] Create 5 JDs (draft → in review → signed lifecycle)
+
+Change scenarios (run all of these — the system must survive change, not just initial entry):
+- [ ] New hire joins — create role, assign person
+- [ ] Employee leaves — end assignment, vacate position
+- [ ] Manager changes — update reporting lines across affected positions
+- [ ] New position created mid-month
+- [ ] Position frozen (role no longer active)
+- [ ] Missing document identified and flagged in org health
+- [ ] JD updated and re-signed after a role change
+- [ ] Monthly org health summary generated from the changed state
+
+### Week 2 — Fix and Freeze
+
+- [ ] Score the production readiness checklist against all 13 requirements
+- [ ] Classify every gap found as trust-destroying or friction
+- [ ] Fix trust-destroying issues only
+- [ ] Document all friction workarounds — do not fix them now
+- [ ] Re-run failed scenarios until they pass
+- [ ] Freeze the product. No feature work after this point.
+
+**Trigger to move to Phase 3:** All 13 checklist items pass. Product is frozen.
 
 ---
 
@@ -71,11 +86,11 @@ The system is production-ready. The work in this plan is not building — it is 
 
 ---
 
-## Phase 3 — Outreach Preparation (Week 4–6)
+## Phase 3 — Outreach Preparation (Week 3)
 
 **Goal:** Build the materials needed to generate the first paying client conversations.
 
-**Output:** Three documents and one target list.
+**Output:** Three documents, one target list, objection log initialised.
 
 ### Documents to create
 
@@ -89,11 +104,7 @@ The system is production-ready. The work in this plan is not building — it is 
   - One sentence describing the outcome
   - One question
   - Maximum 5 lines total
-- [ ] Objection responses (written in advance)
-  - "We're too small for this"
-  - "We already have a spreadsheet"
-  - "Can we just pay per hour?"
-  - "We'll think about it"
+- [ ] Objection responses (written in advance for the 8 most common — see objection-log.md)
 
 ### Target list
 
@@ -105,21 +116,32 @@ The system is production-ready. The work in this plan is not building — it is 
 - [ ] Sources: LinkedIn, Companies House filings, Crunchbase funding announcements
 - [ ] Record in a simple spreadsheet: company name, size, funding date, founder name, LinkedIn URL, outreach status
 
-**Trigger to move to Phase 4:** 30 targets identified. All three documents ready. Offer sheet reviewed and considered honest and accurate.
+### Objection log
+
+- [ ] Open `objection-log.md`
+- [ ] Pre-populate the tally table with the 8 known objections
+- [ ] Ready to log from first conversation
+
+**Trigger to move to Phase 4:** 30 targets identified. All three documents ready. Objection log initialised.
 
 ---
 
-## Phase 4 — First Client Acquisition (Week 6–8)
+## Phase 4 — First Client Acquisition (Week 4–8)
 
 **Goal:** Acquire 3–5 paying clients. Paid pilots only — no free trials, no equity deals, no "let's see how it goes" arrangements.
 
-**Output:** Signed contracts with setup fees received.
+**Output:** Signed contracts with setup fees received. Or, if no sales: a clear evidence base explaining why prospects are not buying.
 
-### Outreach process
+### Week 4 — Send first outreach
 
-- Send cold outreach to 5 targets per week (not more — quality over volume at this stage)
+- [ ] Send 15–20 personalised outreach messages by end of week (not 5 — too few to generate meaningful signal)
+- Each message personalised to the specific company trigger (recent funding, hiring announcement, no HR person visible)
 - Follow up once after 5 days if no response
+
+### Weeks 5–8 — Work the pipeline
+
 - If interested: 30-minute discovery call
+- Log every response (yes, no, objection, silence) in objection-log.md immediately after
 - If fit confirmed: send one-page offer sheet within 24 hours
 - If they want to proceed: setup fee invoice sent within 48 hours
 - Setup begins on receipt of payment
@@ -128,12 +150,19 @@ The system is production-ready. The work in this plan is not building — it is 
 
 A signed 3-month minimum contract and a paid setup fee. Nothing else counts as a client.
 
+### What counts as useful even without a sale
+
+20+ outreach messages sent, 8+ discovery calls completed, objection log with 10+ entries and clear patterns identified.
+
+That is not failure. That is evidence. Use it to refine the message, not the product.
+
 ### Constraints
 
-- Do not start scaling outreach until 3 paying clients exist
+- Do not scale outreach volume before the message is validated (first 15–20 messages are the test)
 - Do not accept a client below the minimum commitment
 - Do not discount to close — adjust scope if price is an objection
 - Do not take on more than 5 Package 3 clients total (hard cap)
+- Do not trigger any feature work based on prospect assumptions — only based on repeated friction observed in discovery calls (same issue raised 3+ times)
 
 ---
 
@@ -157,7 +186,22 @@ At day 60, one number determines success:
 
 **Number of clients with signed contracts and paid setup fees.**
 
-- 0 clients: review outreach message and target list quality
-- 1–2 clients: continue outreach, refine pitch
-- 3–5 clients: model is working, focus on delivery quality
-- 5+ clients: capacity management becomes the priority
+- 0 clients + fewer than 15 outreach messages sent: you stayed in the loop. Start outreach immediately.
+- 0 clients + 20+ conversations + clear objection pattern: messaging problem, not product problem. Adjust pitch.
+- 1–2 clients: model is working. Continue outreach, focus on delivery quality for existing clients.
+- 3–5 clients: strong validation. Capacity management becomes the priority.
+- 5+ clients: do not take more until delivery is stable.
+
+Both outcomes — sales and a clear "why they are not buying" — are valid at day 60. The only failure is reaching day 60 having built more features and spoken to nobody.
+
+---
+
+## The Anti-Loop Rule
+
+At the end of every week, answer one question:
+
+> "Did I speak to a potential client this week?"
+
+If yes: on track.
+
+If no: stop all other work. Send an outreach message before doing anything else that day.
