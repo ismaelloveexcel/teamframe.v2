@@ -1,0 +1,15 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm install --frozen-lockfile && cd lib/db && npx tsc -p tsconfig.json && cd ../api-zod && npx tsc -p tsconfig.json && cd ../../artifacts/mockup-sandbox && pnpm build",
+  "outputDirectory": "artifacts/mockup-sandbox/dist",
+  "framework": null,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ],
+  "env": {
+    "BASE_PATH": "/"
+  }
+}
