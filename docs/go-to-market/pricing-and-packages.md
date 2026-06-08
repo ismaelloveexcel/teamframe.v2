@@ -41,9 +41,10 @@ Up to 10 clients at this tier for a solo operator.
 ### What is included
 
 - Everything in Package 1
-- 2 structured working days per month (defined as 8 pre-agreed work blocks — see scope-and-boundaries.md for definition)
-- Typical work in these blocks:
-  - Job description creation or update (up to 3 roles per block)
+- 2 structured working days per month (8 hours total, delivered as pre-agreed output sessions)
+- Work is delivered through pre-agreed output sessions focused on specific deliverables (e.g., JD creation, org updates, onboarding setup, compliance reviews)
+- Typical outputs per session:
+  - Job description creation or update (up to 3 roles per session)
   - New hire setup (role, assignment, onboarding checklist)
   - Role change or transfer processing
   - Compliance document tracking update
@@ -81,6 +82,8 @@ Fast-growing companies (35–60 employees), hiring frequently, no internal HR pe
 ### Capacity
 
 Maximum 5 clients at this tier. This is a hard cap. Do not exceed it.
+
+This limit exists because Package 3 provides dedicated fractional capacity. Availability is intentionally limited to ensure each client receives the presence they are paying for.
 
 ---
 
