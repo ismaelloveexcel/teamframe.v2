@@ -1,0 +1,12 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm --filter @workspace/db exec tsc -p tsconfig.json && pnpm --filter @workspace/api-zod exec tsc -p tsconfig.json && pnpm --filter @workspace/mockup-sandbox build",
+  "outputDirectory": "artifacts/mockup-sandbox/dist",
+  "framework": "vite",
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/index.html"
+    }
+  ]
+}

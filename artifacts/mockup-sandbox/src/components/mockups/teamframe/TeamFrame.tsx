@@ -1,82 +1,63 @@
-import { useState, useMemo } from "react";
-import { SEED, Position } from "../../../teamframe/data/seed";
+import { useMemo, useState } from "react";
+import { SEED } from "../../../teamframe/data/seed";
 import {
+  ActionItem,
+  ActionStatus,
   ControlState,
-  UIState,
   OrgNode,
-  Signal,
-  Action,
-  PositionEdit,
-  RiskItem,
-  SCENARIOS,
   computeUIState,
 } from "../../../teamframe/engine/compute";
 
-const SCENARIO_LABELS: Record<string, string> = {
-  DEFAULT_VIEW: "Default View",
-  VACANT_POSITION_FOCUS: "Vacant Position",
-  ON_LEAVE_EMPLOYEE_FOCUS: "On Leave Focus",
-  OFFBOARDING_EMPLOYEE_FOCUS: "Offboarding Focus",
-  MISSING_COMPLIANCE_FOCUS: "Compliance Issue",
-  FULL_ORGANIZATION_VIEW: "Full Org View",
-};
+type NavId = "org" | "people" | "actions" | "policies" | "finance" | "administration";
+type ActionFilter = "all" | "open" | "in_progress" | "completed";
+type AdminTab = "organization-setup" | "csv-imports" | "configuration" | "audit";
 
-const NAV_ITEMS = [
-  { id: "org", label: "Org Chart", icon: "⬡" },
-  { id: "risk", label: "Risk Heatmap", icon: "🔥", badge: true },
-  { id: "employees", label: "Employees", icon: "◉" },
-  { id: "signals", label: "Signals", icon: "△", badge: true },
-  { id: "actions", label: "Actions", icon: "⚡", badge: true },
-  { id: "compliance", label: "Compliance", icon: "✓" },
-  { id: "reports", label: "Reports", icon: "≡" },
-  { id: "settings", label: "Settings", icon: "⚙" },
+const NAV_ITEMS: { id: NavId; label: string; icon: string }[] = [
+  { id: "org", label: "Organization Map", icon: "⬡" },
+  { id: "people", label: "People", icon: "◉" },
+  { id: "actions", label: "Actions", icon: "⚡" },
+  { id: "policies", label: "Policies", icon: "📚" },
+  { id: "finance", label: "Finance", icon: "≡" },
+  { id: "administration", label: "Administration", icon: "⚙" },
 ];
 
-function Avatar({ initials, color, size = 36 }: { initials: string; color: string; size?: number }) {
-  return (
-    <div
-      style={{
-        width: size, height: size, borderRadius: "50%", background: color,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: size * 0.35, fontWeight: 600, color: "#fff", flexShrink: 0,
-        border: "2px solid rgba(255,255,255,0.15)",
-      }}
-    >
-      {initials}
-    </div>
-  );
+const ADMIN_TABS: { id: AdminTab; label: string }[] = [
+  { id: "organization-setup", label: "Organization Setup" },
+  { id: "csv-imports", label: "CSV Imports" },
+  { id: "configuration", label: "Configuration" },
+  { id: "audit", label: "Audit Timeline" },
+];
+
+const FILTER_TABS: { id: ActionFilter; label: string }[] = [
+  { id: "all", label: "All" },
+  { id: "open", label: "Open" },
+  { id: "in_progress", label: "In Progress" },
+  { id: "completed", label: "Completed" },
+];
+
+const cardStyle: React.CSSProperties = {
+  background: "rgba(255,255,255,0.03)",
+  border: "1px solid rgba(255,255,255,0.1)",
+  borderRadius: 10,
+};
+
+function positionStatusStyle(status: "filled" | "vacant" | "frozen") {
+  if (status === "filled") return { color: "#22c55e", label: "Filled" };
+  if (status === "vacant") return { color: "#f59e0b", label: "Vacant" };
+  return { color: "#94a3b8", label: "Frozen" };
 }
 
-function StatusDot({ status }: { status: "active" | "on_leave" | "offboarding" | "vacant" }) {
-  const colors: Record<string, string> = {
-    active: "#22c55e",
-    on_leave: "#f59e0b",
-    offboarding: "#ef4444",
-    vacant: "#6b7280",
-  };
-  return (
-    <span style={{
-      display: "inline-block", width: 8, height: 8, borderRadius: "50%",
-      background: colors[status] ?? "#6b7280", flexShrink: 0,
-    }} />
-  );
+function priorityStyle(priority: ActionItem["priority"]) {
+  if (priority === "critical") return { bg: "rgba(239,68,68,0.18)", color: "#fca5a5" };
+  if (priority === "high") return { bg: "rgba(245,158,11,0.18)", color: "#fcd34d" };
+  if (priority === "normal") return { bg: "rgba(99,102,241,0.18)", color: "#c7d2fe" };
+  return { bg: "rgba(148,163,184,0.18)", color: "#cbd5e1" };
 }
 
-function SignalBadge({ level }: { level: "critical" | "warning" | "info" }) {
-  const cfg = {
-    critical: { bg: "rgba(239,68,68,0.2)", color: "#ef4444", icon: "●" },
-    warning: { bg: "rgba(245,158,11,0.2)", color: "#f59e0b", icon: "▲" },
-    info: { bg: "rgba(99,102,241,0.2)", color: "#818cf8", icon: "ℹ" },
-  };
-  const { bg, color, icon } = cfg[level];
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      padding: "2px 7px", borderRadius: 12, background: bg, color, fontSize: 11, fontWeight: 600,
-    }}>
-      {icon} {level.charAt(0).toUpperCase() + level.slice(1)}
-    </span>
-  );
+function actionStatusStyle(status: ActionStatus) {
+  if (status === "completed") return { bg: "rgba(34,197,94,0.18)", color: "#86efac", label: "Completed" };
+  if (status === "in_progress") return { bg: "rgba(99,102,241,0.18)", color: "#c7d2fe", label: "In Progress" };
+  return { bg: "rgba(245,158,11,0.18)", color: "#fcd34d", label: "Open" };
 }
 
 function OrgNodeCard({
@@ -86,748 +67,83 @@ function OrgNodeCard({
 }: {
   node: OrgNode;
   selectedPositionId: string;
-  onSelect: (id: string) => void;
+  onSelect: (positionId: string, employeeId: string | null) => void;
 }) {
-  const emp = node.employee;
-  const isSelected = node.position.id === selectedPositionId;
-  const isVacant = !emp;
-  const isOffboarding = emp?.status === "offboarding";
-  const isOnLeave = emp?.status === "on_leave";
-
-  let borderColor = "rgba(255,255,255,0.08)";
-  if (isSelected) borderColor = "#6366f1";
-  else if (isOffboarding || node.signalLevel === "critical") borderColor = "rgba(239,68,68,0.5)";
-  else if (node.signalLevel === "warning") borderColor = "rgba(245,158,11,0.4)";
-  else if (isOnLeave || isVacant) borderColor = "rgba(245,158,11,0.35)";
+  const selected = selectedPositionId === node.position.id;
+  const dotColor =
+    node.signalLevel === "critical"
+      ? "#ef4444"
+      : node.signalLevel === "warning"
+      ? "#f59e0b"
+      : node.signalLevel === "info"
+      ? "#94a3b8"
+      : "#22c55e";
 
   return (
     <button
-      onClick={() => onSelect(node.position.id)}
+      onClick={() => onSelect(node.position.id, node.employee?.id ?? null)}
       style={{
-        background: isSelected ? "rgba(99,102,241,0.18)" : "rgba(255,255,255,0.04)",
-        border: `1px solid ${borderColor}`,
-        borderRadius: 10, padding: "10px 13px",
-        cursor: "pointer", textAlign: "left", width: 148,
-        transition: "all 0.15s ease",
-        outline: "none",
-        position: "relative",
+        ...cardStyle,
+        width: 188,
+        borderColor: selected ? "#6366f1" : "rgba(255,255,255,0.1)",
+        background: selected ? "rgba(99,102,241,0.16)" : "rgba(255,255,255,0.03)",
+        padding: "10px 11px",
+        textAlign: "left",
+        cursor: "pointer",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        {emp ? (
-          <Avatar initials={emp.avatarInitials} color={emp.avatarColor} size={28} />
-        ) : (
-          <div style={{
-            width: 28, height: 28, borderRadius: "50%",
-            background: "rgba(255,255,255,0.06)", border: "1.5px dashed rgba(255,255,255,0.2)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 13, color: "#6b7280",
-          }}>?</div>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#fff", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {emp?.name ?? "Vacant"}
-          </div>
-        </div>
-      </div>
-      <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.3, marginBottom: 4 }}>
-        {node.position.title}
-      </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 9, color: "#64748b", fontFamily: "monospace" }}>{node.position.id}</span>
-        <StatusDot status={isVacant ? "vacant" : (emp?.status ?? "active")} />
+      <div style={{ color: "#fff", fontSize: 12, fontWeight: 700, lineHeight: 1.3 }}>{node.position.title}</div>
+      <div style={{ color: "#94a3b8", fontSize: 11, marginTop: 3 }}>{node.employee?.name ?? "Vacant"}</div>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", marginTop: 8 }}>
+        <span style={{ width: 9, height: 9, borderRadius: "50%", background: dotColor, display: "inline-block" }} />
+        <span style={{ color: "#64748b", fontSize: 10 }}>{node.children.length} reports</span>
       </div>
     </button>
   );
 }
 
-function OrgLevel({
+function OrgTree({
   nodes,
   selectedPositionId,
   onSelect,
 }: {
   nodes: OrgNode[];
   selectedPositionId: string;
-  onSelect: (id: string) => void;
+  onSelect: (positionId: string, employeeId: string | null) => void;
 }) {
   if (!nodes.length) return null;
   return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
-        {nodes.map((node) => (
-          <div key={node.position.id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <OrgNodeCard node={node} selectedPositionId={selectedPositionId} onSelect={onSelect} />
-            {node.children.length > 0 && (
-              <>
-                <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
-                <OrgLevel nodes={node.children} selectedPositionId={selectedPositionId} onSelect={onSelect} />
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function OrgTreeView({
-  uiState,
-  onSelectPosition,
-}: {
-  uiState: UIState;
-  onSelectPosition: (id: string) => void;
-}) {
-  if (!uiState.orgTree.length) {
-    return <div style={{ color: "#6b7280", padding: 32 }}>No org data available</div>;
-  }
-
-  const root = uiState.orgTree[0];
-  if (!root) return null;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, minWidth: 900 }}>
-      <OrgNodeCard
-        node={root}
-        selectedPositionId={uiState.selectedPosition?.id ?? ""}
-        onSelect={onSelectPosition}
-      />
-      {root.children.length > 0 && (
-        <>
-          <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)" }} />
-          <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-            {root.children.map((child) => (
-              <div key={child.position.id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <OrgNodeCard
-                  node={child}
-                  selectedPositionId={uiState.selectedPosition?.id ?? ""}
-                  onSelect={onSelectPosition}
-                />
-                {child.children.length > 0 && (
-                  <>
-                    <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-                      {child.children.map((gc) => (
-                        <div key={gc.position.id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                          <OrgNodeCard
-                            node={gc}
-                            selectedPositionId={uiState.selectedPosition?.id ?? ""}
-                            onSelect={onSelectPosition}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-      <div style={{ display: "flex", gap: 20, marginTop: 24, flexWrap: "wrap", justifyContent: "center" }}>
-        {[
-          { color: "#22c55e", label: "Filled" },
-          { color: "#6b7280", label: "Vacant" },
-          { color: "#f59e0b", label: "On Leave" },
-          { color: "#ef4444", label: "Offboarding" },
-          { color: "#f87171", label: "Critical" },
-        ].map(({ color, label }) => (
-          <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#94a3b8" }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, display: "inline-block" }} />
-            {label}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
-}
-
-function RiskHeatmapView({
-  uiState,
-  onSelectPosition,
-}: {
-  uiState: UIState;
-  onSelectPosition: (id: string) => void;
-}) {
-  const rb = uiState.riskBreakdown;
-  const maxScore = Math.max(rb.vacancy, rb.offboarding, rb.leave, rb.compliance, rb.overload, rb.single_point, 1);
-  const total = uiState.riskScore;
-  const riskLevel = total >= 150 ? "critical" : total >= 80 ? "warning" : "healthy";
-  const riskColor = riskLevel === "critical" ? "#ef4444" : riskLevel === "warning" ? "#f59e0b" : "#22c55e";
-  const riskBg = riskLevel === "critical" ? "rgba(239,68,68,0.12)" : riskLevel === "warning" ? "rgba(245,158,11,0.12)" : "rgba(34,197,94,0.12)";
-
-  const bars = [
-    { label: "Vacancy", value: rb.vacancy, color: "#f59e0b" },
-    { label: "Offboarding", value: rb.offboarding, color: "#ef4444" },
-    { label: "On Leave", value: rb.leave, color: "#f59e0b" },
-    { label: "Compliance", value: rb.compliance, color: "#f97316" },
-    { label: "Overload", value: rb.overload, color: "#8b5cf6" },
-    { label: "Single Point", value: rb.single_point, color: "#ec4899" },
-  ];
-
-  const categoryMeta: Record<string, { label: string; color: string; icon: string }> = {
-    vacancy: { label: "Vacancy", color: "#f59e0b", icon: "◈" },
-    offboarding: { label: "Offboarding", color: "#ef4444", icon: "❌" },
-    leave: { label: "Leave", color: "#f59e0b", icon: "△" },
-    compliance: { label: "Compliance", color: "#f97316", icon: "⚠" },
-    overload: { label: "Overload", color: "#8b5cf6", icon: "⚡" },
-    single_point: { label: "Single Point", color: "#ec4899", icon: "✶" },
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Top Score Card */}
-      <div style={{
-        display: "flex", gap: 16, alignItems: "stretch",
-      }}>
-        <div style={{
-          flex: 1, padding: "20px 24px", borderRadius: 14,
-          background: riskBg, border: `1.5px solid ${riskColor}40`,
-          display: "flex", alignItems: "center", gap: 20,
-        }}>
-          <div style={{
-            width: 72, height: 72, borderRadius: "50%",
-            border: `3px solid ${riskColor}`, display: "flex",
-            alignItems: "center", justifyContent: "center",
-            fontSize: 28, fontWeight: 800, color: riskColor,
-          }}>
-            {total}
-          </div>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              Organization Risk Score
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: riskColor, marginTop: 4 }}>
-              {riskLevel === "critical" ? "CRITICAL RISK" : riskLevel === "warning" ? "MODERATE RISK" : "HEALTHY"}
-            </div>
-            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-              {uiState.risks.length} active risk items across {uiState.stats.totalPositions} positions
-            </div>
-          </div>
-        </div>
-        <div style={{
-          width: 340, padding: "20px 24px", borderRadius: 14,
-          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
-            Risk Breakdown
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {bars.map(({ label, value, color }) => (
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ width: 80, fontSize: 10, color: "#94a3b8", fontWeight: 500 }}>{label}</span>
-                <div style={{ flex: 1, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-                  <div style={{
-                    height: "100%", borderRadius: 4, background: color,
-                    width: `${(value / maxScore) * 100}%`,
-                    transition: "width 0.3s ease",
-                  }} />
-                </div>
-                <span style={{ width: 28, fontSize: 10, fontWeight: 700, color, textAlign: "right" }}>{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Risk Heatmap Grid */}
-      <div style={{
-        padding: "20px 24px", borderRadius: 14,
-        background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>
-          People Risk Map
-        </div>
-        <div style={{
-          display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10,
-        }}>
-          {uiState.risks.map((risk) => {
-            const meta = categoryMeta[risk.category] ?? categoryMeta.compliance;
-            return (
-              <div
-                key={`${risk.positionId}-${risk.category}`}
-                onClick={() => onSelectPosition(risk.positionId)}
-                style={{
-                  padding: "12px 14px", borderRadius: 10, textAlign: "left",
-                  background: risk.level === "critical" ? "rgba(239,68,68,0.08)"
-                    : risk.level === "warning" ? "rgba(245,158,11,0.08)"
-                    : "rgba(99,102,241,0.08)",
-                  border: `1.5px solid ${risk.level === "critical" ? "rgba(239,68,68,0.25)"
-                    : risk.level === "warning" ? "rgba(245,158,11,0.25)"
-                    : "rgba(99,102,241,0.25)"}`,
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <span style={{ fontSize: 14, color: meta.color }}>{meta.icon}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    {meta.label}
-                  </span>
-                  <span style={{
-                    marginLeft: "auto", fontSize: 10, fontWeight: 800,
-                    color: risk.level === "critical" ? "#ef4444" : risk.level === "warning" ? "#f59e0b" : "#818cf8",
-                  }}>
-                    +{risk.score}
-                  </span>
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", marginBottom: 2 }}>
-                  {risk.positionTitle}
-                </div>
-                <div style={{ fontSize: 10, color: "#94a3b8" }}>
-                  {risk.message}
-                </div>
-                <div style={{ fontSize: 9, color: "#64748b", marginTop: 2 }}>
-                  {risk.detail}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {uiState.risks.length === 0 && (
-          <div style={{ color: "#22c55e", fontSize: 14, padding: "40px 0", textAlign: "center" }}>
-            ✓ No risks detected — organization is healthy
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function PositionForm({
-  position,
-  onSave,
-  onCancel,
-}: {
-  position: Position;
-  onSave: (edit: PositionEdit) => void;
-  onCancel: () => void;
-}) {
-  const [title, setTitle] = useState(position.title);
-  const [department, setDepartment] = useState(position.department);
-
-  return (
-    <div style={{
-      padding: "14px 20px",
-      borderBottom: "1px solid rgba(255,255,255,0.07)",
-    }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
-        Edit Position
-      </div>
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ display: "block", fontSize: 10, color: "#64748b", marginBottom: 4, fontWeight: 600 }}>
-          Title
-        </label>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          style={{
-            width: "100%", padding: "8px 10px", fontSize: 12, color: "#e2e8f0",
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 6, outline: "none",
-          }}
-        />
-      </div>
-      <div style={{ marginBottom: 14 }}>
-        <label style={{ display: "block", fontSize: 10, color: "#64748b", marginBottom: 4, fontWeight: 600 }}>
-          Department
-        </label>
-        <input
-          value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-          style={{
-            width: "100%", padding: "8px 10px", fontSize: 12, color: "#e2e8f0",
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 6, outline: "none",
-          }}
-        />
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button
-          onClick={() => onSave({ id: position.id, title, department })}
-          style={{
-            flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 600,
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff",
-            border: "none", borderRadius: 6, cursor: "pointer",
-          }}
-        >
-          Save Changes
-        </button>
-        <button
-          onClick={onCancel}
-          style={{
-            flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 600,
-            background: "rgba(255,255,255,0.06)", color: "#94a3b8",
-            border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, cursor: "pointer",
-          }}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
-  );
-}
-
-function RightPanel({
-  uiState,
-  onResolveAction,
-  onCompleteOnboarding,
-  onClose,
-  onEditPosition,
-  isEditing,
-  onSaveEdit,
-  onCancelEdit,
-  expandedAction,
-  onToggleAction,
-}: {
-  uiState: UIState;
-  onResolveAction: (id: string) => void;
-  onCompleteOnboarding: (empId: string) => void;
-  onClose: () => void;
-  onEditPosition: () => void;
-  isEditing: boolean;
-  onSaveEdit: (edit: PositionEdit) => void;
-  onCancelEdit: () => void;
-  expandedAction: string | null;
-  onToggleAction: (id: string) => void;
-}) {
-  const emp = uiState.selectedEmployee;
-  const pos = uiState.selectedPosition;
-  const signals = uiState.signals.filter(
-    (s) => s.positionId === pos?.id
-  );
-  const actions = uiState.actions.filter(
-    (a) => a.positionId === pos?.id || a.positionId === "1-001"
-  ).slice(0, 4);
-
-  if (!pos) {
-    return (
-      <div style={{ color: "#6b7280", padding: 24, fontSize: 13 }}>
-        Select a position to view details
-      </div>
-    );
-  }
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <div style={{
-        padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.07)",
-        display: "flex", alignItems: "flex-start", justifyContent: "space-between",
-      }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-          {emp ? (
-            <Avatar initials={emp.avatarInitials} color={emp.avatarColor} size={44} />
-          ) : (
-            <div style={{
-              width: 44, height: 44, borderRadius: "50%",
-              background: "rgba(255,255,255,0.06)", border: "1.5px dashed rgba(255,255,255,0.2)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 18, color: "#6b7280",
-            }}>?</div>
+    <div style={{ display: "flex", gap: 14, justifyContent: "center", flexWrap: "wrap" }}>
+      {nodes.map((node) => (
+        <div key={node.position.id} style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+          <OrgNodeCard node={node} selectedPositionId={selectedPositionId} onSelect={onSelect} />
+          {node.children.length > 0 && (
+            <>
+              <div style={{ width: 1, height: 14, background: "rgba(255,255,255,0.14)" }} />
+              <OrgTree nodes={node.children} selectedPositionId={selectedPositionId} onSelect={onSelect} />
+            </>
           )}
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>
-              {emp?.name ?? "Vacant Position"}
-            </div>
-            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{pos.title}</div>
-            <div style={{ fontSize: 10, color: "#64748b", marginTop: 1 }}>
-              {emp ? "Employee" : "No employee"} · {pos.id}
-            </div>
-            {emp?.status === "offboarding" && (
-              <div style={{
-                marginTop: 6, display: "inline-flex", alignItems: "center", gap: 4,
-                background: "rgba(239,68,68,0.15)", color: "#ef4444",
-                padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600,
-              }}>
-                ● Critical
-              </div>
-            )}
-            {emp?.status === "on_leave" && (
-              <div style={{
-                marginTop: 6, display: "inline-flex", alignItems: "center", gap: 4,
-                background: "rgba(245,158,11,0.15)", color: "#f59e0b",
-                padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600,
-              }}>
-                ▲ On Leave
-              </div>
-            )}
-          </div>
         </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
-          <button
-            onClick={onEditPosition}
-            style={{
-              fontSize: 10, color: "#818cf8", background: "rgba(99,102,241,0.1)",
-              border: "1px solid rgba(99,102,241,0.3)", borderRadius: 4,
-              padding: "4px 10px", cursor: "pointer", fontWeight: 600,
-            }}
-          >
-            Edit
-          </button>
-          <button onClick={onClose} style={{
-            background: "none", border: "none", color: "#64748b",
-            cursor: "pointer", fontSize: 18, padding: "0 4px", lineHeight: 1,
-          }}>×</button>
-        </div>
-      </div>
-
-      {isEditing && pos && (
-        <PositionForm
-          position={pos}
-          onSave={onSaveEdit}
-          onCancel={onCancelEdit}
-        />
-      )}
-
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 0 16px" }}>
-        {emp && (
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-            {[
-              { label: "Reports To", value: SEED.positions.find(p => p.id === pos.reportsToId)?.title ?? "None" },
-              { label: "Department", value: pos.department },
-              { label: "Location", value: emp.location },
-              { label: "Email", value: emp.email },
-              { label: "Phone", value: emp.phone },
-              { label: "Start Date", value: emp.startDate },
-              { label: "Salary", value: `$${emp.salary.toLocaleString()}` },
-              { label: "Bank", value: `${emp.bankName} · ****${emp.bankAccount.slice(-4)}` },
-              { label: "Onboarding", value: emp.onboardingStatus === "complete" ? "Complete" : emp.onboardingStatus === "in_progress" ? "In Progress" : "Not Started" },
-            ].map(({ label, value }) => (
-              <div key={label} style={{
-                display: "flex", justifyContent: "space-between",
-                padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.04)",
-                fontSize: 12,
-              }}>
-                <span style={{ color: "#64748b" }}>{label}</span>
-                <span style={{ color: "#cbd5e1", fontWeight: 500, textAlign: "right", maxWidth: "55%", wordBreak: "break-all" }}>{value}</span>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {uiState.directReports.length > 0 && (
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
-              Direct Reports ({uiState.directReports.length})
-            </div>
-            {uiState.directReports.slice(0, 4).map(({ position, employee: dr }) => (
-              <div key={position.id} style={{
-                display: "flex", alignItems: "center", gap: 10, padding: "6px 0",
-                borderBottom: "1px solid rgba(255,255,255,0.04)",
-              }}>
-                {dr ? (
-                  <Avatar initials={dr.avatarInitials} color={dr.avatarColor} size={28} />
-                ) : (
-                  <div style={{
-                    width: 28, height: 28, borderRadius: "50%",
-                    background: "rgba(255,255,255,0.06)", border: "1.5px dashed rgba(255,255,255,0.2)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 13, color: "#6b7280",
-                  }}>?</div>
-                )}
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0" }}>{position.title}</div>
-                  <div style={{ fontSize: 10, color: "#64748b" }}>{position.id}</div>
-                </div>
-              </div>
-            ))}
-            {uiState.directReports.length > 4 && (
-              <button style={{
-                marginTop: 8, fontSize: 11, color: "#818cf8", background: "none",
-                border: "none", cursor: "pointer", padding: 0,
-              }}>
-                View All Reports
-              </button>
-            )}
-          </div>
-        )}
-
-        {signals.length > 0 && (
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
-              Signals ({signals.length})
-            </div>
-            {signals.map((sig) => (
-              <div key={sig.id} style={{
-                padding: "8px 10px", borderRadius: 8, marginBottom: 8,
-                background: sig.level === "critical" ? "rgba(239,68,68,0.08)" : sig.level === "warning" ? "rgba(245,158,11,0.08)" : "rgba(99,102,241,0.08)",
-                border: `1px solid ${sig.level === "critical" ? "rgba(239,68,68,0.2)" : sig.level === "warning" ? "rgba(245,158,11,0.2)" : "rgba(99,102,241,0.2)"}`,
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                  <SignalBadge level={sig.level} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0" }}>{sig.message}</span>
-                </div>
-                <div style={{ fontSize: 11, color: "#94a3b8" }}>{sig.detail}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {actions.length > 0 && (
-          <div style={{ padding: "14px 20px" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
-              Actions ({actions.length})
-            </div>
-            {actions.map((act) => (
-              <div key={act.id} style={{ marginBottom: 6 }}>
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "8px 10px", borderRadius: 8,
-                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: 6,
-                      background: "rgba(99,102,241,0.15)", display: "flex",
-                      alignItems: "center", justifyContent: "center", fontSize: 13, color: "#818cf8",
-                    }}>⚡</div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0" }}>{act.label}</div>
-                      <div style={{ fontSize: 10, color: "#64748b" }}>{act.dueIn}</div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (act.type === "assign_employee" || act.type === "fix_compliance" || act.type === "complete_offboarding" || act.type === "review_capacity" || act.type === "update_descriptions") {
-                        onResolveAction(act.id);
-                      } else {
-                        onToggleAction(act.id);
-                      }
-                    }}
-                    style={{
-                      fontSize: 10, color: "#818cf8", background: "rgba(99,102,241,0.1)",
-                      border: "1px solid rgba(99,102,241,0.3)", borderRadius: 4,
-                      padding: "3px 8px", cursor: "pointer", fontWeight: 600,
-                    }}
-                  >
-                    {act.type === "update_job_desc" || act.type === "assign_document" || act.type === "complete_onboarding" ? "Open" : "Resolve"}
-                  </button>
-                </div>
-                {expandedAction === act.id && (
-                  <div style={{
-                    padding: "10px 12px", borderRadius: "0 0 8px 8px",
-                    background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.05)",
-                    borderTop: "none",
-                  }}>
-                    {act.type === "update_job_desc" && (
-                      <div>
-                        <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>Upload updated job description file</div>
-                        <div style={{
-                          border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 6,
-                          padding: "12px", textAlign: "center", fontSize: 11, color: "#64748b",
-                          marginBottom: 8,
-                        }}>
-                          📄 Drop file here or click to browse
-                        </div>
-                        <button
-                          onClick={() => onResolveAction(act.id)}
-                          style={{
-                            padding: "5px 12px", fontSize: 11, fontWeight: 600,
-                            background: "rgba(99,102,241,0.2)", color: "#818cf8",
-                            border: "1px solid rgba(99,102,241,0.3)", borderRadius: 4,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Submit & Complete
-                        </button>
-                      </div>
-                    )}
-                    {act.type === "assign_document" && (
-                      <div>
-                        <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>Select document to assign</div>
-                        <div style={{
-                          border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 6,
-                          padding: "12px", textAlign: "center", fontSize: 11, color: "#64748b",
-                          marginBottom: 8,
-                        }}>
-                          📄 Drop file here or click to browse
-                        </div>
-                        <button
-                          onClick={() => onResolveAction(act.id)}
-                          style={{
-                            padding: "5px 12px", fontSize: 11, fontWeight: 600,
-                            background: "rgba(99,102,241,0.2)", color: "#818cf8",
-                            border: "1px solid rgba(99,102,241,0.3)", borderRadius: 4,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Assign Document
-                        </button>
-                      </div>
-                    )}
-                    {act.type === "complete_onboarding" && emp && (
-                      <div>
-                        <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>
-                          Complete onboarding for {emp.name}
-                        </div>
-                        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>
-                          Current status: {emp.onboardingStatus === "complete" ? "Complete" : emp.onboardingStatus === "in_progress" ? "In Progress" : "Not Started"}
-                        </div>
-                        <button
-                          onClick={() => onCompleteOnboarding(emp.id)}
-                          style={{
-                            padding: "5px 12px", fontSize: 11, fontWeight: 600,
-                            background: "rgba(34,197,94,0.2)", color: "#22c55e",
-                            border: "1px solid rgba(34,197,94,0.3)", borderRadius: 4,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Mark Onboarding Complete
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
+      ))}
     </div>
   );
 }
 
-function JsonInspectorPanel({ seed, controlState, uiState }: {
-  seed: typeof SEED;
-  controlState: ControlState;
-  uiState: UIState;
-}) {
-  const [tab, setTab] = useState<"seed" | "control" | "ui">("control");
-  const data = tab === "seed" ? { positions: seed.positions.length, employees: seed.employees.length, compliance: seed.compliance.length }
-    : tab === "control" ? controlState
-    : { selectedPosition: uiState.selectedPosition?.id, selectedEmployee: uiState.selectedEmployee?.id, signals: uiState.signals.length, actions: uiState.actions.length };
-
-  return (
-    <div style={{
-      background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.07)",
-      borderRadius: 10, overflow: "hidden",
-    }}>
-      <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-        {(["seed", "control", "ui"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              flex: 1, padding: "8px 0", fontSize: 10, fontWeight: 600,
-              background: tab === t ? "rgba(99,102,241,0.2)" : "none",
-              color: tab === t ? "#818cf8" : "#64748b",
-              border: "none", cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.06em",
-            }}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-      <pre style={{
-        margin: 0, padding: "12px 14px", fontSize: 9.5, color: "#94a3b8",
-        overflowX: "auto", maxHeight: 180, overflowY: "auto", lineHeight: 1.6,
-      }}>
-        {JSON.stringify(data, null, 2)}
-      </pre>
-    </div>
-  );
+function formatDate(value: string): string {
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return value;
+  return parsed.toLocaleDateString();
 }
 
 export function TeamFrame() {
-  const [activeNav, setActiveNav] = useState("org");
+  const [activeNav, setActiveNav] = useState<NavId>("org");
+  const [actionFilter, setActionFilter] = useState<ActionFilter>("all");
+  const [adminTab, setAdminTab] = useState<AdminTab>("organization-setup");
+  const [detailOpen, setDetailOpen] = useState(false);
+  const [directorySearch, setDirectorySearch] = useState("");
+  const [financeSearch, setFinanceSearch] = useState("");
+  const [newCommentByAction, setNewCommentByAction] = useState<Record<string, string>>({});
+
   const [controlState, setControlState] = useState<ControlState>({
     scenarioId: "DEFAULT_VIEW",
     selectedPositionId: "1-001",
@@ -835,550 +151,686 @@ export function TeamFrame() {
     resolvedActions: [],
     positionEdits: [],
     onboardingCompleted: [],
+    actionOverrides: {},
   });
-  const [expandedAction, setExpandedAction] = useState<string | null>(null);
-  const [employeeSearch, setEmployeeSearch] = useState("");
-  const [showJson, setShowJson] = useState(false);
-  const [editingPosition, setEditingPosition] = useState<string | null>(null);
 
   const uiState = useMemo(() => computeUIState(SEED, controlState), [controlState]);
 
-  const setScenario = (scenarioId: string) => {
-    setControlState((prev) => ({ ...prev, scenarioId }));
-  };
-  const setSelectedPositionId = (id: string) => {
-    const emp = SEED.employees.find((e) => e.positionId === id);
+  const ownerOptions = useMemo(
+    () =>
+      SEED.employees.map((employee) => ({
+        id: employee.id,
+        label: employee.name,
+      })),
+    []
+  );
+
+  const selectPosition = (positionId: string, employeeId: string | null) => {
     setControlState((prev) => ({
       ...prev,
-      selectedPositionId: id,
-      selectedEmployeeId: emp?.id ?? null,
-      scenarioId: "DEFAULT_VIEW",
+      selectedPositionId: positionId,
+      selectedEmployeeId: employeeId,
     }));
+    setDetailOpen(true);
   };
-  const resolveAction = (actionId: string) => {
+
+  const setActionOverride = (actionId: string, patch: Partial<ControlState["actionOverrides"][string]>) => {
     setControlState((prev) => ({
       ...prev,
-      resolvedActions: [...prev.resolvedActions, actionId],
-    }));
-    setExpandedAction(null);
-  };
-  const completeOnboarding = (empId: string) => {
-    setControlState((prev) => ({
-      ...prev,
-      onboardingCompleted: [...prev.onboardingCompleted, empId],
-      resolvedActions: [...prev.resolvedActions, "act-complete-onboarding"],
+      actionOverrides: {
+        ...prev.actionOverrides,
+        [actionId]: {
+          ...(prev.actionOverrides[actionId] ?? {}),
+          ...patch,
+        },
+      },
     }));
   };
-  const updatePosition = (edit: PositionEdit) => {
+
+  const setActionStatus = (action: ActionItem, status: ActionStatus) => {
+    setActionOverride(action.id, { status });
     setControlState((prev) => {
-      const existing = prev.positionEdits.find((e) => e.id === edit.id);
-      const nextEdits = existing
-        ? prev.positionEdits.map((e) => (e.id === edit.id ? edit : e))
-        : [...prev.positionEdits, edit];
-      return { ...prev, positionEdits: nextEdits };
+      const resolved = new Set(prev.resolvedActions);
+      if (status === "completed") {
+        resolved.add(action.id);
+        resolved.add(action.linkedRiskId);
+      } else {
+        resolved.delete(action.id);
+        resolved.delete(action.linkedRiskId);
+      }
+      return { ...prev, resolvedActions: [...resolved] };
     });
   };
-  const updateEmployee = (empId: string, positionId: string) => {
-    setControlState((prev) => ({
-      ...prev,
-      selectedEmployeeId: empId,
-      selectedPositionId: positionId,
-    }));
+
+  const addActionComment = (action: ActionItem) => {
+    const comment = (newCommentByAction[action.id] ?? "").trim();
+    if (!comment) return;
+    setActionOverride(action.id, {
+      comments: [...action.comments, `${new Date().toISOString().slice(0, 10)} · ${comment}`],
+    });
+    setNewCommentByAction((prev) => ({ ...prev, [action.id]: "" }));
   };
 
-  return (
-    <div style={{
-      display: "flex", height: "100vh", width: "100vw",
-      background: "#0f1117", color: "#e2e8f0", fontFamily: "'Inter', system-ui, sans-serif",
-      overflow: "hidden",
-    }}>
-      {/* Sidebar */}
-      <div style={{
-        width: 200, flexShrink: 0, background: "#13161f",
-        borderRight: "1px solid rgba(255,255,255,0.06)",
-        display: "flex", flexDirection: "column",
-      }}>
-        {/* Logo */}
-        <div style={{
-          padding: "16px 16px 12px",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          display: "flex", alignItems: "center", gap: 8,
-        }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 8,
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 14, fontWeight: 700, color: "#fff",
-          }}>T</div>
-          <span style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>TeamFrame V2</span>
-        </div>
+  const filteredActions = uiState.actions.filter((action) => {
+    if (actionFilter === "all") return true;
+    return action.status === actionFilter;
+  });
 
-        {/* Nav */}
-        <nav style={{ flex: 1, padding: "8px 0" }}>
+  const peopleRows = uiState.employeeDirectory.filter((row) => {
+    const query = directorySearch.trim().toLowerCase();
+    if (!query) return true;
+    return `${row.employeeName} ${row.positionTitle} ${row.department} ${row.email} ${row.managerName}`
+      .toLowerCase()
+      .includes(query);
+  });
+
+  const financeRows = uiState.financeRows.filter((row) => {
+    const query = financeSearch.trim().toLowerCase();
+    if (!query) return true;
+    return `${row.employeeId} ${row.employeeName} ${row.position} ${row.department} ${row.manager}`
+      .toLowerCase()
+      .includes(query);
+  });
+
+  const selectedPositionStatus =
+    uiState.selectedPositionStatus && positionStatusStyle(uiState.selectedPositionStatus);
+
+  return (
+    <div
+      style={{
+        display: "flex",
+        width: "100vw",
+        height: "100vh",
+        background: "#0f1117",
+        color: "#e2e8f0",
+        fontFamily: "'Inter', system-ui, sans-serif",
+      }}
+    >
+      <aside
+        style={{
+          width: 228,
+          borderRight: "1px solid rgba(255,255,255,0.1)",
+          background: "#13161f",
+          display: "flex",
+          flexDirection: "column",
+        }}
+      >
+        <div style={{ padding: "16px 14px", borderBottom: "1px solid rgba(255,255,255,0.1)" }}>
+          <div style={{ color: "#fff", fontSize: 14, fontWeight: 800 }}>TeamFrame</div>
+          <div style={{ color: "#64748b", fontSize: 10 }}>Operations Platform</div>
+        </div>
+        <nav style={{ flex: 1, paddingTop: 8 }}>
           {NAV_ITEMS.map((item) => {
-            const isActive = activeNav === item.id;
-            const count = item.id === "signals" ? uiState.signals.length
-              : item.id === "actions" ? uiState.actions.length
-              : item.id === "risk" ? uiState.risks.length
-              : 0;
+            const active = activeNav === item.id;
+            const badge = item.id === "actions" ? uiState.stats.needsAttention : 0;
             return (
               <button
                 key={item.id}
                 onClick={() => setActiveNav(item.id)}
                 style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  width: "100%", padding: "9px 16px", textAlign: "left",
-                  background: isActive ? "rgba(99,102,241,0.15)" : "none",
-                  borderLeft: `2px solid ${isActive ? "#6366f1" : "transparent"}`,
-                  color: isActive ? "#818cf8" : "#64748b",
-                  cursor: "pointer", fontSize: 12, fontWeight: isActive ? 600 : 400,
-                  transition: "all 0.1s ease",
+                  width: "100%",
+                  border: "none",
+                  textAlign: "left",
+                  borderLeft: `2px solid ${active ? "#6366f1" : "transparent"}`,
+                  background: active ? "rgba(99,102,241,0.16)" : "none",
+                  color: active ? "#c7d2fe" : "#64748b",
+                  fontSize: 12,
+                  fontWeight: active ? 700 : 500,
+                  padding: "8px 14px",
+                  display: "flex",
+                  gap: 8,
+                  alignItems: "center",
+                  cursor: "pointer",
                 }}
               >
-                <span style={{ fontSize: 13 }}>{item.icon}</span>
+                <span>{item.icon}</span>
                 <span style={{ flex: 1 }}>{item.label}</span>
-                {item.badge && count > 0 && (
-                  <span style={{
-                    background: item.id === "signals" ? "rgba(239,68,68,0.8)" : "rgba(99,102,241,0.8)",
-                    color: "#fff", borderRadius: 8, padding: "1px 6px", fontSize: 10, fontWeight: 700,
-                  }}>{count}</span>
+                {badge > 0 && (
+                  <span
+                    style={{
+                      fontSize: 9,
+                      background: "rgba(99,102,241,0.75)",
+                      color: "#fff",
+                      borderRadius: 8,
+                      padding: "1px 6px",
+                    }}
+                  >
+                    {badge}
+                  </span>
                 )}
               </button>
             );
           })}
         </nav>
+      </aside>
 
-        {/* Org Overview */}
-        <div style={{
-          padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.06)",
-          background: "rgba(0,0,0,0.15)",
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-            Organization Overview
-          </div>
-          {[
-            { label: "Total Positions", value: uiState.stats.totalPositions, color: "#e2e8f0" },
-            { label: "Filled Positions", value: `${uiState.stats.filledPositions}`, pct: `${uiState.stats.filledPct}%`, color: "#22c55e" },
-            { label: "Vacant Positions", value: `${uiState.stats.vacantPositions}`, pct: `${uiState.stats.vacantPct}%`, color: "#f59e0b" },
-            { label: "On Leave", value: `${uiState.stats.onLeaveCount}`, pct: `${uiState.stats.onLeavePct}%`, color: "#f59e0b" },
-            { label: "Offboarding", value: `${uiState.stats.offboardingCount}`, pct: `${uiState.stats.offboardingPct}%`, color: "#ef4444" },
-          ].map(({ label, value, pct, color }) => (
-            <div key={label} style={{ marginBottom: 6 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <span style={{ fontSize: 10, color: "#64748b" }}>{label}</span>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color }}>{value}</span>
-                  {pct && <span style={{ fontSize: 9, color: "#475569" }}>{pct}</span>}
-                </div>
-              </div>
-            </div>
-          ))}
+      <main style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
+        <header
+          style={{
+            height: 56,
+            borderBottom: "1px solid rgba(255,255,255,0.1)",
+            background: "#13161f",
+            display: "flex",
+            alignItems: "center",
+            padding: "0 14px",
+          }}
+        >
+          <h1 style={{ margin: 0, color: "#fff", fontSize: 16, fontWeight: 800 }}>
+            {NAV_ITEMS.find((item) => item.id === activeNav)?.label}
+          </h1>
+        </header>
 
-          <div style={{ marginTop: 10, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: "#475569", marginBottom: 6 }}>Signal Summary</div>
-            {[
-              { label: "Critical", count: uiState.signalSummary.critical, color: "#ef4444" },
-              { label: "High", count: uiState.signalSummary.high, color: "#f59e0b" },
-              { label: "Medium", count: uiState.signalSummary.medium, color: "#eab308" },
-              { label: "Low", count: uiState.signalSummary.low, color: "#22c55e" },
-            ].map(({ label, count, color }) => (
-              <div key={label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, display: "inline-block" }} />
-                  <span style={{ fontSize: 10, color: "#64748b" }}>{label}</span>
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color }}>{count}</span>
-              </div>
-            ))}
-            <button style={{
-              marginTop: 6, width: "100%", padding: "5px 0", fontSize: 10, fontWeight: 600,
-              background: "rgba(99,102,241,0.1)", color: "#818cf8",
-              border: "1px solid rgba(99,102,241,0.2)", borderRadius: 6, cursor: "pointer",
-            }}>
-              View All Signals
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Area */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {/* Top Header */}
-        <div style={{
-          height: 52, flexShrink: 0,
-          background: "#13161f", borderBottom: "1px solid rgba(255,255,255,0.06)",
-          display: "flex", alignItems: "center", padding: "0 20px", gap: 16,
-        }}>
-          <div style={{ flex: 1 }}>
-            <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#fff" }}>
-              {activeNav === "org" ? "Organization Chart"
-                : activeNav === "risk" ? "People Risk Heatmap"
-                : activeNav === "signals" ? "Signals"
-                : activeNav === "actions" ? "Actions"
-                : activeNav === "compliance" ? "Compliance"
-                : activeNav === "employees" ? "Employee Directory"
-                : activeNav === "reports" ? "Reports"
-                : activeNav.charAt(0).toUpperCase() + activeNav.slice(1)}
-            </h1>
-            <div style={{ fontSize: 10, color: "#475569", marginTop: 1 }}>
-              Position-centric · See reporting relationships at a glance
-            </div>
-          </div>
-
-          {/* Search */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 8, padding: "6px 12px", width: 220,
-          }}>
-            <span style={{ color: "#64748b", fontSize: 12 }}>🔍</span>
-            <span style={{ fontSize: 11, color: "#475569" }}>Search positions or employees...</span>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button
-              onClick={() => setShowJson(!showJson)}
-              style={{
-                padding: "5px 12px", fontSize: 10, fontWeight: 600,
-                background: showJson ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.06)",
-                color: showJson ? "#818cf8" : "#64748b",
-                border: `1px solid ${showJson ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.08)"}`,
-                borderRadius: 6, cursor: "pointer",
-              }}
-            >
-              {"{}"} JSON Inspector
-            </button>
-            <div style={{
-              width: 32, height: 32, borderRadius: "50%",
-              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 700, color: "#fff", cursor: "pointer",
-            }}>SJ</div>
-          </div>
-        </div>
-
-        {/* Scenario Bar */}
-        <div style={{
-          height: 40, flexShrink: 0, padding: "0 20px",
-          background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.05)",
-          display: "flex", alignItems: "center", gap: 8,
-        }}>
-          <span style={{ fontSize: 10, color: "#475569", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginRight: 4 }}>
-            Scenario:
-          </span>
-          {Object.entries(SCENARIO_LABELS).map(([id, label]) => (
-            <button
-              key={id}
-              onClick={() => setScenario(id)}
-              style={{
-                padding: "3px 10px", fontSize: 10, fontWeight: 600,
-                background: controlState.scenarioId === id ? "rgba(99,102,241,0.25)" : "rgba(255,255,255,0.04)",
-                color: controlState.scenarioId === id ? "#818cf8" : "#64748b",
-                border: `1px solid ${controlState.scenarioId === id ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.07)"}`,
-                borderRadius: 5, cursor: "pointer", whiteSpace: "nowrap",
-                transition: "all 0.1s ease",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-          <div style={{ flex: 1 }} />
-          <button style={{
-            padding: "3px 10px", fontSize: 10, fontWeight: 600,
-            background: "rgba(255,255,255,0.04)", color: "#64748b",
-            border: "1px solid rgba(255,255,255,0.07)", borderRadius: 5, cursor: "pointer",
-          }}>
-            ⊞ Filters
-          </button>
-          <button style={{
-            padding: "3px 10px", fontSize: 10, fontWeight: 600,
-            background: "rgba(255,255,255,0.04)", color: "#64748b",
-            border: "1px solid rgba(255,255,255,0.07)", borderRadius: 5, cursor: "pointer",
-          }}>
-            ☰ View Options
-          </button>
-          <button style={{
-            padding: "3px 12px", fontSize: 10, fontWeight: 700,
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff",
-            border: "none", borderRadius: 5, cursor: "pointer",
-          }}>
-            + Add Position
-          </button>
-        </div>
-
-        {/* Content Area */}
-        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-          {/* Org / Main Panel */}
-          <div style={{ flex: 1, overflowX: "auto", overflowY: "auto", padding: "28px 24px" }}>
-            {activeNav === "org" && (
-              <OrgTreeView uiState={uiState} onSelectPosition={setSelectedPositionId} />
-            )}
-            {activeNav === "risk" && (
-              <RiskHeatmapView uiState={uiState} onSelectPosition={setSelectedPositionId} />
-            )}
-            {activeNav === "signals" && (
-              <div>
-                <div style={{ marginBottom: 16, fontSize: 13, color: "#94a3b8" }}>
-                  {uiState.signals.length} active signals across the organization
-                </div>
-                {uiState.signals.map((sig) => {
-                  const pos = SEED.positions.find((p) => p.id === sig.positionId);
-                  const emp = SEED.employees.find((e) => e.positionId === sig.positionId);
-                  return (
-                    <div key={sig.id} style={{
-                      padding: "12px 16px", borderRadius: 10, marginBottom: 10,
-                      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                      display: "flex", alignItems: "center", gap: 14,
-                    }}>
-                      <SignalBadge level={sig.level} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: "#e2e8f0", marginBottom: 2 }}>{sig.message}</div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>{sig.detail}</div>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{pos?.title}</div>
-                        <div style={{ fontSize: 10, color: "#475569" }}>{emp?.name ?? "Vacant"}</div>
-                      </div>
-                      <button
-                        onClick={() => resolveAction(sig.id)}
-                        style={{
-                          fontSize: 10, color: "#818cf8", background: "rgba(99,102,241,0.1)",
-                          border: "1px solid rgba(99,102,241,0.3)", borderRadius: 4,
-                          padding: "4px 10px", cursor: "pointer", fontWeight: 600,
-                        }}
-                      >
-                        Resolve
-                      </button>
-                    </div>
-                  );
-                })}
-                {uiState.signals.length === 0 && (
-                  <div style={{ color: "#22c55e", fontSize: 14, padding: "40px 0", textAlign: "center" }}>
-                    ✓ All signals resolved — organization is healthy
+        <section style={{ flex: 1, overflow: "auto", padding: 14, position: "relative" }}>
+          {activeNav === "org" && (
+            <div style={{ display: "grid", gap: 12 }}>
+              <div style={{ ...cardStyle, padding: 10, display: "grid", gap: 8, gridTemplateColumns: "repeat(6, minmax(130px, 1fr))" }}>
+                {[
+                  { label: "Total Positions", value: uiState.stats.totalPositions },
+                  { label: "Filled Positions", value: uiState.stats.filledPositions },
+                  { label: "Vacant Positions", value: uiState.stats.vacantPositions },
+                  { label: "Critical Vacancies", value: uiState.stats.criticalVacancies },
+                  { label: "Needs Attention", value: uiState.stats.needsAttention },
+                  { label: "Due Soon (48h)", value: uiState.stats.dueSoon },
+                ].map((item) => (
+                  <div key={item.label} style={{ ...cardStyle, padding: 8 }}>
+                    <div style={{ color: "#64748b", fontSize: 10 }}>{item.label}</div>
+                    <div style={{ color: "#fff", fontSize: 18, fontWeight: 800 }}>{item.value}</div>
                   </div>
-                )}
+                ))}
               </div>
-            )}
-            {activeNav === "actions" && (
-              <div>
-                <div style={{ marginBottom: 16, fontSize: 13, color: "#94a3b8" }}>
-                  {uiState.actions.length} pending actions
-                </div>
-                {uiState.actions.map((act) => {
-                  const pos = SEED.positions.find((p) => p.id === act.positionId);
-                  return (
-                    <div key={act.id} style={{
-                      padding: "14px 16px", borderRadius: 10, marginBottom: 10,
-                      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                      display: "flex", alignItems: "center", gap: 14,
-                    }}>
-                      <div style={{
-                        width: 36, height: 36, borderRadius: 8,
-                        background: "rgba(99,102,241,0.15)", display: "flex",
-                        alignItems: "center", justifyContent: "center", fontSize: 16, color: "#818cf8",
-                      }}>⚡</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: "#e2e8f0", marginBottom: 2 }}>{act.label}</div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>{pos?.title} · {pos?.department}</div>
-                      </div>
-                      <span style={{ fontSize: 11, color: "#94a3b8" }}>{act.dueIn}</span>
-                      <button
-                        onClick={() => resolveAction(act.id)}
-                        style={{
-                          fontSize: 10, color: "#22c55e", background: "rgba(34,197,94,0.1)",
-                          border: "1px solid rgba(34,197,94,0.3)", borderRadius: 4,
-                          padding: "4px 10px", cursor: "pointer", fontWeight: 600,
-                        }}
-                      >
-                        Complete
-                      </button>
-                    </div>
-                  );
-                })}
-                {uiState.actions.length === 0 && (
-                  <div style={{ color: "#22c55e", fontSize: 14, padding: "40px 0", textAlign: "center" }}>
-                    ✓ All actions completed
-                  </div>
-                )}
-              </div>
-            )}
-            {activeNav === "compliance" && (
-              <div>
-                <div style={{ marginBottom: 16, fontSize: 13, color: "#94a3b8" }}>
-                  Compliance status across all positions
-                </div>
-                {SEED.compliance.map((item) => {
-                  const pos = SEED.positions.find((p) => p.id === item.positionId);
-                  const statusCfg = item.status === "complete"
-                    ? { color: "#22c55e", bg: "rgba(34,197,94,0.1)", label: "Complete" }
-                    : item.status === "expired"
-                    ? { color: "#f59e0b", bg: "rgba(245,158,11,0.1)", label: "Expired" }
-                    : { color: "#ef4444", bg: "rgba(239,68,68,0.1)", label: "Missing" };
-                  return (
-                    <div key={item.id} style={{
-                      padding: "12px 16px", borderRadius: 10, marginBottom: 8,
-                      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                      display: "flex", alignItems: "center", gap: 14,
-                    }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: "#e2e8f0", marginBottom: 2 }}>{item.type}</div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>{item.description} · {pos?.title}</div>
-                      </div>
-                      <span style={{
-                        padding: "3px 10px", borderRadius: 12,
-                        background: statusCfg.bg, color: statusCfg.color,
-                        fontSize: 11, fontWeight: 600,
-                      }}>
-                        {statusCfg.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {activeNav === "reports" && (
-              <div>
-                <div style={{ marginBottom: 16, fontSize: 13, color: "#94a3b8" }}>
-                  Reports &mdash; Finance Report (read-only)
-                </div>
-                <div style={{
-                  padding: "16px 20px", borderRadius: 10, marginBottom: 10,
-                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
-                    Employee Finance Details
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {SEED.employees.map((emp) => {
-                      const pos = SEED.positions.find((p) => p.id === emp.positionId);
-                      return (
-                        <div key={emp.id} style={{
-                          display: "flex", alignItems: "center", gap: 12,
-                          padding: "10px 12px", borderRadius: 8,
-                          background: "rgba(255,255,255,0.02)",
-                        }}>
-                          <Avatar initials={emp.avatarInitials} color={emp.avatarColor} size={32} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0" }}>{emp.name}</div>
-                            <div style={{ fontSize: 10, color: "#64748b" }}>{pos?.title} &middot; {pos?.department}</div>
-                          </div>
-                          <div style={{ textAlign: "right", minWidth: 100 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: "#22c55e" }}>${emp.salary.toLocaleString()}</div>
-                            <div style={{ fontSize: 9, color: "#64748b" }}>{emp.bankName} &middot; ****{emp.bankAccount.slice(-4)}</div>
-                          </div>
-                          <div style={{
-                            padding: "2px 8px", borderRadius: 12, fontSize: 10, fontWeight: 600,
-                            background: emp.status === "active" ? "rgba(34,197,94,0.1)" : emp.status === "on_leave" ? "rgba(245,158,11,0.1)" : "rgba(239,68,68,0.1)",
-                            color: emp.status === "active" ? "#22c55e" : emp.status === "on_leave" ? "#f59e0b" : "#ef4444",
-                          }}>
-                            {emp.status === "active" ? "Active" : emp.status === "on_leave" ? "Leave" : "Offboarding"}
-                          </div>
+
+              <div style={{ ...cardStyle, minHeight: "76vh", paddingTop: 22, position: "relative" }}>
+                <OrgTree nodes={uiState.orgTree} selectedPositionId={controlState.selectedPositionId} onSelect={selectPosition} />
+
+                {detailOpen && uiState.selectedPosition && (
+                  <aside
+                    style={{
+                      position: "absolute",
+                      right: 0,
+                      top: 0,
+                      width: 340,
+                      height: "100%",
+                      borderLeft: "1px solid rgba(255,255,255,0.1)",
+                      background: "#161b27",
+                      padding: 12,
+                      overflowY: "auto",
+                    }}
+                  >
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                      <div>
+                        <div style={{ color: "#fff", fontSize: 14, fontWeight: 800 }}>
+                          {uiState.selectedPosition.title}
                         </div>
-                      );
-                    })}
-                  </div>
-                </div>
+                        <div style={{ color: "#94a3b8", fontSize: 11 }}>
+                          {uiState.selectedEmployee?.name ?? "Vacant"}
+                        </div>
+                      </div>
+                      <button
+                        onClick={() => setDetailOpen(false)}
+                        style={{ background: "none", border: "none", color: "#94a3b8", cursor: "pointer", fontSize: 18 }}
+                      >
+                        ×
+                      </button>
+                    </div>
+
+                    <div style={{ ...cardStyle, padding: 10 }}>
+                      <div style={{ color: "#64748b", fontSize: 10, textTransform: "uppercase", marginBottom: 6 }}>
+                        Position Status
+                      </div>
+                      <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12 }}>
+                        {selectedPositionStatus && (
+                          <>
+                            <span
+                              style={{
+                                width: 10,
+                                height: 10,
+                                borderRadius: "50%",
+                                background: selectedPositionStatus.color,
+                                display: "inline-block",
+                              }}
+                            />
+                            {selectedPositionStatus.label}
+                          </>
+                        )}
+                      </div>
+                    </div>
+
+                    <div style={{ ...cardStyle, padding: 10, marginTop: 10 }}>
+                      <div style={{ color: "#64748b", fontSize: 10, textTransform: "uppercase", marginBottom: 6 }}>
+                        Missing Items
+                      </div>
+                      <ul style={{ margin: "0 0 0 16px", padding: 0, color: "#cbd5e1", fontSize: 12 }}>
+                        {uiState.selectedPositionMissingItems.length === 0 ? (
+                          <li>None</li>
+                        ) : (
+                          uiState.selectedPositionMissingItems.map((item) => <li key={item}>{item}</li>)
+                        )}
+                      </ul>
+                    </div>
+                  </aside>
+                )}
               </div>
-            )}
-            {activeNav === "employees" && (
-              <div>
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>
-                    {SEED.employees.length} employees
-                  </div>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 8, padding: "6px 12px", width: 300,
-                  }}>
-                    <span style={{ color: "#64748b", fontSize: 12 }}>⌕</span>
-                    <input
-                      type="text"
-                      value={employeeSearch}
-                      onChange={(e) => setEmployeeSearch(e.target.value)}
-                      placeholder="Search by name, position, department..."
-                      style={{
-                        background: "none", border: "none", color: "#e2e8f0",
-                        fontSize: 11, outline: "none", width: "100%",
-                      }}
-                    />
-                  </div>
-                </div>
-                {SEED.employees
-                  .filter((emp) => {
-                    const pos = SEED.positions.find((p) => p.id === emp.positionId);
-                    const q = employeeSearch.toLowerCase();
-                    return !q || emp.name.toLowerCase().includes(q) || (pos?.title.toLowerCase().includes(q) ?? false) || (pos?.department.toLowerCase().includes(q) ?? false);
-                  })
-                  .map((emp) => {
-                    const pos = SEED.positions.find((p) => p.id === emp.positionId);
-                    return (
+            </div>
+          )}
+
+          {activeNav === "people" && (
+            <div style={{ ...cardStyle, padding: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 10 }}>
+                <div style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>Employee Directory</div>
+                <input
+                  value={directorySearch}
+                  onChange={(event) => setDirectorySearch(event.target.value)}
+                  placeholder="Search employees"
+                  style={{
+                    width: 220,
+                    borderRadius: 8,
+                    border: "1px solid rgba(255,255,255,0.16)",
+                    background: "rgba(255,255,255,0.03)",
+                    color: "#e2e8f0",
+                    padding: "7px 9px",
+                    fontSize: 11,
+                    outline: "none",
+                  }}
+                />
+              </div>
+              <div style={{ display: "grid", gap: 8 }}>
+                {peopleRows.map((row) => (
+                  <button
+                    key={row.employeeId}
+                    onClick={() => {
+                      setControlState((prev) => ({
+                        ...prev,
+                        selectedEmployeeId: row.employeeId,
+                        selectedPositionId: SEED.employees.find((item) => item.id === row.employeeId)?.positionId ?? prev.selectedPositionId,
+                      }));
+                      setActiveNav("org");
+                      setDetailOpen(true);
+                    }}
+                    style={{
+                      ...cardStyle,
+                      width: "100%",
+                      cursor: "pointer",
+                      padding: 10,
+                      textAlign: "left",
+                      display: "grid",
+                      gridTemplateColumns: "1.4fr 1fr 1fr 1.3fr 1fr 1.3fr auto",
+                      gap: 8,
+                      alignItems: "center",
+                    }}
+                  >
+                    <span style={{ color: "#fff", fontWeight: 700, fontSize: 12 }}>{row.employeeName}</span>
+                    <span style={{ fontSize: 11 }}>{row.positionTitle}</span>
+                    <span style={{ fontSize: 11 }}>{row.department}</span>
+                    <span style={{ fontSize: 11 }}>{row.email}</span>
+                    <span style={{ fontSize: 11 }}>{row.phone}</span>
+                    <span style={{ fontSize: 11 }}>Reports To: {row.managerName}</span>
+                    <span style={{ fontSize: 10, color: row.status === "active" ? "#22c55e" : row.status === "on_leave" ? "#f59e0b" : "#ef4444" }}>
+                      ●
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {activeNav === "actions" && (
+            <div style={{ ...cardStyle, padding: 12 }}>
+              <div style={{ display: "flex", gap: 8, marginBottom: 12 }}>
+                {FILTER_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActionFilter(tab.id)}
+                    style={{
+                      borderRadius: 8,
+                      border: `1px solid ${actionFilter === tab.id ? "rgba(99,102,241,0.45)" : "rgba(255,255,255,0.14)"}`,
+                      background: actionFilter === tab.id ? "rgba(99,102,241,0.16)" : "rgba(255,255,255,0.03)",
+                      color: actionFilter === tab.id ? "#c7d2fe" : "#94a3b8",
+                      fontSize: 11,
+                      padding: "7px 10px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              <div style={{ display: "grid", gap: 10 }}>
+                {filteredActions.map((action) => {
+                  const priority = priorityStyle(action.priority);
+                  const status = actionStatusStyle(action.status);
+                  return (
+                    <div key={action.id} style={{ ...cardStyle, padding: 10 }}>
                       <div
-                        key={emp.id}
-                        onClick={() => {
-                          setSelectedPositionId(emp.positionId);
-                          setActiveNav("org");
-                        }}
                         style={{
-                          padding: "12px 16px", borderRadius: 10, marginBottom: 8,
-                          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                          display: "flex", alignItems: "center", gap: 14,
-                          cursor: "pointer",
+                          display: "grid",
+                          gap: 8,
+                          gridTemplateColumns: "1.6fr 0.8fr 1fr 0.9fr 1fr 1.1fr 1.1fr",
+                          alignItems: "center",
+                          marginBottom: 8,
                         }}
                       >
-                        <Avatar initials={emp.avatarInitials} color={emp.avatarColor} size={36} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: "#e2e8f0", marginBottom: 2 }}>{emp.name}</div>
-                          <div style={{ fontSize: 11, color: "#64748b" }}>{pos?.title} · {pos?.department}</div>
+                        <div>
+                          <div style={{ color: "#fff", fontSize: 12, fontWeight: 700 }}>{action.title}</div>
+                          <div style={{ color: "#94a3b8", fontSize: 11 }}>{action.relatedRequirement}</div>
                         </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: 10, color: "#475569", marginBottom: 3 }}>{emp.location}</div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
-                            <StatusDot status={emp.status} />
-                            <span style={{ fontSize: 9, color: "#64748b" }}>
-                              {emp.status === "active" ? "Active" : emp.status === "on_leave" ? "Leave" : "Offboarding"}
-                            </span>
-                          </div>
-                        </div>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            justifyContent: "center",
+                            borderRadius: 999,
+                            background: priority.bg,
+                            color: priority.color,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "3px 8px",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {action.priority}
+                        </span>
+                        <div style={{ fontSize: 11 }}>Owner: {ownerOptions.find((item) => item.id === action.ownerId)?.label ?? action.ownerRole}</div>
+                        <div style={{ fontSize: 11 }}>Due: {formatDate(action.dueDate)}</div>
+                        <span
+                          style={{
+                            display: "inline-flex",
+                            justifyContent: "center",
+                            borderRadius: 999,
+                            background: status.bg,
+                            color: status.color,
+                            fontSize: 10,
+                            fontWeight: 700,
+                            padding: "3px 8px",
+                            textTransform: "uppercase",
+                          }}
+                        >
+                          {status.label}
+                        </span>
+                        <div style={{ fontSize: 11 }}>{action.relatedEmployeeName}</div>
+                        <div style={{ fontSize: 11 }}>{action.relatedPositionTitle}</div>
                       </div>
-                    );
-                  })}
-              </div>
-            )}
-            {!["org", "risk", "signals", "actions", "compliance", "employees", "reports"].includes(activeNav) && (
-              <div style={{ color: "#475569", padding: "60px 0", textAlign: "center", fontSize: 13 }}>
-                {activeNav.charAt(0).toUpperCase() + activeNav.slice(1)} view — select a section from the sidebar
-              </div>
-            )}
 
-            {showJson && (
-              <div style={{ marginTop: 24 }}>
-                <JsonInspectorPanel seed={SEED} controlState={controlState} uiState={uiState} />
-              </div>
-            )}
-          </div>
+                      <div
+                        style={{
+                          display: "grid",
+                          gap: 8,
+                          gridTemplateColumns: "1fr 1fr 1.6fr auto auto auto",
+                          alignItems: "center",
+                        }}
+                      >
+                        <select
+                          value={action.ownerId}
+                          onChange={(event) =>
+                            setActionOverride(action.id, {
+                              ownerId: event.target.value,
+                              ownerRole: "employee",
+                            })
+                          }
+                          style={{
+                            borderRadius: 8,
+                            border: "1px solid rgba(255,255,255,0.16)",
+                            background: "rgba(255,255,255,0.03)",
+                            color: "#e2e8f0",
+                            fontSize: 11,
+                            padding: "7px 9px",
+                          }}
+                        >
+                          <option value={action.ownerId}>
+                            {ownerOptions.find((item) => item.id === action.ownerId)?.label ?? action.ownerRole}
+                          </option>
+                          {ownerOptions
+                            .filter((item) => item.id !== action.ownerId)
+                            .map((item) => (
+                              <option key={item.id} value={item.id}>
+                                {item.label}
+                              </option>
+                            ))}
+                        </select>
 
-          {/* Right Detail Panel */}
-          <div style={{
-            width: 320, flexShrink: 0,
-            background: "#13161f", borderLeft: "1px solid rgba(255,255,255,0.06)",
-            display: "flex", flexDirection: "column", overflow: "hidden",
-          }}>
-            <RightPanel
-              uiState={uiState}
-              onResolveAction={resolveAction}
-              onCompleteOnboarding={completeOnboarding}
-              onClose={() => setControlState((prev) => ({ ...prev, selectedPositionId: "1-001" }))}
-              onEditPosition={() => setEditingPosition(uiState.selectedPosition?.id ?? null)}
-              isEditing={editingPosition === uiState.selectedPosition?.id}
-              onSaveEdit={updatePosition}
-              onCancelEdit={() => setEditingPosition(null)}
-              expandedAction={expandedAction}
-              onToggleAction={setExpandedAction}
-            />
-          </div>
-        </div>
-      </div>
+                        <input
+                          type="date"
+                          value={action.dueDate}
+                          onChange={(event) => setActionOverride(action.id, { dueDate: event.target.value })}
+                          style={{
+                            borderRadius: 8,
+                            border: "1px solid rgba(255,255,255,0.16)",
+                            background: "rgba(255,255,255,0.03)",
+                            color: "#e2e8f0",
+                            fontSize: 11,
+                            padding: "7px 9px",
+                          }}
+                        />
+
+                        <input
+                          value={newCommentByAction[action.id] ?? ""}
+                          onChange={(event) =>
+                            setNewCommentByAction((prev) => ({ ...prev, [action.id]: event.target.value }))
+                          }
+                          placeholder="Add comment"
+                          style={{
+                            borderRadius: 8,
+                            border: "1px solid rgba(255,255,255,0.16)",
+                            background: "rgba(255,255,255,0.03)",
+                            color: "#e2e8f0",
+                            fontSize: 11,
+                            padding: "7px 9px",
+                          }}
+                        />
+
+                        <button
+                          onClick={() => addActionComment(action)}
+                          style={{
+                            borderRadius: 8,
+                            border: "1px solid rgba(99,102,241,0.35)",
+                            background: "rgba(99,102,241,0.16)",
+                            color: "#c7d2fe",
+                            fontSize: 11,
+                            padding: "7px 10px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          Add Comment
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            setActionStatus(action, action.status === "in_progress" ? "open" : "in_progress")
+                          }
+                          style={{
+                            borderRadius: 8,
+                            border: "1px solid rgba(245,158,11,0.35)",
+                            background: "rgba(245,158,11,0.16)",
+                            color: "#fcd34d",
+                            fontSize: 11,
+                            padding: "7px 10px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {action.status === "in_progress" ? "Move to Open" : "In Progress"}
+                        </button>
+
+                        <button
+                          onClick={() =>
+                            setActionStatus(action, action.status === "completed" ? "open" : "completed")
+                          }
+                          style={{
+                            borderRadius: 8,
+                            border: "1px solid rgba(34,197,94,0.35)",
+                            background: "rgba(34,197,94,0.16)",
+                            color: "#86efac",
+                            fontSize: 11,
+                            padding: "7px 10px",
+                            cursor: "pointer",
+                          }}
+                        >
+                          {action.status === "completed" ? "Reopen" : "Complete"}
+                        </button>
+                      </div>
+
+                      {action.comments.length > 0 && (
+                        <div style={{ marginTop: 8, color: "#94a3b8", fontSize: 11 }}>
+                          {action.comments.map((comment) => (
+                            <div key={comment}>• {comment}</div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+
+          {activeNav === "policies" && (
+            <div style={{ ...cardStyle, padding: 12 }}>
+              <div style={{ color: "#fff", fontSize: 14, fontWeight: 700, marginBottom: 8 }}>
+                Policy & Compliance Queue
+              </div>
+              {uiState.complianceView.map((item) => (
+                <div key={item.id} style={{ ...cardStyle, padding: 10, marginBottom: 8 }}>
+                  <div style={{ color: "#fff", fontSize: 12, fontWeight: 700 }}>{item.type}</div>
+                  <div style={{ color: "#94a3b8", fontSize: 11 }}>{item.description}</div>
+                  <div style={{ color: item.status === "expired" ? "#fca5a5" : item.status === "missing" ? "#fcd34d" : "#86efac", fontSize: 11, marginTop: 4 }}>
+                    {item.status === "expired" ? "Expired" : item.status === "missing" ? "Missing" : "Complete"}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {activeNav === "finance" && (
+            <div style={{ ...cardStyle, padding: 12 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: 8 }}>
+                <div style={{ color: "#fff", fontSize: 14, fontWeight: 700 }}>Finance Report</div>
+                <input
+                  value={financeSearch}
+                  onChange={(event) => setFinanceSearch(event.target.value)}
+                  placeholder="Search finance rows"
+                  style={{
+                    width: 220,
+                    borderRadius: 8,
+                    border: "1px solid rgba(255,255,255,0.16)",
+                    background: "rgba(255,255,255,0.03)",
+                    color: "#e2e8f0",
+                    padding: "7px 9px",
+                    fontSize: 11,
+                    outline: "none",
+                  }}
+                />
+              </div>
+              <div style={{ overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 11 }}>
+                  <thead>
+                    <tr>
+                      {[
+                        "Employee ID",
+                        "Employee Name",
+                        "Position",
+                        "Department",
+                        "Manager",
+                        "Status",
+                        "Salary",
+                        "Bank",
+                        "Account",
+                        "Join Date",
+                      ].map((header) => (
+                        <th
+                          key={header}
+                          style={{
+                            textAlign: "left",
+                            padding: "7px 6px",
+                            borderBottom: "1px solid rgba(255,255,255,0.16)",
+                            color: "#94a3b8",
+                            whiteSpace: "nowrap",
+                          }}
+                        >
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {financeRows.map((row) => (
+                      <tr key={row.employeeId}>
+                        <td style={{ padding: 6 }}>{row.employeeId}</td>
+                        <td style={{ padding: 6 }}>{row.employeeName}</td>
+                        <td style={{ padding: 6 }}>{row.position}</td>
+                        <td style={{ padding: 6 }}>{row.department}</td>
+                        <td style={{ padding: 6 }}>{row.manager}</td>
+                        <td style={{ padding: 6 }}>{row.employmentStatus}</td>
+                        <td style={{ padding: 6 }}>${row.salary.toLocaleString()}</td>
+                        <td style={{ padding: 6 }}>{row.bankName}</td>
+                        <td style={{ padding: 6 }}>{row.accountNumber}</td>
+                        <td style={{ padding: 6 }}>{row.joinDate}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          {activeNav === "administration" && (
+            <div style={{ display: "grid", gap: 10 }}>
+              <div style={{ ...cardStyle, padding: 10 }}>
+                {ADMIN_TABS.map((tab) => (
+                  <button
+                    key={tab.id}
+                    onClick={() => setAdminTab(tab.id)}
+                    style={{
+                      marginRight: 8,
+                      borderRadius: 8,
+                      border: `1px solid ${
+                        adminTab === tab.id ? "rgba(99,102,241,0.45)" : "rgba(255,255,255,0.14)"
+                      }`,
+                      background: adminTab === tab.id ? "rgba(99,102,241,0.16)" : "rgba(255,255,255,0.03)",
+                      color: adminTab === tab.id ? "#c7d2fe" : "#94a3b8",
+                      fontSize: 11,
+                      padding: "7px 10px",
+                      cursor: "pointer",
+                    }}
+                  >
+                    {tab.label}
+                  </button>
+                ))}
+              </div>
+
+              {adminTab === "organization-setup" && (
+                <div style={{ ...cardStyle, padding: 12, color: "#94a3b8", fontSize: 12 }}>
+                  Organization setup lives here and is hidden from daily operational screens.
+                </div>
+              )}
+
+              {adminTab === "csv-imports" && (
+                <div style={{ ...cardStyle, padding: 12, color: "#94a3b8", fontSize: 12 }}>
+                  Import positions and employees from CSV files.
+                </div>
+              )}
+
+              {adminTab === "configuration" && (
+                <div style={{ ...cardStyle, padding: 12, color: "#94a3b8", fontSize: 12 }}>
+                  Configure document types, policy categories, and status settings.
+                </div>
+              )}
+
+              {adminTab === "audit" && (
+                <div style={{ ...cardStyle, padding: 12 }}>
+                  {[...controlState.resolvedActions.map((item) => `Action or risk resolved: ${item}`)].map(
+                    (event, index) => (
+                      <div key={`${event}-${index}`} style={{ color: "#cbd5e1", fontSize: 12, marginBottom: 5 }}>
+                        {event}
+                      </div>
+                    )
+                  )}
+                  {controlState.resolvedActions.length === 0 && (
+                    <div style={{ color: "#94a3b8", fontSize: 12 }}>No audit events yet.</div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+        </section>
+      </main>
     </div>
   );
 }
