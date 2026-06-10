@@ -112,7 +112,17 @@ New clients pay a one-time setup fee before the retainer begins:
 | 20–35 employees | £2,000–£2,500 |
 | 35–50 employees | £3,000 |
 
-Setup includes: full org structure built in TeamFrame, all existing roles documented, JDs drafted for key positions, compliance baseline established.
+Setup includes: full org structure built in TeamFrame, all existing roles documented, JDs drafted for key positions, compliance baseline established, and a **First Look Report** delivered at the end of the setup phase.
+
+### What is the First Look Report
+
+When your org is mapped from the outside for the first time, gaps and ambiguities that your team has stopped seeing become immediately visible. The First Look Report is a one-page written document capturing:
+- What is unclear, undocumented, or broken in your current org
+- Roles with no clear owner
+- Responsibilities that exist only in someone's head
+- Structural issues visible from outside the organisation
+
+Every founder who receives it says they knew most of it existed — they had just stopped seeing it. This document alone is typically worth the setup fee.
 
 ---
 

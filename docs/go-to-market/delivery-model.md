@@ -108,7 +108,21 @@ Every new client goes through the same onboarding before the retainer begins.
 - Build org in TeamFrame (all positions, people, assignments)
 - Draft JDs for the 3–5 most critical roles
 - Establish compliance baseline (which documents exist, which are missing)
-- Deliver initial org health summary
+- Produce and deliver the **First Look Report**
+
+### The First Look Report
+
+Delivered at the end of every setup engagement. Contains:
+- What a fresh set of eyes sees in the org that the internal team has stopped seeing
+- Roles with no clear owner
+- Responsibilities held only in someone's head or undocumented
+- Structural gaps visible from outside the organisation
+
+Do not frame this as "here is what is broken." Frame it as:
+
+> "Here is what a fresh set of eyes sees in your org that your team can no longer see because they built it."
+
+This is one of the most valuable things you deliver and it costs no extra time — the observations come naturally from building the org in TeamFrame. The report takes 30–45 minutes to write. Send it as a PDF with the initial org health summary.
 
 ### Step 3 — Handover
 - Share org health summary with founder

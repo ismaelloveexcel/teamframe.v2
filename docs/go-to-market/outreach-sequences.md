@@ -4,6 +4,36 @@ Two proven entry points. Use both in parallel.
 
 ---
 
+## Sequence C — Research-Based Opener (use when you have no specific trigger)
+
+Use this when you cannot find a job posting or funding announcement but want to reach a founder who fits the profile.
+
+**Why it works:** Opens with a real founder's experience at quantifiable cost. Signals that you understand the problem from evidence, not theory. Does not sound like a template.
+
+### Message C1 — LinkedIn DM
+
+> Hi [Name],
+>
+> A founder recently shared that he lost a year and $200K because the company slowly bent around a bad hire instead of staying aligned with the mission. I help founders at your stage prevent exactly that — by building the structure and clarity that makes people decisions visible before they become expensive.
+>
+> Would a quick call be useful?
+
+### Message C2 — Email version
+
+**Subject:** Before your next hire costs more than you planned
+
+> Hi [Name],
+>
+> A founder posted recently: "I lost a year and $200K on hiring the wrong senior professional. Then the company slowly bends around the person rather than staying aligned with the mission."
+>
+> That pattern is almost always a structure problem, not a hiring problem. Clear roles, documented ownership, and a visible org prevent it.
+>
+> I run that function for growing startups. Happy to show you what it looks like in practice — 20 minutes.
+>
+> [Your name]
+
+---
+
 ## Sequence A — Job Posting Interception (highest conversion)
 
 **Why this works:** The company has publicly admitted they need HR help, already have budget allocated, and are facing a 2–3 month recruiting gap. You are not convincing them they have a problem — you are offering a faster path to the outcome they already want.

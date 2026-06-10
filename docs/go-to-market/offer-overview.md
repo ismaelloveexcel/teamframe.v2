@@ -6,6 +6,18 @@
 
 ---
 
+## How to Position This in Conversation
+
+Most founders come to this service after a bad hire. The bad hire exposed that there was no structure, no documented role, no ownership clarity. The company bent around the wrong person instead of staying aligned with the mission.
+
+The correct pitch is not "you need better HR admin." It is:
+
+> "Most founders I speak to come to me after a costly people mistake. The mistake exposed that there was no structure behind the decision. I help you build that structure so the next hire lands correctly — and so you can see problems before they cost you."
+
+Lead with the hiring pain. The documentation, compliance tracking, and org clarity are what you build to prevent it. They are the mechanism, not the pitch.
+
+---
+
 ## What Is Being Sold
 
 This is a **managed HR operating system service**. It is not software. It is not consultancy.
@@ -15,6 +27,7 @@ The buyer receives:
 - Ongoing maintenance of that structure as the company grows
 - A named person who handles people operations on their behalf
 - A system that keeps org clarity, documentation, and compliance tracking current
+- A First Look Report at setup — what a fresh set of eyes sees that the internal team has stopped seeing
 
 ---
 
