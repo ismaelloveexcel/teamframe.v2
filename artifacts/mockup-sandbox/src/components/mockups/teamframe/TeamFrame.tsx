@@ -1844,6 +1844,9 @@ export function TeamFrame() {
               {
                 personId: selectedEmployee.id,
                 positionId: selectedPositionId,
+                startedAt: assignmentDraftStartDate
+                  ? new Date(assignmentDraftStartDate).toISOString()
+                  : undefined,
                 idempotencyKey: createIdempotencyKey("assignment-start"),
               },
               options,
@@ -2983,6 +2986,25 @@ export function TeamFrame() {
                               ))}
                             </select>
                           </div>
+
+                          {/* Start date (persisted as assignment startedAt) */}
+                          {!selectedAssignment ? (
+                            <div>
+                              <label
+                                htmlFor="assign-start-date"
+                                style={{ fontSize: 11, color: "#334155", fontWeight: 600, display: "block", marginBottom: 4 }}
+                              >
+                                Start date
+                              </label>
+                              <input
+                                id="assign-start-date"
+                                type="date"
+                                value={assignmentDraftStartDate}
+                                onChange={(event) => setAssignmentDraftStartDate(event.target.value)}
+                                style={{ width: "100%" }}
+                              />
+                            </div>
+                          ) : null}
 
                           {/* Primary action */}
                           <button
