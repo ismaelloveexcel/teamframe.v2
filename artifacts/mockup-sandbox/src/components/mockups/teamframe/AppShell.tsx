@@ -7,12 +7,20 @@ import {
   LayoutTemplate,
   Settings,
   Plus,
+  UserPlus,
 } from "lucide-react";
 import { COLOR, GRADIENT, RADIUS, TEXT, SPACE, SHADOW, FOCUS_RING } from "./design-tokens";
 
 export type OrgOption = { id: string; name: string };
 
-export type NavId = "org" | "actions" | "team" | "policies" | "templates" | "administration";
+export type NavId =
+  | "org"
+  | "hiring"
+  | "actions"
+  | "team"
+  | "policies"
+  | "templates"
+  | "administration";
 
 type NavItem = {
   id: NavId;
@@ -22,6 +30,7 @@ type NavItem = {
 
 const NAV_ITEMS: NavItem[] = [
   { id: "org",            label: "Org Chart",      icon: <GitBranch size={16} strokeWidth={2} /> },
+  { id: "hiring",         label: "Hiring",          icon: <UserPlus size={16} strokeWidth={2} /> },
   { id: "actions",        label: "Actions",         icon: <CheckSquare size={16} strokeWidth={2} /> },
   { id: "team",           label: "Team",            icon: <Users size={16} strokeWidth={2} /> },
   { id: "policies",       label: "Policies",        icon: <ShieldCheck size={16} strokeWidth={2} /> },

@@ -847,6 +847,8 @@ export function TeamFrame() {
   const [assignmentDraftEndDate, setAssignmentDraftEndDate] = useState("");
   const [assignmentDraftActualSalary, setAssignmentDraftActualSalary] = useState("");
 
+  const [vacateLastWorkingDay, setVacateLastWorkingDay] = useState("");
+
   // Inline structure editors (replace window.prompt for B3/B4)
   const [quickInsert, setQuickInsert] = useState<{
     mode: "above" | "below" | "parallel";
@@ -1877,6 +1879,10 @@ export function TeamFrame() {
     const occupant = positionAssignmentById.get(selectedPositionId);
     if (!occupant) return;
 
+    const lastWorkingDay = vacateLastWorkingDay
+      ? new Date(vacateLastWorkingDay).toISOString()
+      : undefined;
+
     await runMutation(
       async () => {
         await executeApiCall("Vacate position", (options) =>
@@ -1884,6 +1890,7 @@ export function TeamFrame() {
             organizationId,
             occupant.assignment.id,
             {
+              endedAt: lastWorkingDay,
               idempotencyKey: createIdempotencyKey("assignment-vacate"),
             },
             options,
@@ -1902,10 +1909,11 @@ export function TeamFrame() {
       [selectedPositionId]: {
         status: "ended",
         startDate: current[selectedPositionId]?.startDate ?? "",
-        endDate: new Date().toISOString().slice(0, 10),
+        endDate: (vacateLastWorkingDay || new Date().toISOString().slice(0, 10)),
         actualSalary: current[selectedPositionId]?.actualSalary ?? "",
       },
     }));
+    setVacateLastWorkingDay("");
   }
 
   async function handleCreateTeam() {
@@ -2264,6 +2272,9 @@ export function TeamFrame() {
       const assignment = activeAssignmentByPersonId.get(person.id);
       const position = assignment ? positionMap.get(assignment.positionId) : null;
       const team = position?.teamId ? teamMap.get(position.teamId) : null;
+      const startDate = assignment?.startedAt
+        ? new Date(assignment.startedAt).toISOString().slice(0, 10)
+        : "";
       return [
         person.id,
         person.fullName,
@@ -2271,11 +2282,13 @@ export function TeamFrame() {
         team?.name ?? "",
         person.email ?? "",
         person.phone ?? "",
+        person.employmentStatus ?? "",
+        startDate,
       ];
     });
 
     const csv = [
-      ["Person ID", "Full Name", "Position", "Team", "Email", "Phone"],
+      ["Person ID", "Full Name", "Position", "Team", "Email", "Phone", "Employment Status", "Start Date"],
       ...rows,
     ]
       .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(","))
@@ -2286,6 +2299,127 @@ export function TeamFrame() {
     const anchor = document.createElement("a");
     anchor.href = href;
     anchor.download = "teamframe-payroll-export.csv";
+    anchor.click();
+    URL.revokeObjectURL(href);
+  }
+
+  function downloadOrgSummaryHtml() {
+    const esc = (value: unknown) =>
+      String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+
+    const now = Date.now();
+    const orgName = organizations.find((org) => org.id === organizationId)?.name ?? "Organization";
+
+    const vacancies = positions.filter((p) => !positionAssignmentById.get(p.id));
+
+    const openActionItems = actions.filter((item) => item.status !== ActionStatus.done);
+    const overdue = openActionItems.filter((item) => {
+      if (!item.dueDate) return false;
+      const due = new Date(item.dueDate).getTime();
+      return !Number.isNaN(due) && due < now;
+    });
+    const blocked = openActionItems.filter((item) => item.blocked);
+
+    const complianceGaps = positions
+      .map((p) => {
+        const occupant = positionAssignmentById.get(p.id);
+        if (!occupant) return null;
+        const missing: string[] = [];
+        if (!occupant.person.email) missing.push("email");
+        if (!occupant.person.phone) missing.push("phone");
+        if (missing.length === 0) return null;
+        return { title: p.title, person: occupant.person.fullName, missing };
+      })
+      .filter((row): row is { title: string; person: string; missing: string[] } => row !== null);
+
+    const structureRows = positions.map((p) => {
+      const occupant = positionAssignmentById.get(p.id);
+      const manager = p.reportsToPositionId ? positionMap.get(p.reportsToPositionId)?.title ?? "—" : "—";
+      const department = p.teamId ? teamMap.get(p.teamId)?.name ?? "—" : "—";
+      return {
+        title: p.title,
+        manager,
+        department,
+        occupant: occupant?.person.fullName ?? "Vacant",
+      };
+    });
+
+    const section = (title: string, body: string) =>
+      `<section><h2>${esc(title)}</h2>${body}</section>`;
+
+    const list = (items: string[], empty: string) =>
+      items.length
+        ? `<ul>${items.map((item) => `<li>${item}</li>`).join("")}</ul>`
+        : `<p class="muted">${esc(empty)}</p>`;
+
+    const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<title>${esc(orgName)} — Org Summary</title>
+<style>
+  body { font-family: Inter, system-ui, sans-serif; color: #0F172A; max-width: 820px; margin: 32px auto; padding: 0 16px; }
+  h1 { font-size: 22px; margin-bottom: 2px; }
+  .sub { color: #64748B; font-size: 13px; margin-bottom: 24px; }
+  h2 { font-size: 15px; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px; margin-top: 28px; }
+  .stat { display: inline-block; margin-right: 18px; font-size: 13px; }
+  .stat b { font-size: 18px; display: block; }
+  table { width: 100%; border-collapse: collapse; font-size: 13px; }
+  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #F1F5F9; }
+  th { color: #475569; }
+  ul { margin: 6px 0; padding-left: 18px; font-size: 13px; }
+  .muted { color: #94A3B8; font-size: 13px; }
+</style></head>
+<body>
+  <h1>${esc(orgName)} — Organization Summary</h1>
+  <div class="sub">Generated ${esc(new Date().toLocaleString())}</div>
+  <div>
+    <span class="stat"><b>${positions.length}</b>Positions</span>
+    <span class="stat"><b>${positionAssignmentById.size}</b>Filled</span>
+    <span class="stat"><b>${vacancies.length}</b>Vacancies</span>
+    <span class="stat"><b>${openActionItems.length}</b>Open actions</span>
+    <span class="stat"><b>${complianceGaps.length}</b>Compliance gaps</span>
+  </div>
+  ${section(
+    "Vacancies",
+    list(
+      vacancies.map((p) => `${esc(p.title)}${p.teamId ? ` <span class="muted">(${esc(teamMap.get(p.teamId)?.name ?? "")})</span>` : ""}`),
+      "No vacant positions.",
+    ),
+  )}
+  ${section(
+    "Actions needing attention",
+    list(
+      [
+        ...overdue.map((item) => `<b>Overdue:</b> ${esc(item.title)}`),
+        ...blocked.map((item) => `<b>Blocked:</b> ${esc(item.title)}`),
+      ],
+      "No overdue or blocked actions.",
+    ),
+  )}
+  ${section(
+    "Compliance gaps",
+    list(
+      complianceGaps.map((row) => `${esc(row.person)} — ${esc(row.title)} <span class="muted">(missing ${esc(row.missing.join(", "))})</span>`),
+      "No compliance gaps detected.",
+    ),
+  )}
+  ${section(
+    "Team structure",
+    structureRows.length
+      ? `<table><thead><tr><th>Position</th><th>Reports to</th><th>Department</th><th>Occupant</th></tr></thead><tbody>${structureRows
+          .map((row) => `<tr><td>${esc(row.title)}</td><td>${esc(row.manager)}</td><td>${esc(row.department)}</td><td>${esc(row.occupant)}</td></tr>`)
+          .join("")}</tbody></table>`
+      : `<p class="muted">No positions yet.</p>`,
+  )}
+</body></html>`;
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.download = "teamframe-org-summary.html";
     anchor.click();
     URL.revokeObjectURL(href);
   }
@@ -3032,6 +3166,24 @@ export function TeamFrame() {
 
                           {/* Termination — single action, clear microcopy */}
                           {selectedAssignment && (
+                            <div>
+                              <label
+                                htmlFor="vacate-last-working-day"
+                                style={{ fontSize: 11, color: "#334155", fontWeight: 600, display: "block", marginBottom: 4 }}
+                              >
+                                Last working day
+                              </label>
+                              <input
+                                id="vacate-last-working-day"
+                                type="date"
+                                value={vacateLastWorkingDay}
+                                onChange={(event) => setVacateLastWorkingDay(event.target.value)}
+                                disabled={isLocalDemoMode}
+                                style={{ width: "100%" }}
+                              />
+                            </div>
+                          )}
+                          {selectedAssignment && (
                             <button
                               type="button"
                               onClick={() => void handleVacateSelectedPosition()}
@@ -3295,6 +3447,153 @@ export function TeamFrame() {
             </>
           )}
 
+          {activeNav === "hiring" && (
+            <section style={STYLE.panel}>
+              <div style={{ ...STYLE.title, fontSize: 17 }}>Hiring Setup</div>
+              <div style={{ fontSize: 12, color: "#475569", marginBottom: 12 }}>
+                A guided checklist to get a role ready. This is a workflow guide — no candidate
+                tracking.
+              </div>
+
+              <div style={{ marginBottom: 14, maxWidth: 360 }}>
+                <label style={{ fontSize: 11, color: "#334155", fontWeight: 600, display: "block", marginBottom: 4 }}>
+                  Role to set up
+                </label>
+                <select
+                  value={selectedPositionId ?? ""}
+                  onChange={(event) => setFocusPositionId(event.target.value || null)}
+                  style={{ width: "100%" }}
+                >
+                  <option value="">Select a position</option>
+                  {positions.map((position) => (
+                    <option key={position.id} value={position.id}>
+                      {position.title}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              {!selectedPosition ? (
+                <div style={{ fontSize: 12, color: "#64748B" }}>
+                  Select a position above, or create one in Org Chart, to begin hiring setup.
+                </div>
+              ) : (
+                (() => {
+                  const occupant = positionAssignmentById.get(selectedPosition.id);
+                  const jdDoc = positionDocuments[selectedPosition.id];
+                  const steps = [
+                    {
+                      label: "Position created",
+                      done: true,
+                      detail: selectedPosition.title,
+                      action: null as null | { label: string; onClick: () => void },
+                    },
+                    {
+                      label: "Reporting line set",
+                      done: !!selectedPosition.reportsToPositionId,
+                      detail: selectedPosition.reportsToPositionId
+                        ? `Reports to ${positionMap.get(selectedPosition.reportsToPositionId)?.title ?? "—"}`
+                        : "No manager set (set one or confirm this is a root role)",
+                      action: {
+                        label: "Set reporting line",
+                        onClick: () => {
+                          setActiveNav("org");
+                          setFocusPositionId(selectedPosition.id);
+                          setPositionPanelTab("position");
+                          setQuickInsert(null);
+                          setReportingLineDraftId(selectedPosition.reportsToPositionId ?? "");
+                          setEditingReportingLine(true);
+                        },
+                      },
+                    },
+                    {
+                      label: "Job description attached",
+                      done: !!jdDoc,
+                      detail: jdDoc ? `${jdDoc.fileName} (${documentStateLabel(jdDoc.state)})` : "No job description uploaded yet",
+                      action: {
+                        label: "Attach JD",
+                        onClick: () => {
+                          setActiveNav("org");
+                          setFocusPositionId(selectedPosition.id);
+                          setPositionPanelTab("documents");
+                        },
+                      },
+                    },
+                    {
+                      label: "Compliance checklist started",
+                      done: !!occupant,
+                      detail: occupant
+                        ? `${occupant.person.fullName} assigned — compliance tracked`
+                        : "Assign a person to begin compliance tracking",
+                      action: {
+                        label: "Assign person",
+                        onClick: () => {
+                          setActiveNav("org");
+                          setFocusPositionId(selectedPosition.id);
+                          setPositionPanelTab("assignment");
+                        },
+                      },
+                    },
+                  ];
+                  const completed = steps.filter((step) => step.done).length;
+                  return (
+                    <>
+                      <div style={{ fontSize: 12, color: "#334155", fontWeight: 700, marginBottom: 10 }}>
+                        {completed} of {steps.length} steps complete
+                      </div>
+                      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                        {steps.map((step) => (
+                          <div
+                            key={step.label}
+                            style={{
+                              display: "flex",
+                              alignItems: "center",
+                              justifyContent: "space-between",
+                              gap: 12,
+                              border: "1px solid #E5E7EB",
+                              borderRadius: 8,
+                              padding: "10px 12px",
+                              background: step.done ? "#F0FDF4" : "#FFFFFF",
+                            }}
+                          >
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+                              <div
+                                style={{
+                                  width: 20,
+                                  height: 20,
+                                  borderRadius: "50%",
+                                  flexShrink: 0,
+                                  background: step.done ? "#16A34A" : "#E2E8F0",
+                                  color: "#FFFFFF",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 12,
+                                  fontWeight: 800,
+                                }}
+                              >
+                                {step.done ? "✓" : ""}
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{step.label}</div>
+                                <div style={{ fontSize: 11, color: "#64748B" }}>{step.detail}</div>
+                              </div>
+                            </div>
+                            {!step.done && step.action ? (
+                              <button onClick={step.action.onClick} style={{ flexShrink: 0 }}>
+                                {step.action.label}
+                              </button>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
+                    </>
+                  );
+                })()
+              )}
+            </section>
+          )}
+
           {activeNav === "actions" && (
             <section style={STYLE.panel}>
               <div style={{ ...STYLE.title, fontSize: 17 }}>Actions</div>
@@ -3507,6 +3806,7 @@ export function TeamFrame() {
                 Organization ID: {organizationId ?? "-"}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                <button onClick={downloadOrgSummaryHtml}>Download Org Summary (HTML)</button>
                 <button onClick={downloadPayrollCsv}>Download Payroll Export</button>
                 {import.meta.env.DEV ? (
                   <>
