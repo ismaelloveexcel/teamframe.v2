@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   GitBranch,
   CheckSquare,
@@ -5,8 +6,11 @@ import {
   ShieldCheck,
   LayoutTemplate,
   Settings,
+  Plus,
 } from "lucide-react";
 import { COLOR, GRADIENT, RADIUS, TEXT, SPACE, SHADOW, FOCUS_RING } from "./design-tokens";
+
+export type OrgOption = { id: string; name: string };
 
 export type NavId = "org" | "actions" | "team" | "policies" | "templates" | "administration";
 
@@ -39,6 +43,10 @@ type AppShellProps = {
   statusMessage?: string | null;
   errorMessage?: string | null;
   isDemoMode?: boolean;
+  organizations?: OrgOption[];
+  activeOrganizationId?: string | null;
+  onSelectOrganization?: (id: string) => void;
+  onCreateOrganization?: (name: string) => void;
   children: React.ReactNode;
 };
 
@@ -49,8 +57,15 @@ export function AppShell({
   statusMessage,
   errorMessage,
   isDemoMode,
+  organizations,
+  activeOrganizationId,
+  onSelectOrganization,
+  onCreateOrganization,
   children,
 }: AppShellProps) {
+  const [creatingOrg, setCreatingOrg] = useState(false);
+  const [orgName, setOrgName] = useState("");
+  const orgList = organizations ?? [];
   return (
     <div
       style={{
@@ -205,6 +220,79 @@ export function AppShell({
           gap: SPACE[4],
         }}
       >
+        {/* Org switcher */}
+        {onSelectOrganization && orgList.length > 0 ? (
+          <div style={{ display: "flex", alignItems: "center", gap: SPACE[2], flexShrink: 0 }}>
+            {creatingOrg ? (
+              <>
+                <input
+                  autoFocus
+                  value={orgName}
+                  onChange={(e) => setOrgName(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter" && orgName.trim() && onCreateOrganization) {
+                      onCreateOrganization(orgName.trim());
+                      setOrgName("");
+                      setCreatingOrg(false);
+                    }
+                    if (e.key === "Escape") {
+                      setOrgName("");
+                      setCreatingOrg(false);
+                    }
+                  }}
+                  placeholder="New organization name"
+                  style={{ fontSize: TEXT.sm, padding: "5px 8px", borderRadius: RADIUS.sm, border: `1px solid ${COLOR.borderDefault}` }}
+                />
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (orgName.trim() && onCreateOrganization) {
+                      onCreateOrganization(orgName.trim());
+                      setOrgName("");
+                      setCreatingOrg(false);
+                    }
+                  }}
+                  disabled={!orgName.trim()}
+                  style={{ fontSize: TEXT.sm, padding: "5px 8px", borderRadius: RADIUS.sm, border: `1px solid ${COLOR.borderDefault}`, background: COLOR.pageBg, cursor: orgName.trim() ? "pointer" : "not-allowed" }}
+                >
+                  Create
+                </button>
+                <button
+                  type="button"
+                  onClick={() => { setOrgName(""); setCreatingOrg(false); }}
+                  style={{ fontSize: TEXT.sm, padding: "5px 8px", borderRadius: RADIUS.sm, border: `1px solid ${COLOR.borderDefault}`, background: COLOR.cardBg, cursor: "pointer" }}
+                >
+                  Cancel
+                </button>
+              </>
+            ) : (
+              <>
+                <select
+                  value={activeOrganizationId ?? ""}
+                  onChange={(e) => onSelectOrganization(e.target.value)}
+                  title="Switch organization"
+                  style={{ fontSize: TEXT.sm, fontWeight: 600, padding: "5px 8px", borderRadius: RADIUS.sm, border: `1px solid ${COLOR.borderDefault}`, background: COLOR.pageBg, color: COLOR.textPrimary, maxWidth: 200 }}
+                >
+                  {orgList.map((org) => (
+                    <option key={org.id} value={org.id}>{org.name}</option>
+                  ))}
+                </select>
+                {onCreateOrganization ? (
+                  <button
+                    type="button"
+                    onClick={() => setCreatingOrg(true)}
+                    title="Create organization"
+                    style={{ display: "flex", alignItems: "center", gap: 4, fontSize: TEXT.sm, fontWeight: 600, padding: "5px 8px", borderRadius: RADIUS.sm, border: `1px solid ${COLOR.borderDefault}`, background: COLOR.cardBg, color: COLOR.textSecondary, cursor: "pointer" }}
+                  >
+                    <Plus size={13} strokeWidth={2.5} /> New
+                  </button>
+                ) : null}
+              </>
+            )}
+            <div style={{ width: 1, height: 20, background: COLOR.borderSubtle }} />
+          </div>
+        ) : null}
+
         {/* Health badges */}
         <div style={{ display: "flex", alignItems: "center", gap: SPACE[1]+2 }}>
           {health.map((badge) => {

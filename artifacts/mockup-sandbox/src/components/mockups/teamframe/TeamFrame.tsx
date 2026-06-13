@@ -45,6 +45,7 @@ import {
   updatePosition,
   type Action,
   type Assignment,
+  type Organization,
   type Person,
   type Policy,
   type Position,
@@ -801,6 +802,8 @@ function cloneLocalDemoState(): LocalDemoState {
 export function TeamFrame() {
   const [activeNav, setActiveNav] = useState<NavId>("org");
   const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [orgNameDraft, setOrgNameDraft] = useState("");
 
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState(false);
@@ -1250,8 +1253,15 @@ export function TeamFrame() {
     throw new Error(describeError(label, lastError), { cause: lastError });
   }
 
+  async function loadOrganizations(): Promise<Organization[]> {
+    const orgs = await executeApiCall("Load organizations", (options) => listOrganizations(options));
+    setOrganizations(orgs.items);
+    return orgs.items;
+  }
+
   async function bootstrapOrganizationContext(): Promise<string> {
     const orgs = await executeApiCall("Load organizations", (options) => listOrganizations(options));
+    setOrganizations(orgs.items);
     let orgId = orgs.items[0]?.id ?? null;
 
     if (!orgId) {
@@ -1265,9 +1275,50 @@ export function TeamFrame() {
         ),
       );
       orgId = created.id;
+      setOrganizations((current) => [...current, created]);
     }
 
     return orgId;
+  }
+
+  async function handleSelectOrganization(targetOrganizationId: string) {
+    if (!targetOrganizationId || targetOrganizationId === organizationId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setOrganizationId(targetOrganizationId);
+      await loadOrganizationState(targetOrganizationId);
+      setActiveNav("org");
+    } catch (error) {
+      setError(describeError("Switch organization", error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCreateOrganization(name: string) {
+    const cleanName = name.trim();
+    if (!cleanName) {
+      setError("Organization name is required");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const created = await executeApiCall("Create organization", (options) =>
+        createOrganization({ name: cleanName, slug: defaultOrgSlug() }, options),
+      );
+      await loadOrganizations();
+      setOrgNameDraft("");
+      setOrganizationId(created.id);
+      await loadOrganizationState(created.id);
+      setActiveNav("org");
+      setFeedbackToast({ tone: "success", message: `Created "${cleanName}"` });
+    } catch (error) {
+      setError(describeError("Create organization", error));
+    } finally {
+      setLoading(false);
+    }
   }
 
   async function loadOrganizationState(targetOrganizationId: string) {
@@ -1340,10 +1391,13 @@ export function TeamFrame() {
       setLoading(true);
       setError(null);
       try {
-        const orgId = await bootstrapOrganizationContext();
+        const orgs = await loadOrganizations();
         if (cancelled) return;
-        setOrganizationId(orgId);
-        await loadOrganizationState(orgId);
+        const firstOrgId = orgs[0]?.id ?? null;
+        setOrganizationId(firstOrgId);
+        if (firstOrgId) {
+          await loadOrganizationState(firstOrgId);
+        }
       } catch (error) {
         if (!cancelled) {
           setError(describeError("Bootstrap", error));
@@ -2255,6 +2309,74 @@ export function TeamFrame() {
     return <LoadingScreen />;
   }
 
+  if (!isLocalDemoMode && organizations.length === 0) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#F1F5F9",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+          padding: 24,
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 420,
+            background: "#FFFFFF",
+            border: "1px solid #D8E0EC",
+            borderRadius: 12,
+            padding: 24,
+            boxShadow: "0 10px 30px rgba(15,23,42,0.08)",
+          }}
+        >
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", marginBottom: 6 }}>
+            Create your first organization
+          </div>
+          <div style={{ fontSize: 13, color: "#64748B", marginBottom: 16 }}>
+            Name the company you're setting up. You can add and switch between more
+            organizations later.
+          </div>
+          <input
+            autoFocus
+            value={orgNameDraft}
+            onChange={(event) => setOrgNameDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && orgNameDraft.trim()) {
+                void handleCreateOrganization(orgNameDraft);
+              }
+            }}
+            placeholder="Organization name"
+            style={{ width: "100%", marginBottom: 12, padding: "9px 12px" }}
+          />
+          <button
+            onClick={() => void handleCreateOrganization(orgNameDraft)}
+            disabled={!orgNameDraft.trim()}
+            style={{
+              width: "100%",
+              background: orgNameDraft.trim() ? "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)" : "#E2E8F0",
+              color: orgNameDraft.trim() ? "#FFFFFF" : "#94A3B8",
+              border: "none",
+              borderRadius: 8,
+              padding: "10px 14px",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: orgNameDraft.trim() ? "pointer" : "not-allowed",
+            }}
+          >
+            Create organization
+          </button>
+          {error ? (
+            <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 10 }}>{error}</div>
+          ) : null}
+        </div>
+      </div>
+    );
+  }
+
   const openActions = actions.filter((item) => item.status !== ActionStatus.done).length;
   const needsAttention = overdueActions + blockedActions;
   const vacantCount = positions.length - positionAssignmentById.size;
@@ -2376,6 +2498,10 @@ export function TeamFrame() {
       statusMessage={mutationStatusText}
       errorMessage={error}
       isDemoMode={isLocalDemoMode}
+      organizations={organizations.map((org) => ({ id: org.id, name: org.name }))}
+      activeOrganizationId={organizationId}
+      onSelectOrganization={isLocalDemoMode ? undefined : (id) => void handleSelectOrganization(id)}
+      onCreateOrganization={isLocalDemoMode ? undefined : (name) => void handleCreateOrganization(name)}
     >
       {showOrgReadyBanner && (
         <OrgReadyBanner
