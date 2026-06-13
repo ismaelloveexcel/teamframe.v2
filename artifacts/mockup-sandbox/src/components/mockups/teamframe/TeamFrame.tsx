@@ -844,6 +844,14 @@ export function TeamFrame() {
   const [assignmentDraftEndDate, setAssignmentDraftEndDate] = useState("");
   const [assignmentDraftActualSalary, setAssignmentDraftActualSalary] = useState("");
 
+  // Inline structure editors (replace window.prompt for B3/B4)
+  const [quickInsert, setQuickInsert] = useState<{
+    mode: "above" | "below" | "parallel";
+    title: string;
+  } | null>(null);
+  const [editingReportingLine, setEditingReportingLine] = useState(false);
+  const [reportingLineDraftId, setReportingLineDraftId] = useState<string>("");
+
   const [newTeamName, setNewTeamName] = useState("");
   const [newTeamParentId, setNewTeamParentId] = useState<string>("");
 
@@ -1391,20 +1399,14 @@ export function TeamFrame() {
   async function handleQuickInsertPosition(
     mode: "above" | "below" | "parallel",
     targetPositionId: string,
+    title: string,
   ) {
     if (!organizationId) return;
     const target = positionMap.get(targetPositionId);
     if (!target) return;
 
-    const suggestedTitle =
-      mode === "above"
-        ? `New ${UI_TERMS.entities.position} Above`
-        : mode === "parallel"
-          ? `New ${UI_TERMS.entities.position} Parallel`
-          : `New ${UI_TERMS.entities.position} Below`;
-
-    const title = window.prompt("Position title is required", suggestedTitle)?.trim();
-    if (!title) {
+    const cleanTitle = title.trim();
+    if (!cleanTitle) {
       setError("Position title is required");
       return;
     }
@@ -1420,7 +1422,7 @@ export function TeamFrame() {
           createPosition(
             organizationId,
             {
-              title,
+              title: cleanTitle,
               teamId: target.teamId ?? undefined,
               reportsToPositionId: reportsToPositionId ?? undefined,
               lifecycleStatus: PositionLifecycleStatus.vacant,
@@ -1444,6 +1446,7 @@ export function TeamFrame() {
 
         setFocusPositionId(inserted.id);
         setPositionPanelTab("position");
+        setQuickInsert(null);
       },
       {
         loadingMessage: UI_TERMS.feedback.loading.updatingStructure,
@@ -1458,20 +1461,15 @@ export function TeamFrame() {
     );
   }
 
-  async function handleUpdateReportingLine(positionId: string) {
+  async function handleUpdateReportingLine(
+    positionId: string,
+    nextManagerId: string | null,
+  ) {
     if (!organizationId) return;
     const position = positionMap.get(positionId);
     if (!position) return;
 
-    const optionsText = positions
-      .filter((candidate) => candidate.id !== positionId)
-      .map((candidate) => `${candidate.id.slice(0, 8)} — ${candidate.title}`)
-      .join("\n");
-    const promptText = `Set reports-to position ID prefix. Leave blank for root.\n\n${optionsText}`;
-    const response = window.prompt(promptText, position.reportsToPositionId ?? "");
-    if (response === null) return;
-
-    const normalized = response.trim();
+    const normalized = (nextManagerId ?? "").trim();
     if (!normalized) {
       await runMutation(
         async () => {
@@ -1492,10 +1490,11 @@ export function TeamFrame() {
           failureMessage: UI_TERMS.errors.cannotUpdateStructure,
         },
       );
+      setEditingReportingLine(false);
       return;
     }
 
-    const nextManager = positions.find((candidate) => candidate.id.startsWith(normalized));
+    const nextManager = positions.find((candidate) => candidate.id === normalized);
     if (!nextManager || nextManager.id === positionId) {
       setError(UI_TERMS.errors.cannotUpdateStructure);
       return;
@@ -1530,6 +1529,7 @@ export function TeamFrame() {
         failureMessage: UI_TERMS.errors.cannotUpdateStructure,
       },
     );
+    setEditingReportingLine(false);
   }
 
   function ownerLabel(ownerPersonId?: string | null, ownerPositionId?: string | null): string {
@@ -1672,7 +1672,10 @@ export function TeamFrame() {
                 }}
                 onClick={(event) => {
                   event.stopPropagation();
-                  void handleQuickInsertPosition("below", positionId);
+                  setFocusPositionId(positionId);
+                  setPositionPanelTab("position");
+                  setEditingReportingLine(false);
+                  setQuickInsert({ mode: "below", title: "" });
                 }}
                 title={UI_TERMS.feedback.hover.addRelatedPosition}
               >
@@ -2694,16 +2697,22 @@ export function TeamFrame() {
                           <textarea placeholder="Add context" rows={2} style={{ width: "100%", resize: "vertical" }} />
 
                           <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                            <button onClick={() => void handleQuickInsertPosition("above", selectedPosition.id)}>
+                            <button onClick={() => { setEditingReportingLine(false); setQuickInsert({ mode: "above", title: "" }); }}>
                               Add above
                             </button>
-                            <button onClick={() => void handleQuickInsertPosition("below", selectedPosition.id)}>
+                            <button onClick={() => { setEditingReportingLine(false); setQuickInsert({ mode: "below", title: "" }); }}>
                               Add below
                             </button>
-                            <button onClick={() => void handleQuickInsertPosition("parallel", selectedPosition.id)}>
+                            <button onClick={() => { setEditingReportingLine(false); setQuickInsert({ mode: "parallel", title: "" }); }}>
                               Add parallel
                             </button>
-                            <button onClick={() => void handleUpdateReportingLine(selectedPosition.id)}>
+                            <button
+                              onClick={() => {
+                                setQuickInsert(null);
+                                setReportingLineDraftId(selectedPosition.reportsToPositionId ?? "");
+                                setEditingReportingLine(true);
+                              }}
+                            >
                               Update reporting line
                             </button>
                             <button
@@ -2713,6 +2722,59 @@ export function TeamFrame() {
                               Vacate position
                             </button>
                           </div>
+
+                          {quickInsert ? (
+                            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+                              <input
+                                autoFocus
+                                value={quickInsert.title}
+                                onChange={(event) =>
+                                  setQuickInsert({ mode: quickInsert.mode, title: event.target.value })
+                                }
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" && quickInsert.title.trim()) {
+                                    void handleQuickInsertPosition(quickInsert.mode, selectedPosition.id, quickInsert.title);
+                                  }
+                                  if (event.key === "Escape") setQuickInsert(null);
+                                }}
+                                placeholder={`New position title (add ${quickInsert.mode})`}
+                                style={{ flex: 1 }}
+                              />
+                              <button
+                                onClick={() => void handleQuickInsertPosition(quickInsert.mode, selectedPosition.id, quickInsert.title)}
+                                disabled={!quickInsert.title.trim() || isLocalDemoMode}
+                              >
+                                Create
+                              </button>
+                              <button onClick={() => setQuickInsert(null)}>Cancel</button>
+                            </div>
+                          ) : null}
+
+                          {editingReportingLine ? (
+                            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+                              <select
+                                value={reportingLineDraftId}
+                                onChange={(event) => setReportingLineDraftId(event.target.value)}
+                                style={{ flex: 1 }}
+                              >
+                                <option value="">No manager (root position)</option>
+                                {positions
+                                  .filter((candidate) => candidate.id !== selectedPosition.id)
+                                  .map((candidate) => (
+                                    <option key={candidate.id} value={candidate.id}>
+                                      {candidate.title}
+                                    </option>
+                                  ))}
+                              </select>
+                              <button
+                                onClick={() => void handleUpdateReportingLine(selectedPosition.id, reportingLineDraftId || null)}
+                                disabled={isLocalDemoMode}
+                              >
+                                Save
+                              </button>
+                              <button onClick={() => setEditingReportingLine(false)}>Cancel</button>
+                            </div>
+                          ) : null}
                         </div>
                       ) : null}
 
@@ -2929,18 +2991,17 @@ export function TeamFrame() {
                 </div>
               </div>
 
-              <details style={{ marginTop: 12 }}>
-                <summary
+              <div style={{ marginTop: 12 }}>
+                <div
                   style={{
-                    cursor: "pointer",
                     fontSize: 12,
                     fontWeight: 700,
                     color: "#334155",
                     marginBottom: 10,
                   }}
                 >
-                  Structure controls
-                </summary>
+                  Add Positions & People
+                </div>
 
                 <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
                   <div style={STYLE.panel}>
@@ -3081,14 +3142,14 @@ export function TeamFrame() {
                     </div>
                   </div>
                 </div>
-              </details>
+              </div>
             </section>
             </>
           )}
 
           {activeNav === "actions" && (
             <section style={STYLE.panel}>
-              <div style={{ ...STYLE.title, fontSize: 17 }}>Actions (execution layer)</div>
+              <div style={{ ...STYLE.title, fontSize: 17 }}>Actions</div>
 
               <div style={{ ...STYLE.panel, marginBottom: 12 }}>
                 <div style={STYLE.subTitle}>Create Action</div>
@@ -3121,10 +3182,12 @@ export function TeamFrame() {
                         <div style={{ fontSize: 12, color: "#475569" }}>
                           Owner: {ownerLabel(item.ownerPersonId, item.ownerPositionId)} · Due: {formatDateLabel(item.dueDate)}
                         </div>
-                        <div style={{ fontSize: 11, color: "#1D4ED8", marginTop: 2 }}>
-                          Path: {item.assignmentId ? "assignment > person > position" : item.ownerPersonId ? "person > position fallback" : "position structural"}
-                          {item.assignmentId ? ` · Assignment ${item.assignmentId.slice(0, 8)}` : ""}
-                        </div>
+                        {import.meta.env.DEV ? (
+                          <div style={{ fontSize: 11, color: "#1D4ED8", marginTop: 2 }}>
+                            Path: {item.assignmentId ? "assignment > person > position" : item.ownerPersonId ? "person > position fallback" : "position structural"}
+                            {item.assignmentId ? ` · Assignment ${item.assignmentId.slice(0, 8)}` : ""}
+                          </div>
+                        ) : null}
                       </div>
                       <div style={{ display: "flex", gap: 6 }}>
                         <span style={{ fontSize: 11, fontWeight: 700, color: "#334155", border: "1px solid #CBD5E1", borderRadius: 999, padding: "3px 8px" }}>
@@ -3159,7 +3222,7 @@ export function TeamFrame() {
 
           {activeNav === "team" && (
             <section style={STYLE.panel}>
-              <div style={{ ...STYLE.title, fontSize: 17 }}>Team Directory (structural capability)</div>
+              <div style={{ ...STYLE.title, fontSize: 17 }}>Team Directory</div>
               <table style={{ width: "100%", borderCollapse: "collapse" }}>
                 <thead>
                   <tr style={{ textAlign: "left", borderBottom: "1px solid #E5E7EB" }}>
@@ -3198,7 +3261,7 @@ export function TeamFrame() {
 
           {activeNav === "policies" && (
             <section style={STYLE.panel}>
-              <div style={{ ...STYLE.title, fontSize: 17 }}>Policies (team/position context)</div>
+              <div style={{ ...STYLE.title, fontSize: 17 }}>Policies</div>
 
               <div style={{ ...STYLE.panel, marginBottom: 12 }}>
                 <div style={STYLE.subTitle}>Create Policy</div>
@@ -3291,26 +3354,26 @@ export function TeamFrame() {
 
           {activeNav === "administration" && (
             <section style={STYLE.panel}>
-              <div style={{ ...STYLE.title, fontSize: 17 }}>Administration (minimal)</div>
+              <div style={{ ...STYLE.title, fontSize: 17 }}>Administration</div>
               <div style={{ fontSize: 12, color: "#475569", marginBottom: 10 }}>
                 Organization ID: {organizationId ?? "-"}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-                <button onClick={downloadPayrollCsv}>Download Payroll Export (utility)</button>
-                <button onClick={() => void handleResetDemoState()} disabled={busy}>
-                  Reset Deterministic Demo
-                </button>
-                <button onClick={() => void handleInvalidOrgRecoveryCheck()} disabled={busy}>
-                  Run Invalid-Org Recovery Check
-                </button>
+                <button onClick={downloadPayrollCsv}>Download Payroll Export</button>
+                {import.meta.env.DEV ? (
+                  <>
+                    <button onClick={() => void handleResetDemoState()} disabled={busy}>
+                      Reset Deterministic Demo
+                    </button>
+                    <button onClick={() => void handleInvalidOrgRecoveryCheck()} disabled={busy}>
+                      Run Invalid-Org Recovery Check
+                    </button>
+                  </>
+                ) : null}
               </div>
-              {demoResetSummary ? (
+              {import.meta.env.DEV && demoResetSummary ? (
                 <div style={{ fontSize: 12, color: "#0F172A", marginBottom: 6 }}>{demoResetSummary}</div>
               ) : null}
-              <div style={{ fontSize: 11, color: "#64748B" }}>
-                COO walkthrough baseline: Org Map to Teams to Owners to Actions to Policies.
-                {isLocalDemoMode ? " Local snapshot mode is active for visual review." : ""}
-              </div>
             </section>
           )}
       {feedbackToast ? (
