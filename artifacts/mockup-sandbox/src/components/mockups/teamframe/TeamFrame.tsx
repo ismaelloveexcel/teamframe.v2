@@ -2316,8 +2316,15 @@ export function TeamFrame() {
     const isoDate = `${generatedAt.getFullYear()}-${String(generatedAt.getMonth() + 1).padStart(2, "0")}-${String(generatedAt.getDate()).padStart(2, "0")}`;
 
     // Ownership = explicit decision-ownership records (positions, not people).
-    const hasOwner = (item: Action) => Boolean(item.ownerPositionId || item.ownerPersonId);
     const isVacant = (p: Position) => !positionAssignmentById.get(p.id);
+    // An action is "routed" only if a real human is accountable: a person owner,
+    // or a position owner whose seat is actually filled. An action owned by a
+    // vacant position is effectively unrouted — the founder still carries it.
+    const isRouted = (item: Action) => {
+      if (item.ownerPersonId) return true;
+      if (item.ownerPositionId) return Boolean(positionAssignmentById.get(item.ownerPositionId));
+      return false;
+    };
     const isOwnedPosition = (p: Position) => Boolean(positionOwnershipMap.get(p.id));
     const teamHasLead = (teamId: string) => Boolean(teamOwnershipMap.get(teamId));
     const hasJobDescription = (p: Position) => Boolean(positionDocuments[p.id]);
@@ -2330,14 +2337,14 @@ export function TeamFrame() {
 
     const openActionItems = actions.filter((item) => item.status !== ActionStatus.done);
     const overdue = openActionItems.filter((item) => daysOverdue(item.dueDate) > 0);
-    const overdueNoOwner = overdue.filter((item) => !hasOwner(item));
+    const overdueNoOwner = overdue.filter((item) => !isRouted(item));
 
     // ── Section 1 — Ownership snapshot ──────────────────────────────────────
     const totalPositions = positions.length;
     const unownedPositions = positions.filter((p) => !isOwnedPosition(p));
     const ownedCount = totalPositions - unownedPositions.length;
     const teamsWithoutLead = teams.filter((t) => !teamHasLead(t.id));
-    const unownedActions = openActionItems.filter((item) => !hasOwner(item));
+    const unownedActions = openActionItems.filter((item) => !isRouted(item));
     const coverage = totalPositions ? Math.round((ownedCount / totalPositions) * 100) : 0;
 
     // ── Section 2 — Single points of failure ────────────────────────────────
