@@ -1,0 +1,13 @@
+{
+  "id": "D",
+  "name": "Repair Safety",
+  "pass": true,
+  "details": [
+    "directProjectionPatch=false",
+    "emitsRepairRequestedEvent=true",
+    "repairEventsPersisted=1",
+    "replayLiveConverged=true",
+    "runtimeRepairError=false"
+  ],
+  "errors": []
+}

@@ -1,0 +1,16 @@
+{
+  "id": "F",
+  "name": "Failure Injection",
+  "pass": true,
+  "details": [
+    "quarantined=true",
+    "blocked=true",
+    "replayInterrupted=true",
+    "repairFirstApplied=true",
+    "repairLoopDetected=false",
+    "runtimeRepairError=false",
+    "positionBypassDetected=false",
+    "finalReplayMatches=true"
+  ],
+  "errors": []
+}

@@ -1,0 +1,69 @@
+{
+  "generatedAt": "2026-06-05T11:58:25.928678+00:00",
+  "files": {
+    "artifacts/api-server/src/system-certification-audit.ts": {
+      "sha256": "e3d81881b739a1a0ddfd0fb172966ab38e8c568a62eea646ea01accd1348d4ab",
+      "bytes": 40717
+    },
+    "artifacts/system-certification-audit/system-certification-result.json": {
+      "sha256": "3adb4e2e9559d6bc6bc964f52fe5e5f0ad6aa25f3d6c28e34d98ad1565e2f9ef",
+      "bytes": 234
+    },
+    "artifacts/system-certification-audit/section-a-event-authority.json": {
+      "sha256": "6b856f03447a5b647cce86069baaa093d03f23da5b75d8c6373bb8a70b461f1e",
+      "bytes": 147
+    },
+    "artifacts/system-certification-audit/section-b-replay-determinism.json": {
+      "sha256": "79a2bd51fcd9a2b151123705dafb550d234464a7af6aab506606b69a21ae6f60",
+      "bytes": 244
+    },
+    "artifacts/system-certification-audit/section-c-quarantine-isolation.json": {
+      "sha256": "46639124e6520134fea634e6f31cec8d327d7e9e721ee9d4371967e90d695688",
+      "bytes": 245
+    },
+    "artifacts/system-certification-audit/section-d-repair-safety.json": {
+      "sha256": "d48906c145e5384bf2f36dbf00b03807d8e4991f34832723e037734fcbd96ed9",
+      "bytes": 261
+    },
+    "artifacts/system-certification-audit/section-e-outbox-recovery.json": {
+      "sha256": "7e4516b0cb8bb1b18dc46323b25c97baed6a08353a7e2ced52be11ecb66498a1",
+      "bytes": 251
+    },
+    "artifacts/system-certification-audit/section-f-failure-injection.json": {
+      "sha256": "6fd1d662067eff8388f8e7a818b804e203529754983b332d445dd7ad99f97e31",
+      "bytes": 333
+    },
+    "artifacts/system-certification-audit/section-g-legacy-truth-surface.json": {
+      "sha256": "04ae9d851ee7b49e623681185306c4c3987e2808e32019873f63f18686c0751f",
+      "bytes": 2528
+    },
+    "artifacts/system-certification-audit/section-h-global-determinism.json": {
+      "sha256": "59743e8a899dd135d212f01b678d60c1d911b6b254d6c144db118da5ae8fdf19",
+      "bytes": 65536
+    },
+    "artifacts/stability/replay-divergence-map.json": {
+      "sha256": "c1fa2ed4a9326ed32dce1b0f08eea1ba838fd8ae74fcc3030d66bd42c5d7f827",
+      "bytes": 154
+    },
+    "artifacts/stability/repair-request-certification.json": {
+      "sha256": "eb2d8b802b1455b8306dc6253a8c8dc9fa958e37d6ab16a6594b5dd7a257072b",
+      "bytes": 196
+    },
+    "artifacts/stability/malformed-stream-certification.json": {
+      "sha256": "775d4796fd09abf6e4aeabc1f7cbc13c18468ccd3534137724939088bd2f8c2f",
+      "bytes": 655
+    },
+    "artifacts/stability/outbox-recovery-matrix.json": {
+      "sha256": "ac69560b283f2724c09f315a3d0aa93c0952d5d22621d30d8c33ebd192a48d8e",
+      "bytes": 553
+    },
+    "artifacts/stability/projection-authority-proof.md": {
+      "sha256": "46138aa2e3dc344213fe0a4c45bf81bd4be42d8d356b006946fa5350e228083b",
+      "bytes": 915
+    },
+    "artifacts/stability/stabilization-baseline.json": {
+      "sha256": "dab1d3cfdaae4d7796d460345a1ba1817c4382e5e9e01c0e28cebaa4c5da47b2",
+      "bytes": 810
+    }
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "id": "C",
+  "name": "Quarantine Isolation",
+  "pass": true,
+  "details": [
+    "invokesReplay=false",
+    "invokesProjector=false",
+    "touchesProjections=false",
+    "projectionUnchanged=true",
+    "quarantined=true"
+  ],
+  "errors": []
+}

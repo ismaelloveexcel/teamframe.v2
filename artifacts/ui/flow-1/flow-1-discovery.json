@@ -1,0 +1,111 @@
+{
+  "flow": "Flow #1 — Onboarding → First Value Moment",
+  "auditedAt": "2026-06-05",
+  "entryPoints": [
+    {
+      "id": "ep-1",
+      "file": "artifacts/mockup-sandbox/src/components/mockups/teamframe/TeamFrame.tsx",
+      "line": 2220,
+      "description": "Loading state gate — renders before any content",
+      "currentBehavior": "Plain text: 'Loading TeamFrame workspace…' on white background",
+      "friction": "CRITICAL — No branding, no progress, no value communication. First impression is a blank page with a status string.",
+      "fix": "Replace with branded loading screen that communicates what is being prepared"
+    },
+    {
+      "id": "ep-2",
+      "file": "artifacts/mockup-sandbox/src/components/mockups/teamframe/TeamFrame.tsx",
+      "line": 1237,
+      "description": "Bootstrap function — silently creates org if none exists",
+      "currentBehavior": "Silent API call, user receives no feedback during this phase",
+      "friction": "MODERATE — User waits with no context. If API is slow, experience is opaque.",
+      "fix": "Surface bootstrap progress in loading screen with contextual messages"
+    },
+    {
+      "id": "ep-3",
+      "file": "artifacts/mockup-sandbox/src/components/mockups/teamframe/TeamFrame.tsx",
+      "line": 2332,
+      "description": "Empty org state — when rootPositions.length === 0",
+      "currentBehavior": "Single unstyled line: 'No positions yet. Create a root position to start.'",
+      "friction": "CRITICAL — No CTA, no visual guidance, no explanation of value. User dead-ends immediately.",
+      "fix": "Full-panel guided empty state with single primary CTA and value explanation"
+    },
+    {
+      "id": "ep-4",
+      "file": "artifacts/mockup-sandbox/src/components/mockups/teamframe/TeamFrame.tsx",
+      "line": 2353,
+      "description": "Side panel empty state — when no position is selected",
+      "currentBehavior": "Text: 'Select a position from the org chart.'",
+      "friction": "LOW — Acceptable as secondary, but should guide the action",
+      "fix": "Replace with context-aware helper text that points to the primary CTA"
+    }
+  ],
+  "firstValueMoment": {
+    "definition": "User sees their first position rendered as a node in the org chart with a team label and status badge",
+    "currentState": "No visual confirmation. Position appears silently after form submit.",
+    "targetState": "Position card animates in with a brief success banner: 'Your org chart is live.'",
+    "followOnAction": "Banner with guided next step: 'Assign a person to this position →'"
+  },
+  "shellAudit": {
+    "sidebar": {
+      "width": "176px fixed",
+      "background": "#0B1220",
+      "navItems": "text-only buttons, no icons",
+      "issues": [
+        "No icons — navigation relies 100% on text label recall",
+        "Active state uses only background color change — low contrast",
+        "No logo mark or brand identity",
+        "Version label 'TeamFrame V1 · Execution' is developer-facing language"
+      ]
+    },
+    "statusBar": {
+      "location": "Top of main content area",
+      "currentContent": "Positions X | Filled X | Open actions X | Needs attention X",
+      "issues": [
+        "Reads as a debug/developer metrics bar",
+        "No semantic grouping or visual weight hierarchy",
+        "Error messages mixed directly into this bar",
+        "Mutation status ('Syncing changes…') uses same font size as error text"
+      ]
+    },
+    "mainContent": {
+      "title": "'Org Chart' h1 + subtitle 'Select a node to manage assignment…'",
+      "issues": [
+        "Title is redundant with the nav item already selected",
+        "Subtitle is an instruction, not a value statement",
+        "Panel uses box with min-height 620px but no graceful empty state"
+      ]
+    }
+  },
+  "frictionMap": [
+    { "id": "f-1", "severity": "CRITICAL", "screen": "loading", "issue": "No brand identity or value communication during load" },
+    { "id": "f-2", "severity": "CRITICAL", "screen": "empty-org", "issue": "Dead-end empty state with no actionable CTA" },
+    { "id": "f-3", "severity": "HIGH",     "screen": "shell-sidebar", "issue": "Text-only navigation, no icons, no active state affordance" },
+    { "id": "f-4", "severity": "HIGH",     "screen": "shell-header", "issue": "Status bar looks like debug output, not product value" },
+    { "id": "f-5", "severity": "HIGH",     "screen": "first-position", "issue": "No success confirmation after first action completed" },
+    { "id": "f-6", "severity": "MEDIUM",   "screen": "panel-empty", "issue": "Side panel empty state is a dead end" },
+    { "id": "f-7", "severity": "MEDIUM",   "screen": "all", "issue": "Zero use of installed Tailwind/shadcn/Lucide/Framer Motion — raw inline styles throughout" }
+  ],
+  "technicalDebtSummary": {
+    "componentSize": "3043 lines in single file — high cognitive load for maintenance",
+    "stylingApproach": "100% inline style objects — Tailwind, shadcn, Lucide all installed but unused",
+    "stateManagement": "30+ useState hooks in root component — causes full re-render on every mutation",
+    "scopeForFlow1": [
+      "Replace loading state (lines 2220–2226)",
+      "Replace empty org state (lines 2332–2333)",
+      "Upgrade sidebar (lines 2231–2253)",
+      "Upgrade status/context bar (lines 2256–2286)",
+      "Add first-value moment banner"
+    ],
+    "notInScope": [
+      "Core org chart rendering logic",
+      "Assignment/document functionality",
+      "Actions/policies/templates/administration sections"
+    ]
+  },
+  "recommendedComponentsToCreate": [
+    { "file": "LoadingScreen.tsx",   "purpose": "Branded loading state with animated progress messages" },
+    { "file": "EmptyOrgGuide.tsx",   "purpose": "Full-panel guided empty state with primary CTA" },
+    { "file": "AppShell.tsx",        "purpose": "Premium sidebar with Lucide icons + status bar" },
+    { "file": "OrgReadyBanner.tsx",  "purpose": "First-value confirmation banner after first position created" }
+  ]
+}

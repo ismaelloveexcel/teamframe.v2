@@ -5,6 +5,8 @@ export interface Position {
   reportsToId: string | null;
   order: number;
   level: number;
+  isCriticalPosition?: boolean;
+  lifecycleStatus?: "active" | "frozen";
 }
 
 export interface Employee {
@@ -40,17 +42,17 @@ export interface SeedData {
 
 export const SEED: SeedData = {
   positions: [
-    { id: "1-001", title: "CEO", department: "Executive", reportsToId: null, order: 0, level: 0 },
+    { id: "1-001", title: "CEO", department: "Executive", reportsToId: null, order: 0, level: 0, isCriticalPosition: true },
     { id: "1-002", title: "Head of People", department: "HR", reportsToId: "1-001", order: 1, level: 1 },
-    { id: "1-003", title: "CTO", department: "Engineering", reportsToId: "1-001", order: 2, level: 1 },
+    { id: "1-003", title: "CTO", department: "Engineering", reportsToId: "1-001", order: 2, level: 1, isCriticalPosition: true },
     { id: "1-004", title: "COO", department: "Operations", reportsToId: "1-001", order: 3, level: 1 },
     { id: "2-001", title: "VP Engineering", department: "Engineering", reportsToId: "1-003", order: 4, level: 2 },
     { id: "2-002", title: "VP Marketing", department: "Marketing", reportsToId: "1-004", order: 5, level: 2 },
     { id: "2-003", title: "VP Product", department: "Product", reportsToId: "1-003", order: 6, level: 2 },
-    { id: "2-004", title: "VP Finance", department: "Finance", reportsToId: "1-004", order: 7, level: 2 },
+    { id: "2-004", title: "VP Finance", department: "Finance", reportsToId: "1-004", order: 7, level: 2, isCriticalPosition: true },
     { id: "2-005", title: "VP Sales", department: "Sales", reportsToId: "1-004", order: 8, level: 2 },
     { id: "3-001", title: "Tech Lead Backend", department: "Engineering", reportsToId: "2-001", order: 9, level: 3 },
-    { id: "3-002", title: "Tech Lead Frontend", department: "Engineering", reportsToId: "2-001", order: 10, level: 3 },
+    { id: "3-002", title: "Tech Lead Frontend", department: "Engineering", reportsToId: "2-001", order: 10, level: 3, isCriticalPosition: true },
     { id: "3-003", title: "QA Manager", department: "Engineering", reportsToId: "2-001", order: 11, level: 3 },
     { id: "3-004", title: "DevOps Lead", department: "Engineering", reportsToId: "2-001", order: 12, level: 3 },
     { id: "3-005", title: "Product Manager", department: "Product", reportsToId: "2-003", order: 13, level: 3 },
@@ -65,7 +67,7 @@ export const SEED: SeedData = {
     { id: "3-014", title: "Sales Development", department: "Sales", reportsToId: "2-005", order: 22, level: 3 },
     { id: "3-015", title: "Sales Manager", department: "Sales", reportsToId: "2-005", order: 23, level: 3 },
     { id: "3-016", title: "Account Executive", department: "Sales", reportsToId: "2-005", order: 24, level: 3 },
-    { id: "3-017", title: "Sales Development", department: "Sales", reportsToId: "2-005", order: 25, level: 3 },
+    { id: "3-017", title: "Sales Development", department: "Sales", reportsToId: "2-005", order: 25, level: 3, lifecycleStatus: "frozen" },
   ],
   employees: [
     {

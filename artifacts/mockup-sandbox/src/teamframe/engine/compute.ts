@@ -1,9 +1,22 @@
-import { SeedData, Position, Employee, ComplianceItem } from "../data/seed";
+import { ComplianceItem, Employee, Position, SeedData } from "../data/seed";
 
 export interface PositionEdit {
   id: string;
   title: string;
   department: string;
+}
+
+export type ActionStatus = "open" | "in_progress" | "completed";
+export type ActionPriority = "critical" | "high" | "normal" | "low";
+export type PositionStatus = "filled" | "vacant" | "frozen";
+export type RiskCategory = "missing_document" | "expired_document" | "policy_ack_overdue" | "onboarding_overdue";
+
+export interface ActionOverride {
+  status?: ActionStatus;
+  ownerId?: string;
+  ownerRole?: string;
+  dueDate?: string;
+  comments?: string[];
 }
 
 export interface ControlState {
@@ -13,6 +26,73 @@ export interface ControlState {
   resolvedActions: string[];
   positionEdits: PositionEdit[];
   onboardingCompleted: string[];
+  actionOverrides: Record<string, ActionOverride>;
+}
+
+export interface Signal {
+  id: string;
+  requirementKey: string;
+  category: RiskCategory;
+  positionId: string;
+  employeeId: string | null;
+  level: "critical" | "warning" | "info";
+  cause: string;
+  impact: string;
+  recommendedAction: string;
+}
+
+export interface ActionItem {
+  id: string;
+  linkedRiskId: string;
+  requirementKey: string;
+  title: string;
+  priority: ActionPriority;
+  ownerId: string;
+  ownerRole: string;
+  assignedBy: string;
+  dueDate: string;
+  status: ActionStatus;
+  relatedEmployeeId: string | null;
+  relatedEmployeeName: string;
+  relatedPositionId: string;
+  relatedPositionTitle: string;
+  relatedRequirement: string;
+  comments: string[];
+}
+
+export interface RiskItem {
+  id: string;
+  positionId: string;
+  positionTitle: string;
+  category: RiskCategory;
+  cause: string;
+  impact: string;
+  recommendedAction: string;
+  linkedActionId: string;
+}
+
+export interface EmployeeDirectoryRow {
+  employeeId: string;
+  employeeName: string;
+  positionTitle: string;
+  department: string;
+  email: string;
+  phone: string;
+  managerName: string;
+  status: Employee["status"];
+}
+
+export interface FinanceRow {
+  employeeId: string;
+  employeeName: string;
+  position: string;
+  department: string;
+  manager: string;
+  employmentStatus: string;
+  salary: number;
+  bankName: string;
+  accountNumber: string;
+  joinDate: string;
 }
 
 export interface OrgNode {
@@ -22,444 +102,306 @@ export interface OrgNode {
   signalLevel: "critical" | "warning" | "info" | null;
 }
 
-export interface Signal {
-  id: string;
-  positionId: string;
-  level: "critical" | "warning" | "info";
-  message: string;
-  detail: string;
-}
-
-export interface Action {
-  id: string;
-  positionId: string;
-  type: "assign_employee" | "fix_compliance" | "complete_offboarding" | "review_capacity" | "update_descriptions" | "update_job_desc" | "assign_document" | "complete_onboarding";
-  label: string;
-  dueIn: string;
-  relatedSignalId: string | null;
-}
-
-export interface RiskItem {
-  positionId: string;
-  positionTitle: string;
-  category: "vacancy" | "offboarding" | "leave" | "compliance" | "overload" | "single_point";
-  level: "critical" | "warning" | "info";
-  score: number;
-  message: string;
-  detail: string;
-}
-
 export interface UIState {
   selectedPosition: Position | null;
   selectedEmployee: Employee | null;
+  selectedPositionStatus: PositionStatus | null;
+  selectedPositionMissingItems: string[];
   orgTree: OrgNode[];
-  signals: Signal[];
-  actions: Action[];
+  actions: ActionItem[];
+  risks: RiskItem[];
   complianceView: ComplianceItem[];
-  directReports: { position: Position; employee: Employee | null }[];
+  employeeDirectory: EmployeeDirectoryRow[];
+  financeRows: FinanceRow[];
   stats: {
     totalPositions: number;
     filledPositions: number;
     vacantPositions: number;
-    onLeaveCount: number;
-    offboardingCount: number;
-    filledPct: number;
-    vacantPct: number;
-    onLeavePct: number;
-    offboardingPct: number;
+    criticalVacancies: number;
+    needsAttention: number;
+    dueSoon: number;
   };
-  signalSummary: { critical: number; high: number; medium: number; low: number };
-  risks: RiskItem[];
-  riskScore: number;
-  riskBreakdown: { vacancy: number; offboarding: number; leave: number; compliance: number; overload: number; single_point: number };
 }
-
-export const SCENARIOS: Record<string, Partial<ControlState>> = {
-  DEFAULT_VIEW: { selectedPositionId: "1-001", selectedEmployeeId: "e-001", onboardingCompleted: [] },
-  VACANT_POSITION_FOCUS: { selectedPositionId: "3-002", selectedEmployeeId: null, onboardingCompleted: [] },
-  ON_LEAVE_EMPLOYEE_FOCUS: { selectedPositionId: "2-002", selectedEmployeeId: "e-006", onboardingCompleted: [] },
-  OFFBOARDING_EMPLOYEE_FOCUS: { selectedPositionId: "2-004", selectedEmployeeId: "e-008", onboardingCompleted: [] },
-  MISSING_COMPLIANCE_FOCUS: { selectedPositionId: "2-001", selectedEmployeeId: "e-005", onboardingCompleted: [] },
-  FULL_ORGANIZATION_VIEW: { selectedPositionId: "1-001", selectedEmployeeId: null, onboardingCompleted: [] },
-};
 
 function applyPositionEdits(seed: SeedData, edits: PositionEdit[]): SeedData {
   return {
     ...seed,
-    positions: seed.positions.map((p) => {
-      const edit = edits.find((e) => e.id === p.id);
-      if (!edit) return p;
-      return { ...p, title: edit.title, department: edit.department };
+    positions: seed.positions.map((position) => {
+      const edit = edits.find((item) => item.id === position.id);
+      if (!edit) return position;
+      return { ...position, title: edit.title, department: edit.department };
     }),
   };
 }
 
-function buildOrgTree(
-  seed: SeedData,
-  signals: Signal[],
-  parentId: string | null
-): OrgNode[] {
-  const children = seed.positions
-    .filter((p) => p.reportsToId === parentId)
-    .sort((a, b) => a.order - b.order);
-
-  return children.map((position) => {
-    const employee = seed.employees.find((e) => e.positionId === position.id) ?? null;
-    const posSignals = signals.filter((s) => s.positionId === position.id);
-    let signalLevel: OrgNode["signalLevel"] = null;
-    if (posSignals.some((s) => s.level === "critical")) signalLevel = "critical";
-    else if (posSignals.some((s) => s.level === "warning")) signalLevel = "warning";
-    else if (posSignals.some((s) => s.level === "info")) signalLevel = "info";
-
-    return {
-      position,
-      employee,
-      children: buildOrgTree(seed, signals, position.id),
-      signalLevel,
-    };
-  });
+function employeeForPosition(seed: SeedData, positionId: string): Employee | null {
+  return seed.employees.find((employee) => employee.positionId === positionId) ?? null;
 }
 
-function computeSignals(seed: SeedData, resolvedActions: string[]): Signal[] {
-  const signals: Signal[] = [];
+function managerName(seed: SeedData, position: Position): string {
+  if (!position.reportsToId) return "—";
+  const managerPosition = seed.positions.find((item) => item.id === position.reportsToId);
+  if (!managerPosition) return "—";
+  return employeeForPosition(seed, managerPosition.id)?.name ?? managerPosition.title;
+}
 
-  for (const position of seed.positions) {
-    const employee = seed.employees.find((e) => e.positionId === position.id);
+function inferPositionStatus(position: Position, employee: Employee | null): PositionStatus {
+  if (position.lifecycleStatus === "frozen") return "frozen";
+  return employee ? "filled" : "vacant";
+}
 
-    if (!employee) {
-      const id = `sig-vacant-${position.id}`;
-      if (!resolvedActions.includes(id)) {
-        signals.push({
-          id,
-          positionId: position.id,
-          level: "info",
-          message: "Vacant Position",
-          detail: `${position.title} has no assigned employee`,
-        });
-      }
-    } else if (employee.status === "on_leave") {
-      const id = `sig-leave-${position.id}`;
-      if (!resolvedActions.includes(id)) {
-        signals.push({
-          id,
-          positionId: position.id,
-          level: "info",
-          message: "Employee On Leave",
-          detail: `${employee.name} is currently on leave`,
-        });
-      }
-    } else if (employee.status === "offboarding") {
-      const id = `sig-offboard-${position.id}`;
-      if (!resolvedActions.includes(id)) {
-        signals.push({
-          id,
-          positionId: position.id,
-          level: "critical",
-          message: "Offboarding in Progress",
-          detail: `${employee.name} is offboarding — position will be vacant`,
-        });
-      }
-    }
+function daysSince(dateString: string): number {
+  const parsed = new Date(dateString);
+  if (Number.isNaN(parsed.getTime())) return 0;
+  const diff = Date.now() - parsed.getTime();
+  return Math.floor(diff / (1000 * 60 * 60 * 24));
+}
 
-    const complianceIssues = seed.compliance.filter(
-      (c) => c.positionId === position.id && c.status !== "complete"
-    );
-    for (const issue of complianceIssues) {
-      const id = `sig-compliance-${issue.id}`;
-      if (!resolvedActions.includes(id)) {
-        signals.push({
-          id,
-          positionId: position.id,
-          level: "warning",
-          message: `Missing Compliance`,
-          detail: issue.description,
-        });
-      }
-    }
+function addDaysIso(days: number): string {
+  const value = new Date();
+  value.setDate(value.getDate() + days);
+  return value.toISOString().slice(0, 10);
+}
+
+function actionPriorityFor(category: RiskCategory): ActionPriority {
+  if (category === "expired_document") return "critical";
+  if (category === "missing_document") return "high";
+  return "normal";
+}
+
+function actionDueDateFor(category: RiskCategory): string {
+  if (category === "expired_document") return addDaysIso(2);
+  if (category === "missing_document") return addDaysIso(5);
+  if (category === "policy_ack_overdue") return addDaysIso(7);
+  return addDaysIso(7);
+}
+
+function riskFromCompliance(issue: ComplianceItem, position: Position, employee: Employee | null): Signal {
+  const category: RiskCategory = issue.status === "expired" ? "expired_document" : "missing_document";
+  const signalId = `risk-${issue.id}`;
+  return {
+    id: signalId,
+    requirementKey: `${issue.positionId}:${issue.type.toLowerCase().replace(/\s+/g, "-")}`,
+    category,
+    positionId: issue.positionId,
+    employeeId: employee?.id ?? null,
+    level: issue.status === "expired" ? "critical" : "warning",
+    cause: issue.description,
+    impact: `${position.title} cannot be considered fully compliant.`,
+    recommendedAction: issue.status === "expired" ? "Upload updated document" : "Upload required document",
+  };
+}
+
+function onboardingSignal(seed: SeedData, employee: Employee): Signal | null {
+  const staleDays = daysSince(employee.startDate);
+  if (employee.onboardingStatus === "complete" || staleDays <= 30) {
+    return null;
   }
 
-  const highTurnoverId = "sig-high-turnover-engineering";
-  if (!resolvedActions.includes(highTurnoverId)) {
-    signals.push({
-      id: highTurnoverId,
-      positionId: "2-001",
-      level: "critical",
-      message: "High Turnover Risk",
-      detail: "Engineering team workload at capacity",
-    });
+  return {
+    id: `risk-onboarding-${employee.id}`,
+    requirementKey: `${employee.id}:onboarding`,
+    category: "onboarding_overdue",
+    positionId: employee.positionId,
+    employeeId: employee.id,
+    level: "warning",
+    cause: `Onboarding is still ${employee.onboardingStatus.replace("_", " ")} after ${staleDays} days.`,
+    impact: "Operational readiness remains incomplete.",
+    recommendedAction: "Complete onboarding task",
+  };
+}
+
+function buildSignals(seed: SeedData): Signal[] {
+  const signals: Signal[] = [];
+
+  for (const complianceIssue of seed.compliance.filter((item) => item.status !== "complete")) {
+    const position = seed.positions.find((item) => item.id === complianceIssue.positionId);
+    if (!position) continue;
+    const employee = employeeForPosition(seed, position.id);
+    signals.push(riskFromCompliance(complianceIssue, position, employee));
+  }
+
+  for (const employee of seed.employees) {
+    const signal = onboardingSignal(seed, employee);
+    if (signal) {
+      signals.push(signal);
+    }
   }
 
   return signals;
 }
 
-function computeActions(signals: Signal[], resolvedActions: string[]): Action[] {
-  const actions: Action[] = [];
+function buildActions(seed: SeedData, signals: Signal[], controlState: ControlState): ActionItem[] {
+  return signals.map((signal) => {
+    const position = seed.positions.find((item) => item.id === signal.positionId);
+    const employee = signal.employeeId ? seed.employees.find((item) => item.id === signal.employeeId) ?? null : null;
+    const manager = position ? managerName(seed, position) : "People Operations";
+    const actionId = `action-${signal.id}`;
+    const overrides = controlState.actionOverrides[actionId] ?? {};
+    const completed = controlState.resolvedActions.includes(actionId) || controlState.resolvedActions.includes(signal.id);
 
-  for (const signal of signals) {
-    if (signal.level === "info" && signal.message === "Vacant Position") {
-      const id = `act-assign-${signal.positionId}`;
-      if (!resolvedActions.includes(id)) {
-        actions.push({
-          id,
-          positionId: signal.positionId,
-          type: "assign_employee",
-          label: "Assign Employee",
-          dueIn: "Due in 2 weeks",
-          relatedSignalId: signal.id,
-        });
-      }
-    }
-    if (signal.message === "Missing Compliance") {
-      const id = `act-compliance-${signal.positionId}`;
-      if (!resolvedActions.includes(id)) {
-        actions.push({
-          id,
-          positionId: signal.positionId,
-          type: "fix_compliance",
-          label: "Fix Compliance",
-          dueIn: "Due in 1 week",
-          relatedSignalId: signal.id,
-        });
-      }
-    }
-    if (signal.message === "Offboarding in Progress") {
-      const id = `act-offboard-${signal.positionId}`;
-      if (!resolvedActions.includes(id)) {
-        actions.push({
-          id,
-          positionId: signal.positionId,
-          type: "complete_offboarding",
-          label: "Complete Offboarding",
-          dueIn: "Due in 3 days",
-          relatedSignalId: signal.id,
-        });
-      }
-    }
-    if (signal.message === "High Turnover Risk") {
-      const id = `act-review-capacity`;
-      if (!resolvedActions.includes(id) && !actions.find((a) => a.id === id)) {
-        actions.push({
-          id,
-          positionId: signal.positionId,
-          type: "review_capacity",
-          label: "Review Team Capacity",
-          dueIn: "Due in 3 days",
-          relatedSignalId: signal.id,
-        });
-      }
-    }
-  }
-
-  const descId = "act-update-descriptions";
-  if (!resolvedActions.includes(descId)) {
-    actions.push({
-      id: descId,
-      positionId: "1-001",
-      type: "update_descriptions",
-      label: "Update Job Descriptions",
-      dueIn: "Due in 1 week",
-      relatedSignalId: null,
-    });
-  }
-
-  const jobDescId = "act-update-jobdesc";
-  if (!resolvedActions.includes(jobDescId)) {
-    actions.push({
-      id: jobDescId,
-      positionId: "1-001",
-      type: "update_job_desc",
-      label: "Update Job Description",
-      dueIn: "Due in 3 days",
-      relatedSignalId: null,
-    });
-  }
-
-  const docId = "act-assign-doc";
-  if (!resolvedActions.includes(docId)) {
-    actions.push({
-      id: docId,
-      positionId: "2-001",
-      type: "assign_document",
-      label: "Assign Document",
-      dueIn: "Due in 5 days",
-      relatedSignalId: null,
-    });
-  }
-
-  const onboardId = "act-complete-onboarding";
-  if (!resolvedActions.includes(onboardId)) {
-    actions.push({
-      id: onboardId,
-      positionId: "3-001",
-      type: "complete_onboarding",
-      label: "Complete Onboarding",
-      dueIn: "Due in 1 week",
-      relatedSignalId: null,
-    });
-  }
-
-  return actions;
+    return {
+      id: actionId,
+      linkedRiskId: signal.id,
+      requirementKey: signal.requirementKey,
+      title: signal.recommendedAction,
+      priority: actionPriorityFor(signal.category),
+      ownerId: overrides.ownerId ?? (employee?.id ?? `manager:${position?.id ?? "unknown"}`),
+      ownerRole: overrides.ownerRole ?? (employee ? "employee" : "manager"),
+      assignedBy: "system",
+      dueDate: overrides.dueDate ?? actionDueDateFor(signal.category),
+      status: completed ? "completed" : overrides.status ?? "open",
+      relatedEmployeeId: employee?.id ?? null,
+      relatedEmployeeName: employee?.name ?? "Vacant / Unassigned",
+      relatedPositionId: signal.positionId,
+      relatedPositionTitle: position?.title ?? "Unknown Position",
+      relatedRequirement: signal.cause,
+      comments: overrides.comments ?? [],
+    };
+  });
 }
 
-function computeRisks(seed: SeedData, signals: Signal[]): RiskItem[] {
-  const risks: RiskItem[] = [];
-  for (const signal of signals) {
-    const pos = seed.positions.find((p) => p.id === signal.positionId);
-    if (!pos) continue;
-    let category: RiskItem["category"] = "compliance";
-    let score = 0;
-    if (signal.message === "Vacant Position") { category = "vacancy"; score = 30; }
-    else if (signal.message === "Employee On Leave") { category = "leave"; score = 20; }
-    else if (signal.message === "Offboarding in Progress") { category = "offboarding"; score = 50; }
-    else if (signal.message === "Missing Compliance") { category = "compliance"; score = 35; }
-    else if (signal.message === "High Turnover Risk") { category = "overload"; score = 40; }
-    risks.push({
-      positionId: pos.id,
-      positionTitle: pos.title,
-      category,
-      level: signal.level,
-      score,
-      message: signal.message,
-      detail: signal.detail,
+function openRisksFromSignals(seed: SeedData, signals: Signal[], actions: ActionItem[]): RiskItem[] {
+  const actionByRiskId = new Map(actions.map((action) => [action.linkedRiskId, action]));
+  return signals
+    .filter((signal) => (actionByRiskId.get(signal.id)?.status ?? "open") !== "completed")
+    .map((signal) => {
+      const position = seed.positions.find((item) => item.id === signal.positionId);
+      const action = actionByRiskId.get(signal.id);
+      return {
+        id: signal.id,
+        positionId: signal.positionId,
+        positionTitle: position?.title ?? "Unknown Position",
+        category: signal.category,
+        cause: signal.cause,
+        impact: signal.impact,
+        recommendedAction: signal.recommendedAction,
+        linkedActionId: action?.id ?? "",
+      };
     });
-  }
+}
 
-  const reportCounts = new Map<string, number>();
-  for (const pos of seed.positions) {
-    if (!pos.reportsToId) continue;
-    reportCounts.set(pos.reportsToId, (reportCounts.get(pos.reportsToId) ?? 0) + 1);
-  }
-  for (const [managerId, count] of reportCounts.entries()) {
-    if (count >= 5) {
-      const pos = seed.positions.find((p) => p.id === managerId);
-      if (pos) {
-        const emp = seed.employees.find((e) => e.positionId === pos.id);
-        risks.push({
-          positionId: pos.id,
-          positionTitle: pos.title,
-          category: "overload",
-          level: "warning",
-          score: 25,
-          message: "Overloaded Manager",
-          detail: `${emp?.name ?? pos.title} has ${count} direct reports (recommended max: 5)`,
-        });
-      }
-    }
-  }
+function buildOrgTree(seed: SeedData, risks: RiskItem[], parentId: string | null): OrgNode[] {
+  const children = seed.positions
+    .filter((position) => position.reportsToId === parentId)
+    .sort((a, b) => a.order - b.order);
 
-  const deptEmployees = new Map<string, string[]>();
-  for (const emp of seed.employees) {
-    const pos = seed.positions.find((p) => p.id === emp.positionId);
-    if (pos) {
-      const list = deptEmployees.get(pos.department) ?? [];
-      list.push(emp.id);
-      deptEmployees.set(pos.department, list);
-    }
-  }
-  for (const [, ids] of deptEmployees.entries()) {
-    if (ids.length === 1) {
-      const emp = seed.employees.find((e) => e.id === ids[0]);
-      const pos = seed.positions.find((p) => p.id === emp?.positionId);
-      if (pos && emp) {
-        risks.push({
-          positionId: pos.id,
-          positionTitle: pos.title,
-          category: "single_point",
-          level: "warning",
-          score: 20,
-          message: "Single Point of Failure",
-          detail: `${emp.name} is the only person in ${pos.department}`,
-        });
-      }
-    }
-  }
+  return children.map((position) => {
+    const employee = employeeForPosition(seed, position.id);
+    const positionRisks = risks.filter((risk) => risk.positionId === position.id);
+    const signalLevel: OrgNode["signalLevel"] =
+      positionRisks.some((risk) => risk.category === "expired_document")
+        ? "critical"
+        : positionRisks.length > 0
+        ? "warning"
+        : employee?.status === "on_leave"
+        ? "info"
+        : null;
 
-  return risks.sort((a, b) => b.score - a.score);
+    return {
+      position,
+      employee,
+      signalLevel,
+      children: buildOrgTree(seed, risks, position.id),
+    };
+  });
+}
+
+function buildEmployeeDirectory(seed: SeedData): EmployeeDirectoryRow[] {
+  return seed.employees.map((employee) => {
+    const position = seed.positions.find((item) => item.id === employee.positionId);
+    return {
+      employeeId: employee.id,
+      employeeName: employee.name,
+      positionTitle: position?.title ?? "Unknown Position",
+      department: position?.department ?? "Unknown",
+      email: employee.email,
+      phone: employee.phone,
+      managerName: position ? managerName(seed, position) : "—",
+      status: employee.status,
+    };
+  });
+}
+
+function buildFinanceRows(seed: SeedData): FinanceRow[] {
+  return seed.employees.map((employee) => {
+    const position = seed.positions.find((item) => item.id === employee.positionId);
+    return {
+      employeeId: employee.id,
+      employeeName: employee.name,
+      position: position?.title ?? "Unknown Position",
+      department: position?.department ?? "Unknown",
+      manager: position ? managerName(seed, position) : "—",
+      employmentStatus:
+        employee.status === "active"
+          ? "Active"
+          : employee.status === "on_leave"
+          ? "On Leave"
+          : "Offboarding",
+      salary: employee.salary,
+      bankName: employee.bankName,
+      accountNumber: employee.bankAccount,
+      joinDate: employee.startDate,
+    };
+  });
 }
 
 export function computeUIState(seed: SeedData, controlState: ControlState): UIState {
   const seedWithEdits = applyPositionEdits(seed, controlState.positionEdits ?? []);
-  const scenario = SCENARIOS[controlState.scenarioId] ?? {};
-  const mergedControl: ControlState = {
-    ...controlState,
-    ...scenario,
-    resolvedActions: controlState.resolvedActions,
-    positionEdits: controlState.positionEdits ?? [],
-    onboardingCompleted: controlState.onboardingCompleted ?? [],
-  };
-
-  const selectedPosition = seedWithEdits.positions.find((p) => p.id === mergedControl.selectedPositionId) ?? null;
-  const selectedEmployee = mergedControl.selectedEmployeeId
-    ? (seed.employees.find((e) => e.id === mergedControl.selectedEmployeeId) ?? null)
+  const selectedPosition =
+    seedWithEdits.positions.find((position) => position.id === controlState.selectedPositionId) ?? null;
+  const selectedEmployee = controlState.selectedEmployeeId
+    ? seedWithEdits.employees.find((employee) => employee.id === controlState.selectedEmployeeId) ?? null
     : selectedPosition
-    ? (seed.employees.find((e) => e.positionId === selectedPosition.id) ?? null)
+    ? employeeForPosition(seedWithEdits, selectedPosition.id)
     : null;
 
-  const signals = computeSignals(seedWithEdits, mergedControl.resolvedActions);
-  const orgTree = buildOrgTree(seedWithEdits, signals, null);
-  const actions = computeActions(signals, mergedControl.resolvedActions);
+  const signals = buildSignals(seedWithEdits);
+  const actions = buildActions(seedWithEdits, signals, controlState);
+  const risks = openRisksFromSignals(seedWithEdits, signals, actions);
 
-  const directReportPositions = selectedPosition
-    ? seedWithEdits.positions
-        .filter((p) => p.reportsToId === selectedPosition.id)
-        .sort((a, b) => a.order - b.order)
-        .map((p) => ({
-          position: p,
-          employee: seed.employees.find((e) => e.positionId === p.id) ?? null,
-        }))
-    : [];
+  const statusMap = seedWithEdits.positions.map((position) => ({
+    position,
+    status: inferPositionStatus(position, employeeForPosition(seedWithEdits, position.id)),
+  }));
 
-  const complianceView = seedWithEdits.compliance.filter(
-    (c) => !selectedPosition || c.positionId === selectedPosition.id
-  );
+  const now = new Date();
+  const soonThreshold = new Date(now.getTime() + 48 * 60 * 60 * 1000);
+  const activeActions = actions.filter((action) => action.status !== "completed");
+  const overdueActions = activeActions.filter((action) => new Date(action.dueDate).getTime() < now.getTime());
+  const dueSoonActions = activeActions.filter((action) => {
+    const due = new Date(action.dueDate).getTime();
+    return due >= now.getTime() && due <= soonThreshold.getTime();
+  });
 
-  const totalPositions = seedWithEdits.positions.length;
-  const filled = seed.employees.filter((e) => e.status !== "offboarding");
-  const filledPositions = filled.length;
-  const vacantPositions = totalPositions - seed.employees.length;
-  const onLeaveCount = seed.employees.filter((e) => e.status === "on_leave").length;
-  const offboardingCount = seed.employees.filter((e) => e.status === "offboarding").length;
-
-  const signalSummary = {
-    critical: signals.filter((s) => s.level === "critical").length,
-    high: Math.floor(signals.length * 0.3),
-    medium: Math.floor(signals.length * 0.4),
-    low: Math.floor(signals.length * 0.2),
-  };
-
-  const risks = computeRisks(seedWithEdits, signals);
-  const riskScore = risks.reduce((sum, r) => sum + r.score, 0);
-  const riskBreakdown = {
-    vacancy: risks.filter((r) => r.category === "vacancy").reduce((s, r) => s + r.score, 0),
-    offboarding: risks.filter((r) => r.category === "offboarding").reduce((s, r) => s + r.score, 0),
-    leave: risks.filter((r) => r.category === "leave").reduce((s, r) => s + r.score, 0),
-    compliance: risks.filter((r) => r.category === "compliance").reduce((s, r) => s + r.score, 0),
-    overload: risks.filter((r) => r.category === "overload").reduce((s, r) => s + r.score, 0),
-    single_point: risks.filter((r) => r.category === "single_point").reduce((s, r) => s + r.score, 0),
-  };
+  const selectedPositionMissingItems = risks
+    .filter((risk) => risk.positionId === selectedPosition?.id)
+    .map((risk) => risk.cause);
 
   return {
     selectedPosition,
     selectedEmployee,
-    orgTree,
-    signals,
+    selectedPositionStatus: selectedPosition
+      ? inferPositionStatus(selectedPosition, employeeForPosition(seedWithEdits, selectedPosition.id))
+      : null,
+    selectedPositionMissingItems,
+    orgTree: buildOrgTree(seedWithEdits, risks, null),
     actions,
-    complianceView,
-    directReports: directReportPositions,
-    stats: {
-      totalPositions,
-      filledPositions,
-      vacantPositions,
-      onLeaveCount,
-      offboardingCount,
-      filledPct: Math.round((filledPositions / totalPositions) * 1000) / 10,
-      vacantPct: Math.round((vacantPositions / totalPositions) * 1000) / 10,
-      onLeavePct: Math.round((onLeaveCount / totalPositions) * 1000) / 10,
-      offboardingPct: Math.round((offboardingCount / totalPositions) * 1000) / 10,
-    },
-    signalSummary,
     risks,
-    riskScore,
-    riskBreakdown,
+    complianceView: seedWithEdits.compliance.filter(
+      (item) => !selectedPosition || item.positionId === selectedPosition.id
+    ),
+    employeeDirectory: buildEmployeeDirectory(seedWithEdits),
+    financeRows: buildFinanceRows(seedWithEdits),
+    stats: {
+      totalPositions: seedWithEdits.positions.length,
+      filledPositions: statusMap.filter((item) => item.status === "filled").length,
+      vacantPositions: statusMap.filter((item) => item.status === "vacant").length,
+      criticalVacancies: statusMap.filter(
+        (item) => item.status === "vacant" && item.position.isCriticalPosition
+      ).length,
+      needsAttention: overdueActions.length,
+      dueSoon: dueSoonActions.length,
+    },
   };
 }

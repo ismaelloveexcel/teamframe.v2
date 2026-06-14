@@ -1,0 +1,75 @@
+{
+  "flow": "Flow #3 — Value Confirmation / Retention Loop",
+  "closureStatus": "COMPLETE",
+  "auditedAt": "2026-06-05",
+  "exitCriteriaEvaluation": {
+    "orgHealthSummaryVisibleOnMainOrgView": true,
+    "usesOnlyExistingComputedState": true,
+    "healthBadgesAreClickable": true,
+    "badgeDrillDownsWork": true,
+    "evidenceProgressCardAppearsAfterAssignment": true,
+    "noNewBackendEndpoints": true,
+    "noCertificationHarnessChanges": true,
+    "noRegressionFlow1": true,
+    "noRegressionFlow2": true,
+    "allCriteriaMet": true
+  },
+  "threeQuestionsAnswered": {
+    "whereAmI": "OrgHealthSummary — narrative + coverage bar + metric cards on org view",
+    "whatNeedsAttention": "Actionable AppShell badges + DrillDownPanel (vacancies / actions / compliance)",
+    "whatShouldIDoNext": "SetupProgressCard — 3-step visual + Complete Evidence CTA after assignment"
+  },
+  "frontendTypecheck": {
+    "command": "pnpm --filter @workspace/mockup-sandbox typecheck",
+    "result": "PASS",
+    "errors": 0
+  },
+  "systemCertificationAudit": {
+    "note": "Flow #3 contains zero backend changes. DB not present in current cloud agent VM. Last certified: teamframe-stable-core-v1 A-H PASS.",
+    "lastVerifiedTag": "teamframe-stable-core-v1"
+  },
+  "uxChecklist": {
+    "artifactPath": "artifacts/ui/flow-3/ux-checklist.json",
+    "pass": true,
+    "totalChecks": 20,
+    "passed": 20,
+    "failed": 0
+  },
+  "componentArtifacts": {
+    "created": [
+      "artifacts/mockup-sandbox/src/components/mockups/teamframe/OrgHealthSummary.tsx",
+      "artifacts/mockup-sandbox/src/components/mockups/teamframe/DrillDownPanel.tsx",
+      "artifacts/mockup-sandbox/src/components/mockups/teamframe/SetupProgressCard.tsx"
+    ],
+    "modified": [
+      "artifacts/mockup-sandbox/src/components/mockups/teamframe/AppShell.tsx",
+      "artifacts/mockup-sandbox/src/components/mockups/teamframe/TeamFrame.tsx"
+    ]
+  },
+  "stateUsed": {
+    "existingComputedValues": [
+      "positionAssignmentById.size",
+      "positions.length",
+      "openActions (actions.filter status !== done)",
+      "overdueActions (useMemo, line 1172)",
+      "blockedActions (useMemo, line 1183)",
+      "positionComplianceAlerts (useMemo, line 977)",
+      "positionDocuments (component state)",
+      "positionMap, teamMap, personMap"
+    ],
+    "newStateAdded": [
+      "drillDownMode: DrillDownMode | null",
+      "showSetupProgress: boolean",
+      "setupProgressPositionId: string | null"
+    ]
+  },
+  "outOfScopeConfirmed": [
+    "document upload persistence",
+    "new compliance engine",
+    "ownership workflows",
+    "notifications",
+    "reporting exports",
+    "new backend APIs"
+  ],
+  "nextPhase": "Broader design-system standardization or monetization surfaces per backlog"
+}

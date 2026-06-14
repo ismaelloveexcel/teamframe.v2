@@ -1,0 +1,153 @@
+{
+  "flow": "Flow #3 — Value Confirmation / Retention Loop",
+  "evaluatedAt": "2026-06-05",
+  "uxRule": "Every element answers one of: Where am I? What needs attention? What should I do next?",
+  "items": [
+    {
+      "id": "ux-1",
+      "check": "Org Health Summary visible on main org view when positions > 0",
+      "answersQuestion": "Where am I?",
+      "pass": true,
+      "evidence": "OrgHealthSummary.tsx renders above org chart section when positions.length > 0. Shows narrative text + metric cards."
+    },
+    {
+      "id": "ux-2",
+      "check": "Health summary uses only existing computed state — no new backend endpoints",
+      "answersQuestion": "Rule compliance",
+      "pass": true,
+      "evidence": "Props sourced from: positionAssignmentById.size, positions.length, openActions, overdueActions, blockedActions, positionComplianceAlerts. All pre-existing useMemo values."
+    },
+    {
+      "id": "ux-3",
+      "check": "Narrative text communicates org status in plain language (not just numbers)",
+      "answersQuestion": "Where am I?",
+      "pass": true,
+      "evidence": "healthNarrative() produces: 'Organization is 82% staffed.', '4 positions are vacant.', '3 actions require attention.', '2 compliance items unresolved.' Sentence-level language, not metric labels."
+    },
+    {
+      "id": "ux-4",
+      "check": "Coverage progress bar visible at a glance",
+      "answersQuestion": "Where am I?",
+      "pass": true,
+      "evidence": "80px progress bar with color-coded fill (green=100%, blue=≥80%, amber=<80%) + percentage label in OrgHealthSummary header."
+    },
+    {
+      "id": "ux-5",
+      "check": "Founder can understand current org status in <5 seconds without inspecting individual positions",
+      "answersQuestion": "Where am I?",
+      "pass": true,
+      "evidence": "Narrative first, compact metric chips second. All relevant signals (staffing, vacancies, actions, compliance) visible in one panel without position selection."
+    },
+    {
+      "id": "ux-6",
+      "check": "Needs attention badge is clickable and opens filtered view",
+      "answersQuestion": "What needs attention?",
+      "pass": true,
+      "evidence": "AppShell HealthBadge has onClick prop. 'needs attention' badge onClick={() => setDrillDownMode('actions')} when needsAttention > 0."
+    },
+    {
+      "id": "ux-7",
+      "check": "Vacant count badge is clickable and opens filtered view",
+      "answersQuestion": "What needs attention?",
+      "pass": true,
+      "evidence": "'vacant' badge onClick={() => setDrillDownMode('vacancies')} when vacantCount > 0."
+    },
+    {
+      "id": "ux-8",
+      "check": "Actions badge is clickable and opens filtered view",
+      "answersQuestion": "What needs attention?",
+      "pass": true,
+      "evidence": "'open actions' badge onClick={() => setDrillDownMode('actions')} when openActions > 0."
+    },
+    {
+      "id": "ux-9",
+      "check": "Vacancy drill-down shows position title, reporting manager, team, and vacancy age",
+      "answersQuestion": "What needs attention?",
+      "pass": true,
+      "evidence": "DrillDownPanel vacancies mode shows: position title, teamName, reportsToTitle, formatVacancyAge(since) derived from position.updatedAt."
+    },
+    {
+      "id": "ux-10",
+      "check": "Actions drill-down distinguishes overdue vs blocked with visual priority",
+      "answersQuestion": "What needs attention?",
+      "pass": true,
+      "evidence": "DrillDownPanel actions mode: overdue items get red background+badge, blocked items get amber. Sorted overdue→blocked→other. Shows owner name, position link, due date."
+    },
+    {
+      "id": "ux-11",
+      "check": "Compliance drill-down shows specific missing fields per person/position",
+      "answersQuestion": "What needs attention?",
+      "pass": true,
+      "evidence": "DrillDownPanel compliance mode: shows position, person name, 'Missing email' / 'Missing phone' tags from positionComplianceAlerts data."
+    },
+    {
+      "id": "ux-12",
+      "check": "Every drill-down row is actionable (click navigates to position panel)",
+      "answersQuestion": "What should I do next?",
+      "pass": true,
+      "evidence": "Vacancy and compliance rows call onSelectPosition(positionId) + onClose() on click, setting focusPositionId and switching to position panel."
+    },
+    {
+      "id": "ux-13",
+      "check": "Evidence completion guidance appears after assignment saved",
+      "answersQuestion": "What should I do next?",
+      "pass": true,
+      "evidence": "useEffect fires when positionAssignmentById.size > prevFilledCount: sets setupProgressPositionId + showSetupProgress=true. SetupProgressCard renders in fixed bottom-right."
+    },
+    {
+      "id": "ux-14",
+      "check": "Setup progress card shows 3-step visual (Structure ✓, Assignment ✓, Evidence ○)",
+      "answersQuestion": "What should I do next?",
+      "pass": true,
+      "evidence": "SetupProgressCard renders 3 step indicators. Structure always done. Assignment done if positionAssignmentById has entry. Evidence done if signed document exists."
+    },
+    {
+      "id": "ux-15",
+      "check": "'Complete Evidence' CTA deep-links to Documents tab on the assigned position",
+      "answersQuestion": "What should I do next?",
+      "pass": true,
+      "evidence": "onCompleteEvidence: setActiveNav('org') + setFocusPositionId(setupProgressPositionId) + setPositionPanelTab('documents') + setShowSetupProgress(false). Zero additional clicks."
+    },
+    {
+      "id": "ux-16",
+      "check": "Evidence completion percentage shown on setup progress card",
+      "answersQuestion": "Where am I?",
+      "pass": true,
+      "evidence": "compliancePct = Math.round((totalSigned / positions.length) * 100). Rendered as progress bar + percentage label in SetupProgressCard."
+    },
+    {
+      "id": "ux-17",
+      "check": "No new backend endpoints introduced",
+      "answersQuestion": "Rule compliance",
+      "pass": true,
+      "evidence": "All data sourced from existing useMemo state. No new API calls. No new api-server endpoints. Zero changes to event system."
+    },
+    {
+      "id": "ux-18",
+      "check": "No regression to Flow #1 behavior (loading, empty state, shell)",
+      "answersQuestion": "Rule compliance",
+      "pass": true,
+      "evidence": "LoadingScreen, EmptyOrgGuide, OrgReadyBanner untouched. AppShell nav + sidebar unchanged. Only badges extended with onClick."
+    },
+    {
+      "id": "ux-19",
+      "check": "No regression to Flow #2 behavior (tabs, stub removal, termination consolidation)",
+      "answersQuestion": "Rule compliance",
+      "pass": true,
+      "evidence": "Assignment tab, numbered workflow tabs, Vacate position button, OrgReadyBanner deep-link all unchanged in this closure."
+    },
+    {
+      "id": "ux-20",
+      "check": "OrgHealthSummary metric cards are clickable where the underlying data is actionable",
+      "answersQuestion": "What needs attention?",
+      "pass": true,
+      "evidence": "MetricCard renders as <button> with onClick prop. Vacancy, needs-attention, open-actions, compliance cards have clickable=true with View details → affordance. Filled card is informational only."
+    }
+  ],
+  "summary": {
+    "totalChecks": 20,
+    "passed": 20,
+    "failed": 0,
+    "pass": true
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "generated_at": "2026-06-04T17:34:10.891393+00:00",
+  "hash_formula": "sha256(phase_spec + commit_hash + sorted_json(review_report))",
+  "reviewer_hash": "07e3d5eaaefd6ea28d74e7ca9ca6fb6f8f2949fafa21beb4d0c84b5e69465538"
+}

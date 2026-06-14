@@ -1,0 +1,41 @@
+{
+  "actor": {
+    "userId": "fbc2b1d2-4c0c-4ea4-afc6-8534ed6d13c7",
+    "email": "phase4-independent-1780647450409@teamframe.audit",
+    "fullName": "Phase4 Independent Verifier"
+  },
+  "gate": {
+    "name": "Global Determinism Validation",
+    "pass": true,
+    "details": [
+      "{\"compareMatches\":true,\"positions\":true,\"assignments\":true,\"evidenceByAssignment\":true,\"compensationCurrent\":true}"
+    ],
+    "errors": []
+  },
+  "organizationId": "ab6cd851-f9a3-4057-a91d-ee2080448b27",
+  "checks": {
+    "compareMatches": true,
+    "positions": true,
+    "assignments": true,
+    "evidenceByAssignment": true,
+    "compensationCurrent": true
+  },
+  "hashes": {
+    "positions": {
+      "live": "23a31a3fac59c69e858f9a494b5c3eaf86379054ec9caf4fe0fefa3a2fe1ac38",
+      "replay": "23a31a3fac59c69e858f9a494b5c3eaf86379054ec9caf4fe0fefa3a2fe1ac38"
+    },
+    "assignments": {
+      "live": "c9128d4f135a59a744d6d1c44bc69b093b4582aee3c5e6cb2fa1b1a89fab7d41",
+      "replay": "c9128d4f135a59a744d6d1c44bc69b093b4582aee3c5e6cb2fa1b1a89fab7d41"
+    },
+    "evidenceByAssignment": {
+      "live": "994527e90927a1e343fb69d0b651d6f2db5820f08a84b500b01eb8d1ea7b34de",
+      "replay": "994527e90927a1e343fb69d0b651d6f2db5820f08a84b500b01eb8d1ea7b34de"
+    },
+    "compensationCurrent": {
+      "live": "07db16797ade93e0e91ee8af323d9929c6e4e1b01928d61e1f55f0deda71b223",
+      "replay": "07db16797ade93e0e91ee8af323d9929c6e4e1b01928d61e1f55f0deda71b223"
+    }
+  }
+}

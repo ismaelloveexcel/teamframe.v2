@@ -1,0 +1,17 @@
+{
+  "harnessCommit": "a15ffc4dd292ded4480cb001dbddd6d9a83a436e",
+  "runtimeCommit": "a15ffc4dd292ded4480cb001dbddd6d9a83a436e",
+  "databaseSnapshotId": "55a35ca83f7704ea162ca5cbfd9da9d2de8fe97117779cbaa27597305ccbc639",
+  "certificationHash": "e3d81881b739a1a0ddfd0fb172966ab38e8c568a62eea646ea01accd1348d4ab",
+  "timestamp": "2026-06-05T11:16:38.987616Z",
+  "databaseFingerprint": {
+    "orgCount": 25,
+    "orgEventsCount": 310,
+    "orgEventsHash": "d73e6357af4dce3352794490b72f836c",
+    "positionsHash": "a53ff02519e2096d90ee175355d38406",
+    "assignmentsHash": "64d34fb0abf069b9edb27fcd0e4767ef",
+    "evidenceByAssignmentHash": "27d07e51df9f75db3c6f84a58fadb2fe",
+    "evidenceByPositionHash": "72370e509bf56be9453acaf29ed23761",
+    "compensationCurrentHash": "57534677080e5e0b1effbdbc57b6134a"
+  }
+}

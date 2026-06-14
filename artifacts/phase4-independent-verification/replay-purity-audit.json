@@ -1,0 +1,10 @@
+{
+  "name": "Replay Purity Audit",
+  "pass": true,
+  "details": [
+    "Forbidden table references in replayOrganization: 0"
+  ],
+  "errors": [],
+  "replayOnlyReadsOrgEvents": true,
+  "hits": []
+}

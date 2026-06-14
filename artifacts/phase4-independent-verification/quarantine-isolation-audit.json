@@ -1,0 +1,13 @@
+{
+  "name": "Quarantine Isolation Audit",
+  "pass": true,
+  "details": [
+    "invokesReplay=false",
+    "invokesProjector=false",
+    "touchesProjectionTables=false"
+  ],
+  "errors": [],
+  "invokesReplay": false,
+  "invokesProjector": false,
+  "touchesProjectionTables": false
+}

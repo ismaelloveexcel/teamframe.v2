@@ -1,0 +1,115 @@
+{
+  "baselineTag": "teamframe-core-certified-v1",
+  "commit": "28b682c2f1684c3e0dc119bafc691938d7e5ec5f",
+  "generatedAtUtc": "2026-06-05T05:12:22Z",
+  "includes": [
+    "founder-flow-certification artifact",
+    "phase-1 artifacts",
+    "phase-2 artifacts",
+    "reviewer hashes",
+    "auditor hashes",
+    "migration artifacts"
+  ],
+  "files": [
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/founder-flow-certification.json",
+      "sha256": "3f311f8a3661f958cc9bd125679bf160cfd92bab4b2161539d5e6a107032afbc",
+      "bytes": 1973
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/migration-artifacts/001_event_store_guards.sql",
+      "sha256": "dad9c889456b1f0283ca65b92306237a0b4533c96808f3887443938caa5b9dfd",
+      "bytes": 724
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-1/audit_hash.txt",
+      "sha256": "451f30c01c15f795141fa02f5aed99e82cc0c6d07570c4eb1953d15bbb3e7bf4",
+      "bytes": 65
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-1/audit_report.json",
+      "sha256": "3364832187f2831c828a8d78c1c5939b928c58f1247108a8fa3e595493e60628",
+      "bytes": 315
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-1/engineer_report.json",
+      "sha256": "45608ac07eb1c3bf848a6c5a9a6212aeee4381c616a925b21a9273da9e157e94",
+      "bytes": 761
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-1/phase_log.json",
+      "sha256": "10e989c7dd965889c1ac7419618ed5e4630fbbc6fdeb2e6933570bd89a56662d",
+      "bytes": 505
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-1/phase_spec.txt",
+      "sha256": "51e9e223b01f1e6ff4e3e1d9174fcd687e1c3f7f96212dad8c82da303cdcf23b",
+      "bytes": 340
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-1/review_report.json",
+      "sha256": "28f63f068406f844f038c9ff2061db170f947cc4fc4c0eefd516e711bd63b78d",
+      "bytes": 309
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-1/reviewer_hash.txt",
+      "sha256": "c9989f3ae33fd4a4b3819e783c8f9481cb2cc6294c9ab40fd0a4d7de80569126",
+      "bytes": 65
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-1/reviewer_hash_meta.json",
+      "sha256": "d98fa64a8adb354330b735565493e59a32386858561552f6e172ad6834d2cae2",
+      "bytes": 227
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-1/test_report.json",
+      "sha256": "2450dad13b2ab8dc8f328a5876e21fffe67d28f981934fea636de66f1fce6ecb",
+      "bytes": 663
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-2/audit_hash.txt",
+      "sha256": "8712b148bd4efe4e0b361b950fa7e86d9469fd1ac24bb2333adf08d8f40e2250",
+      "bytes": 65
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-2/audit_report.json",
+      "sha256": "d1a69ca84677fbe2dd2e98ac30fef69fc5464754d08352468b66a385a9db253d",
+      "bytes": 295
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-2/engineer_report.json",
+      "sha256": "57aa808fa9a14c8745679e54fb7ad047015a2c61a3aa65558bb35afb72ce24ca",
+      "bytes": 664
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-2/phase_log.json",
+      "sha256": "3a46677c746e8d1ad08b449efc6dead88d283e48d5a5d9d7627e442f812a9bbc",
+      "bytes": 585
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-2/phase_spec.txt",
+      "sha256": "38bb1e07e4f80506e8b243d6b45d8141fc6329a286a6e8f659077d236ed9bd25",
+      "bytes": 396
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-2/review_report.json",
+      "sha256": "31447c2c1b1dc3923259a02a388e9c72469536c0a7ee62d59f656ec6fb3c1658",
+      "bytes": 287
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-2/reviewer_hash.txt",
+      "sha256": "47d927e2bc15b453f0c6c27a9fb2210b50965ec1474a8c2e0e31907a15136c95",
+      "bytes": 65
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-2/reviewer_hash_meta.json",
+      "sha256": "8f7eba2e435e2e0dda42d65810a8e7433faadd55d63adc6091d71f66a1d6ca7c",
+      "bytes": 227
+    },
+    {
+      "path": "artifacts/phase-execution/baselines/teamframe-core-certified-v1/phase-2/test_report.json",
+      "sha256": "3a017ec0bef520b252d4fd5757b37d50c61d2b7d6817361ef04918c141bcc44e",
+      "bytes": 658
+    }
+  ]
+}

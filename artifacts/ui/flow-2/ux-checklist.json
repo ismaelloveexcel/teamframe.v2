@@ -1,0 +1,84 @@
+{
+  "flow": "Flow #2 — Core Operating Loop",
+  "evaluatedAt": "2026-06-05",
+  "items": [
+    {
+      "id": "ux-1",
+      "check": "Stub 'Change assignment type' button removed (fp-2)",
+      "pass": true,
+      "evidence": "Button calling setError('Assignment type updated.') deleted from Assignment tab action row. No UI element implies assignment type editing remains."
+    },
+    {
+      "id": "ux-2",
+      "check": "Duplicate termination actions consolidated into single Vacate Position (fp-5, ui-1)",
+      "pass": true,
+      "evidence": "Replaced 'End assignment' + 'Mark as vacant' (identical handlers) with single 'Vacate position' button with microcopy: 'End the current assignment and make this position vacant.'"
+    },
+    {
+      "id": "ux-3",
+      "check": "OrgReadyBanner CTA deep-links to Assignment tab with first field focused (fp-14, dn-10)",
+      "pass": true,
+      "evidence": "onAssignPerson now calls: setActiveNav('org'), setPositionPanelTab('assignment'), dismisses banner, then focuses assignPersonSelectRef via 80ms deferred focus. Zero additional clicks required."
+    },
+    {
+      "id": "ux-4",
+      "check": "Position creation auto-focus consistent — form path behaves like hover-insert path (fp-8)",
+      "pass": true,
+      "evidence": "handleCreatePosition now calls setFocusPositionId(created.id) and setPositionPanelTab('position') after API success, matching handleQuickInsertPosition behaviour at lines 1435-1436."
+    },
+    {
+      "id": "ux-5",
+      "check": "Workflow tabs numbered with Lucide icons: 1 Structure / 2 Assign / 3 Evidence (fp-9, dn-3)",
+      "pass": true,
+      "evidence": "Tab row replaced with pill-style numbered tabs using LayoutGrid/UserCheck/FileText Lucide icons. Active state uses white card + blue accent + bold text. Step number + icon + label per tab."
+    },
+    {
+      "id": "ux-6",
+      "check": "Misleading non-persisted fields hidden (fp-1): assignment type select, start/end date inputs, salary field",
+      "pass": true,
+      "evidence": "Assignment type select, start date input, end date input, and salary input removed from Assignment tab. Only the person selector (the only persisted field) and action buttons remain."
+    },
+    {
+      "id": "ux-7",
+      "check": "Assignment tab has current occupant summary card when position is filled",
+      "pass": true,
+      "evidence": "Green summary card showing person initials + full name + 'Active assignment' label renders above person selector when selectedAssignment is truthy."
+    },
+    {
+      "id": "ux-8",
+      "check": "Assignment tab has vacancy warning when position is empty",
+      "pass": true,
+      "evidence": "Amber warning banner 'This position is vacant. Assign a person below.' renders when selectedAssignment is null."
+    },
+    {
+      "id": "ux-9",
+      "check": "Primary action button has clear visual hierarchy (blue gradient, shadow)",
+      "pass": true,
+      "evidence": "Assign/Reassign person button uses gradient #2563EB→#1D4ED8 with 0 2px 8px rgba(37,99,235,0.25) shadow when enabled. Disabled state uses neutral #E2E8F0."
+    },
+    {
+      "id": "ux-10",
+      "check": "Vacate position termination action has clear microcopy explaining consequence",
+      "pass": true,
+      "evidence": "Rendered as card-style button: title 'Vacate position' + subtitle 'End the current assignment and make this position vacant.' Only visible when selectedAssignment is truthy."
+    },
+    {
+      "id": "ux-11",
+      "check": "Person select has labelled id for accessibility and programmatic focus",
+      "pass": true,
+      "evidence": "select has id='assign-person-select' + htmlFor label + ref={assignPersonSelectRef} for deep-link focus."
+    },
+    {
+      "id": "ux-12",
+      "check": "No editable field may imply persistence if persistence does not exist",
+      "pass": true,
+      "evidence": "All removed fields (type, dates, salary) were client-only state that was silently dropped on API call. No such fields remain in the Assignment tab."
+    }
+  ],
+  "summary": {
+    "totalChecks": 12,
+    "passed": 12,
+    "failed": 0,
+    "pass": true
+  }
+}

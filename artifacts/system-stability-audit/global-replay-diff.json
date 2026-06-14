@@ -1,0 +1,1063 @@
+{
+  "generatedAt": "2026-06-05T07:32:58.586Z",
+  "summary": {
+    "result": "FAIL",
+    "confidence": "HIGH",
+    "primaryRootCause": "Projection mutation bypass exists and direct state writes are not fully event-sourced.",
+    "secondaryCauses": [
+      "Replay/live divergence persists in multiple projections across organizations.",
+      "Quarantine service triggers replay side effects during detection/recovery flow.",
+      "Projection repair uses direct table patching (state mutation) instead of pure event-driven correction.",
+      "Legacy people.position_id column remains active in schema, increasing migration drift risk."
+    ],
+    "checks": {
+      "determinism": false,
+      "replayPurity": true,
+      "mutationSafety": false,
+      "quarantineIsolation": false
+    }
+  },
+  "organizations": [
+    {
+      "orgId": "a28773d5-f9b1-4661-9dba-8ebf0454aea5",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "259d13c0fa8153a3a8c4d7a7d02ec82c8d99ef36e1ec8d0276fb6f8755fa4451",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "128110e9-8f8a-468e-9f29-3a8a5f788739",
+            "32f51ec0-1467-4513-87ae-43e68218ff2c",
+            "7d806f14-14c2-4dd9-aacf-b13dce1cf3ba",
+            "8259e409-dd62-4dbd-9f83-952eaf71865d",
+            "8f199d8f-3004-4323-bec6-1b1009d669a4",
+            "e612af75-0194-4194-be47-98c9bb0df552",
+            "eeec99bb-ac91-4753-ad96-5f35f0c6d372"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "674476ed-8bdc-47c2-9fb1-6f37216b8a1e",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "128110e9-8f8a-468e-9f29-3a8a5f788739",
+            "32f51ec0-1467-4513-87ae-43e68218ff2c",
+            "7d806f14-14c2-4dd9-aacf-b13dce1cf3ba",
+            "8259e409-dd62-4dbd-9f83-952eaf71865d",
+            "8f199d8f-3004-4323-bec6-1b1009d669a4",
+            "e612af75-0194-4194-be47-98c9bb0df552",
+            "eeec99bb-ac91-4753-ad96-5f35f0c6d372"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "551aa53efbde4a9a237afe6399d08763617b091e5e890bddd142aa7ece9c18cd",
+          "replayHash": "6734af0808aa09b08755e86be8e7eb4a45ea16a86f42cd392ce174853fabe9cf",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [
+            "87a89080-456d-499d-8ba1-2a0b9f56fd1a",
+            "9dbe69ac-9704-43d2-8bc9-c317fc871c91"
+          ],
+          "firstDivergenceEventId": "674476ed-8bdc-47c2-9fb1-6f37216b8a1e",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "87a89080-456d-499d-8ba1-2a0b9f56fd1a",
+            "9dbe69ac-9704-43d2-8bc9-c317fc871c91"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": false,
+          "liveHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "replayHash": "c06d78b75523a441e3342f1987733e2245e563ecf220585171cd10e692e021ff",
+          "onlyInLive": [],
+          "onlyInReplay": [
+            "87a89080-456d-499d-8ba1-2a0b9f56fd1a",
+            "9dbe69ac-9704-43d2-8bc9-c317fc871c91"
+          ],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "674476ed-8bdc-47c2-9fb1-6f37216b8a1e",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "87a89080-456d-499d-8ba1-2a0b9f56fd1a",
+            "9dbe69ac-9704-43d2-8bc9-c317fc871c91"
+          ]
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "66e16f44a50f2537328f94b4a5e991817cf717d37e418a2a0fa1e0137562cb53",
+        "secondRunHash": "66e16f44a50f2537328f94b4a5e991817cf717d37e418a2a0fa1e0137562cb53"
+      },
+      "replayMatchesLive": false
+    },
+    {
+      "orgId": "169f169d-49ca-4e1b-b163-483fb7036388",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "d3a768f9c69f3310fdb2f938305c452c3d43473ead4d7e090aa719f76a22ed8c",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "0e65e0a4-79c2-4962-91d7-9d0cfbd21ab4",
+            "1cfdcfcd-328a-4298-a7b3-deda1c493314",
+            "3f2e2ea0-b7f4-466b-869c-936c23431863",
+            "6cad8c42-6176-4ff5-8740-24ce9f6aa114",
+            "9bcf0ed7-0512-48bd-8432-2b00b820e4e2",
+            "b90eabaf-537f-4a00-b77b-de47cf976af7",
+            "cfbed848-4855-4162-8895-c0be51de71e9"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "e7ba0a8b-62ba-4098-92fb-797ef7bb7599",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "0e65e0a4-79c2-4962-91d7-9d0cfbd21ab4",
+            "1cfdcfcd-328a-4298-a7b3-deda1c493314",
+            "3f2e2ea0-b7f4-466b-869c-936c23431863",
+            "6cad8c42-6176-4ff5-8740-24ce9f6aa114",
+            "9bcf0ed7-0512-48bd-8432-2b00b820e4e2",
+            "b90eabaf-537f-4a00-b77b-de47cf976af7",
+            "cfbed848-4855-4162-8895-c0be51de71e9"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "2abf569c506923327dffb8dd069fc13937a4f27983e52c7ce4bc24cabf3e7e76",
+          "replayHash": "fa9ec39dbb7488864737d1a0b60b51bbf60112e9e2d07bb50642d40e2297c817",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [
+            "8748a169-3f78-40c3-8c17-c8259f207470",
+            "88a88584-f852-4c37-919c-eb91c1e1155a"
+          ],
+          "firstDivergenceEventId": "e7ba0a8b-62ba-4098-92fb-797ef7bb7599",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "8748a169-3f78-40c3-8c17-c8259f207470",
+            "88a88584-f852-4c37-919c-eb91c1e1155a"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": false,
+          "liveHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "replayHash": "289e78e3d614c01c94a87a22f8100a3a5743da47c175a31bcba9c4a2fbdd8aa4",
+          "onlyInLive": [],
+          "onlyInReplay": [
+            "8748a169-3f78-40c3-8c17-c8259f207470",
+            "88a88584-f852-4c37-919c-eb91c1e1155a"
+          ],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "e7ba0a8b-62ba-4098-92fb-797ef7bb7599",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "8748a169-3f78-40c3-8c17-c8259f207470",
+            "88a88584-f852-4c37-919c-eb91c1e1155a"
+          ]
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "e332021bb0f987e5d14eb17af1ebf05307a4424d6b0787edee0e23c62ebd986f",
+        "secondRunHash": "e332021bb0f987e5d14eb17af1ebf05307a4424d6b0787edee0e23c62ebd986f"
+      },
+      "replayMatchesLive": false
+    },
+    {
+      "orgId": "bd3e1cf1-2004-4dcc-9ee4-b1012deea6bc",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "8b88ff1b6ab9535fdf9805cf6ded29b4772439ba7476d0dc54eb06c0a0ad20fc",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "0b273ec1-1dc3-447a-b57e-59a9ac46a6ae",
+            "ab9136eb-7f3f-4b68-a44b-04177d7e99c2"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "cf877340-7e58-4c5f-9e81-a7f9449fa784",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "0b273ec1-1dc3-447a-b57e-59a9ac46a6ae",
+            "ab9136eb-7f3f-4b68-a44b-04177d7e99c2"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "7069ec00ab34e6e978e96bf4c70bd28913ef79c6cad25cf1144efe49663019ed",
+          "replayHash": "c2ddfb4dbf8ac523e750c0ba0661aaeb6ba6772a42ec6301690a693459df3ca8",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [
+            "2c101731-65ca-4735-990f-be840e13e6ef"
+          ],
+          "firstDivergenceEventId": "cf877340-7e58-4c5f-9e81-a7f9449fa784",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "2c101731-65ca-4735-990f-be840e13e6ef"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": false,
+          "liveHash": "64ff4391a1165e4fc2fb529dfdfb26897e904c0b76fcf98191cdc9b7ed544c13",
+          "replayHash": "55f0713d37f30c673b4f496c9b987aab60177d4b67bba506685eab1b4e688b0d",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [
+            "2c101731-65ca-4735-990f-be840e13e6ef"
+          ],
+          "firstDivergenceEventId": "f2d11bb4-0431-4949-bb64-97d3febfad31",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "2c101731-65ca-4735-990f-be840e13e6ef"
+          ]
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "0e7151b75e5ba50d395ac0cc1a409526eda08093ef756d781fc275f633562965",
+        "secondRunHash": "0e7151b75e5ba50d395ac0cc1a409526eda08093ef756d781fc275f633562965"
+      },
+      "replayMatchesLive": false
+    },
+    {
+      "orgId": "970c1b29-8400-408e-a9dc-257fc1d4c61b",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "1ba41d96703e68f390d0ecfb6e86476d3cda6428b831d1d584809604c91db7a8",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "723fc869-02df-417a-b717-45a8346554ab",
+            "9ddfe3d2-8610-4abc-a1a0-dcee73ba5830"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "dbf84371-4839-4b21-aa19-750fbee46305",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "723fc869-02df-417a-b717-45a8346554ab",
+            "9ddfe3d2-8610-4abc-a1a0-dcee73ba5830"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "e02d62a1ac60651381e95557af3c70082e5d410ecfc8ea49f09d6ee6ed758437",
+          "replayHash": "eece2fc72406bd139ed59b08a3fb66cf5ddff3caf0328d0faa814fc4358f7e01",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [
+            "65a6b78c-bed0-4e7e-acad-cbf7c54ef3b2"
+          ],
+          "firstDivergenceEventId": "dbf84371-4839-4b21-aa19-750fbee46305",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "65a6b78c-bed0-4e7e-acad-cbf7c54ef3b2"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": true,
+          "liveHash": "1ca6db3a9889538fd3a4b2b8ba1eca84a3c8e9e3bd18850de139de3dafb7196d",
+          "replayHash": "1ca6db3a9889538fd3a4b2b8ba1eca84a3c8e9e3bd18850de139de3dafb7196d",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "b785aca734a8e57b34ebefe72fbf17d069cbeea91dd5fc7d8a0fb0c719464b6c",
+        "secondRunHash": "b785aca734a8e57b34ebefe72fbf17d069cbeea91dd5fc7d8a0fb0c719464b6c"
+      },
+      "replayMatchesLive": true
+    },
+    {
+      "orgId": "9fac93d9-3ef0-40be-a222-84cb2a5a86a7",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "5e064e96681637e76fb2a5af9b03cf8ec826512454812f3910dc2a4a27d79e2c",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "22d3c012-b256-4925-848b-d5f0f1156e33",
+            "70e93156-db67-481d-bc68-1061dc872618"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "0d811ba6-15f5-4959-96b2-9fd07af39209",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "22d3c012-b256-4925-848b-d5f0f1156e33",
+            "70e93156-db67-481d-bc68-1061dc872618"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": true,
+          "liveHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": false,
+          "liveHash": "325c578b4cb0fe3b9310da312d4f7dc897b9d68afa7932ec7ed594d675cba58d",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "e17653d0-bee7-40e4-bbc9-e9a14a4d9cdb"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "0d811ba6-15f5-4959-96b2-9fd07af39209",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "e17653d0-bee7-40e4-bbc9-e9a14a4d9cdb"
+          ]
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "8cd2fd8ff165261c0b5ff746ba85c51b31a031e46ed74ceef27661b663d92f7c",
+          "replayHash": "8cd2fd8ff165261c0b5ff746ba85c51b31a031e46ed74ceef27661b663d92f7c",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "e912772823b79d8559184be59a9384ce3484bba83f41d31207f464df3098bcf9",
+        "secondRunHash": "e912772823b79d8559184be59a9384ce3484bba83f41d31207f464df3098bcf9"
+      },
+      "replayMatchesLive": true
+    },
+    {
+      "orgId": "bb4e20fb-760b-450b-9f6c-b21841a5a0b4",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "9f1cb8fc513725c364c348764c2734206e63c6b13c24a7ef409d5e8e50e8e80d",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "066120a8-69f3-45ec-befc-0001681e1c58",
+            "94974b2c-1bbf-495f-95d5-e27adbdcc6e1"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "6aa6e1c0-639c-405e-a5e1-530bcd398c05",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "066120a8-69f3-45ec-befc-0001681e1c58",
+            "94974b2c-1bbf-495f-95d5-e27adbdcc6e1"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "63ff8311f99f51619310fb8c7f39f0343f11d863ebb566d32095a46cd0bc29b2",
+          "replayHash": "5bbb9ed88e28d7da7905a3344fc7b0d806a92af36011f89f7cffee461dda8c1d",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [
+            "3a692bab-92b1-4b86-9edb-d6d0e6d8db12"
+          ],
+          "firstDivergenceEventId": "6aa6e1c0-639c-405e-a5e1-530bcd398c05",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "3a692bab-92b1-4b86-9edb-d6d0e6d8db12"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": true,
+          "liveHash": "b88655beeb014f8ed7b046280155b9ce7fc907fd79beb9348b4b8d0c5dde2dfb",
+          "replayHash": "b88655beeb014f8ed7b046280155b9ce7fc907fd79beb9348b4b8d0c5dde2dfb",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "c6a0d952e0b3330494e1ca59344c1808796b168443f9cb1572d1c7a0fd884c35",
+          "replayHash": "c6a0d952e0b3330494e1ca59344c1808796b168443f9cb1572d1c7a0fd884c35",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "115ec187f2c865b0dbf40d8c27bb79e0486092e942a7c9926505ddb6afeae985",
+        "secondRunHash": "115ec187f2c865b0dbf40d8c27bb79e0486092e942a7c9926505ddb6afeae985"
+      },
+      "replayMatchesLive": true
+    },
+    {
+      "orgId": "11a77402-8259-4275-ad29-6512d3656c40",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "a4b84dbd13fce02db692e5c89acbc801bf9645c10a508156718ebacc293a144b",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "b79eaa12-1d4e-4ffc-9a6f-ecbf55fc711d",
+            "bde1b1b7-de31-4c7a-aafe-0965a16546d4"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "7b042e98-dec6-43c3-a78e-793ed12db389",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "b79eaa12-1d4e-4ffc-9a6f-ecbf55fc711d",
+            "bde1b1b7-de31-4c7a-aafe-0965a16546d4"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "2f1166de3b329658b3b661db6eebb65da95a8b44fed228b8d74faa5d5348dcfe",
+          "replayHash": "fb19ffd85e266749023dfaa4139f0e26b55b0c536e667ce8237909a8e779a37e",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [
+            "fe28b779-eb9f-46f3-8e29-574fc0d8125b"
+          ],
+          "firstDivergenceEventId": "7b042e98-dec6-43c3-a78e-793ed12db389",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "fe28b779-eb9f-46f3-8e29-574fc0d8125b"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": true,
+          "liveHash": "d1cbfe080afc84295a8a3b9c0c74a92506252324285dc64c9081965001fb71a2",
+          "replayHash": "d1cbfe080afc84295a8a3b9c0c74a92506252324285dc64c9081965001fb71a2",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "537418444c48606a32ad1ee1d63ae1dfc7ba962926f608f8e8a7713c3292978d",
+          "replayHash": "537418444c48606a32ad1ee1d63ae1dfc7ba962926f608f8e8a7713c3292978d",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "9dcd7637f36bc75b3e01a3db54e07439045dbd032043049f5ade2c27ddc3391e",
+        "secondRunHash": "9dcd7637f36bc75b3e01a3db54e07439045dbd032043049f5ade2c27ddc3391e"
+      },
+      "replayMatchesLive": true
+    },
+    {
+      "orgId": "3f297512-8bb2-4974-bbaf-28a761de0f1c",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "f9cb7349522bba2fe7b2be56b8a2a07b45265a3a45ada139d402b907cc1b7c82",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "776e6204-82a3-4064-8dc9-bb341661494d",
+            "b915cfcd-f5dc-42d0-8b98-26baa6e855a6"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "bdf78345-d590-4eb6-8202-d8eff786114c",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "776e6204-82a3-4064-8dc9-bb341661494d",
+            "b915cfcd-f5dc-42d0-8b98-26baa6e855a6"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "4bc6caab99701d4172add103faf8c11b74f6d26d65f79030092b4fbf594a9d11",
+          "replayHash": "125ea6c983ecf1d3ed405613503e668056128c879a9f12a75061122de7c34e83",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [
+            "2ad4c35f-708b-48f0-b55e-fa2217aa9f19"
+          ],
+          "firstDivergenceEventId": "bdf78345-d590-4eb6-8202-d8eff786114c",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "2ad4c35f-708b-48f0-b55e-fa2217aa9f19"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": true,
+          "liveHash": "8e4146918881b06bd2ff5f70ef61a0dc8286c656c7ef8f0bbaa0122bcea95c5c",
+          "replayHash": "8e4146918881b06bd2ff5f70ef61a0dc8286c656c7ef8f0bbaa0122bcea95c5c",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "50c8cebf1b4c296afc0f88f77ce6581da4936c966ab393c270d3ff1d75de965d",
+          "replayHash": "50c8cebf1b4c296afc0f88f77ce6581da4936c966ab393c270d3ff1d75de965d",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "1cfa1fa8a583a9a7e9ebcc083bca6c2e47f8d84caf9c408e9e0460a7b288f3da",
+        "secondRunHash": "1cfa1fa8a583a9a7e9ebcc083bca6c2e47f8d84caf9c408e9e0460a7b288f3da"
+      },
+      "replayMatchesLive": true
+    },
+    {
+      "orgId": "2171733f-ab73-4bb6-9808-7ea6c5affe3b",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "872e8ea5206af8866cdf341e060b22cfc507ef5d5c2597aa9bd39095cde75a2b",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "5831e438-a489-4832-8972-f359b86b4ea9",
+            "5ab8a698-33e0-4772-a9c9-a739b7f2f632"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "31c48055-09b1-4e55-9979-c7ada9402d4d",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "5831e438-a489-4832-8972-f359b86b4ea9",
+            "5ab8a698-33e0-4772-a9c9-a739b7f2f632"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "a9c62d1c60339f01dc2ee82684e6c6c5433cae48ece94c76633175bea5e0af25",
+          "replayHash": "554f8c07c48ef9c115b4e67f614f686543345faafeb7e83432493668fb158ab4",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [
+            "7cbf98b1-7472-4b2a-a09a-8b3fdb88d759"
+          ],
+          "firstDivergenceEventId": "31c48055-09b1-4e55-9979-c7ada9402d4d",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "7cbf98b1-7472-4b2a-a09a-8b3fdb88d759"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": true,
+          "liveHash": "4623e08ab9538e8ac400352e3e1e1ae973c72ebef844a79cd1eaf6c0d7836cc0",
+          "replayHash": "4623e08ab9538e8ac400352e3e1e1ae973c72ebef844a79cd1eaf6c0d7836cc0",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "a33cee79776fd3ccfab2052674d0e630381cf7d7cd869124ef41fa835a04a804",
+          "replayHash": "a33cee79776fd3ccfab2052674d0e630381cf7d7cd869124ef41fa835a04a804",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "e5fe3725c61ed4d88b12607c805cc7645e06d544430a1a472deae875a039bf9e",
+        "secondRunHash": "e5fe3725c61ed4d88b12607c805cc7645e06d544430a1a472deae875a039bf9e"
+      },
+      "replayMatchesLive": true
+    },
+    {
+      "orgId": "22810a12-c6ec-44a8-a8c1-7008045500ba",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "4934eb82048881913943cd2df7fb2ef18d48a99fd3e73674a30ab0b83eea5db7",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "0f7285d3-044d-4530-a04f-a50fad954d9d",
+            "db7375d6-8b3f-4ea0-b73c-a16bb0626089"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "5ec27257-ba9b-4349-aa2a-77d9d7e0cf33",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "0f7285d3-044d-4530-a04f-a50fad954d9d",
+            "db7375d6-8b3f-4ea0-b73c-a16bb0626089"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "97c7bd23af2d2c272740051210da36370d71671bbbc34886fcbd80eff0c6466b",
+          "replayHash": "a0ccae77b13b56eac283376c2f4feea687926d3e65cf4aab4e5ef4b34528e528",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [
+            "af9f4394-6a7c-410d-9448-b7199541c6d1"
+          ],
+          "firstDivergenceEventId": "5ec27257-ba9b-4349-aa2a-77d9d7e0cf33",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "af9f4394-6a7c-410d-9448-b7199541c6d1"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": true,
+          "liveHash": "87ac2348a313ebb59ba7f1f57202ededcaf643a038e50c060c37b415f190a240",
+          "replayHash": "87ac2348a313ebb59ba7f1f57202ededcaf643a038e50c060c37b415f190a240",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "5f8db08559b59cd6a5daffe273a73cb80201acef86a2ee3228b47bb2b4a04a9f",
+          "replayHash": "5f8db08559b59cd6a5daffe273a73cb80201acef86a2ee3228b47bb2b4a04a9f",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "3a76f1326f9d26a4db29f43a720942754d8d87a79e944b733898cbc23f7009aa",
+        "secondRunHash": "3a76f1326f9d26a4db29f43a720942754d8d87a79e944b733898cbc23f7009aa"
+      },
+      "replayMatchesLive": true
+    },
+    {
+      "orgId": "e7ab7a7d-ae29-4120-85b8-867881e2499b",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "a9a85fccb316a42dc778512964460ea04d5f00755e1cf89d2380412eb887d993",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "183f7b5b-2577-4c7b-a0a9-458d48d0e0af",
+            "f10c7f63-96f5-4591-a4c2-5c7b0fedfe8b",
+            "f1709f52-d570-4b84-a375-7986a4876242"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "055eb42a-d48e-468d-9ff5-010f79999ece",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "183f7b5b-2577-4c7b-a0a9-458d48d0e0af",
+            "f10c7f63-96f5-4591-a4c2-5c7b0fedfe8b",
+            "f1709f52-d570-4b84-a375-7986a4876242"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "276ca917ec44fe05b105d0ebb04f04e53b3f1495bc1cbcc372e22f8c6822b69d",
+          "replayHash": "f489f7faf680077dc79d4f575a9a8727ad2bb11c32ac30de4be6636ddaf57620",
+          "onlyInLive": [],
+          "onlyInReplay": [
+            "corrupt-f20e7d65-0115-4751-b220-5bf09cf920dc"
+          ],
+          "valueMismatches": [
+            "a3c44022-63df-45cf-aef8-ce149bb81eaf",
+            "ef579879-d810-485c-a602-cc30ea3acede"
+          ],
+          "firstDivergenceEventId": "055eb42a-d48e-468d-9ff5-010f79999ece",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "a3c44022-63df-45cf-aef8-ce149bb81eaf",
+            "corrupt-f20e7d65-0115-4751-b220-5bf09cf920dc",
+            "ef579879-d810-485c-a602-cc30ea3acede"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": false,
+          "liveHash": "bdb6f76cb15ed62b96ff8e61b10ced7babe8bcf6bf873c8e4d20733096bdffe6",
+          "replayHash": "bcede7d51e1009bbca4087a81d6826d31f6d0ddb7301dd6ed21ce77fb1d6dd74",
+          "onlyInLive": [],
+          "onlyInReplay": [
+            "corrupt-f20e7d65-0115-4751-b220-5bf09cf920dc",
+            "ef579879-d810-485c-a602-cc30ea3acede"
+          ],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "055eb42a-d48e-468d-9ff5-010f79999ece",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "corrupt-f20e7d65-0115-4751-b220-5bf09cf920dc",
+            "ef579879-d810-485c-a602-cc30ea3acede"
+          ]
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "0b857954ccce4f625cc068ec961d78cff1642e9eb70dcfe381828a472149bd3d",
+          "replayHash": "0b857954ccce4f625cc068ec961d78cff1642e9eb70dcfe381828a472149bd3d",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "286cb66284a8296e85fb0bf51567276cf6fdc44a97292d117f2a76f5b6176f20",
+        "secondRunHash": "286cb66284a8296e85fb0bf51567276cf6fdc44a97292d117f2a76f5b6176f20"
+      },
+      "replayMatchesLive": false
+    },
+    {
+      "orgId": "57f1fa13-059a-45f0-b2a7-42c53c4333c2",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "4632ac8f90fdc2a002e84d8364b9541bf4ad3b17b6ce5e77977a4cbbc518288c",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "6dc084ef-11e1-441e-950d-22283fb72976",
+            "77fec3fc-d341-4451-8241-2ca41b299f19",
+            "d0a8bd0d-5fbf-4d5f-a349-c918b9aad086"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "cc5482ea-a79a-44ce-86ab-c138dacaf0b6",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "6dc084ef-11e1-441e-950d-22283fb72976",
+            "77fec3fc-d341-4451-8241-2ca41b299f19",
+            "d0a8bd0d-5fbf-4d5f-a349-c918b9aad086"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "4f958db0a63ea329c446f6444e9fa7786047e84fad2b5a67db85e1617265df96",
+          "replayHash": "00a75f129ee25845d0f1b40db2ffd4c74d67d16046e755976c7a66856fdcbf82",
+          "onlyInLive": [],
+          "onlyInReplay": [
+            "corrupt-7067f993-f50c-49c2-b7ac-1fbafa9b7208"
+          ],
+          "valueMismatches": [
+            "32f80d7d-5ab0-40ee-9ff6-7e879b0d6472",
+            "4587d1f8-0fbd-49de-bd16-0deeeba91e70"
+          ],
+          "firstDivergenceEventId": "cc5482ea-a79a-44ce-86ab-c138dacaf0b6",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "32f80d7d-5ab0-40ee-9ff6-7e879b0d6472",
+            "4587d1f8-0fbd-49de-bd16-0deeeba91e70",
+            "corrupt-7067f993-f50c-49c2-b7ac-1fbafa9b7208"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": false,
+          "liveHash": "8dfaaa0bfadb45efdd7c17e27d8f48be7848c2dbeaaa9570d6a1941c72979e00",
+          "replayHash": "008d9fa8462da0d8864857c5d106cc477433312f8a9ebb8484219d1af7084c1f",
+          "onlyInLive": [],
+          "onlyInReplay": [
+            "corrupt-7067f993-f50c-49c2-b7ac-1fbafa9b7208"
+          ],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "cc5482ea-a79a-44ce-86ab-c138dacaf0b6",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "corrupt-7067f993-f50c-49c2-b7ac-1fbafa9b7208"
+          ]
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "8bcfbf933471fda6ee48e22a59a7489b2cdd15e50d47602f1fd5a14828269b66",
+          "replayHash": "8bcfbf933471fda6ee48e22a59a7489b2cdd15e50d47602f1fd5a14828269b66",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "9cd208cd95c61411617982ec87c54e74c0c06a0d60e26b5b2a66d9414ec7e953",
+        "secondRunHash": "9cd208cd95c61411617982ec87c54e74c0c06a0d60e26b5b2a66d9414ec7e953"
+      },
+      "replayMatchesLive": false
+    },
+    {
+      "orgId": "a122e102-19b7-45b9-a3c1-591bec9a2920",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "c9a25b8fce23cc5e36df7cb02252e8f1b37e6d790ff11846701ef5770d676a01",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "167b4059-4c60-4973-930c-ec864109afb2",
+            "7f3fdf55-fb5f-4578-97d1-ad78a387ba39",
+            "d216436c-fc0e-4390-8b70-4d61acf575d8"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "5363c124-fb4a-48b3-8959-530e30860abc",
+          "divergenceCause": "repair_side_effect_contamination",
+          "downstreamCorruptedAggregates": [
+            "167b4059-4c60-4973-930c-ec864109afb2",
+            "7f3fdf55-fb5f-4578-97d1-ad78a387ba39",
+            "d216436c-fc0e-4390-8b70-4d61acf575d8"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "8e9aa6bc705d07ffb8fd38bec3c8f7a42cd91917bace616ac2a28d08574676b0",
+          "replayHash": "c5535cf9b86f44199f57281c732c0ce895b0d717260838257ae0f2830e7fdd00",
+          "onlyInLive": [],
+          "onlyInReplay": [
+            "corrupt-338009fd-bc15-44ad-93aa-08a8b168ad30"
+          ],
+          "valueMismatches": [
+            "88a5070e-3f80-4e58-9c88-211141c02da8",
+            "d2458ad2-a235-46ca-a675-80c6864b4813"
+          ],
+          "firstDivergenceEventId": "5363c124-fb4a-48b3-8959-530e30860abc",
+          "divergenceCause": "repair_side_effect_contamination",
+          "downstreamCorruptedAggregates": [
+            "88a5070e-3f80-4e58-9c88-211141c02da8",
+            "corrupt-338009fd-bc15-44ad-93aa-08a8b168ad30",
+            "d2458ad2-a235-46ca-a675-80c6864b4813"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": false,
+          "liveHash": "112139d6690ac6f2d3cf00ffd8b0340fa809005d2791037524b797c488e3f80e",
+          "replayHash": "7b2639fa580e0818e24ea0e3bdff18e57a4477857db722748ef957595f6f91be",
+          "onlyInLive": [],
+          "onlyInReplay": [
+            "corrupt-338009fd-bc15-44ad-93aa-08a8b168ad30"
+          ],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "5363c124-fb4a-48b3-8959-530e30860abc",
+          "divergenceCause": "repair_side_effect_contamination",
+          "downstreamCorruptedAggregates": [
+            "corrupt-338009fd-bc15-44ad-93aa-08a8b168ad30"
+          ]
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "3bb148186cab8b8e4eda2a49a641388cee62b09364787559df26b720593b560e",
+          "replayHash": "3bb148186cab8b8e4eda2a49a641388cee62b09364787559df26b720593b560e",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "f1da76bc3eda78cd50a414d669fbe759824674f1e42fae477165945c66731117",
+        "secondRunHash": "f1da76bc3eda78cd50a414d669fbe759824674f1e42fae477165945c66731117"
+      },
+      "replayMatchesLive": false
+    },
+    {
+      "orgId": "a33635e6-2fa9-440c-ae73-00a348d5d329",
+      "projectionDiffs": [
+        {
+          "projection": "positions_current",
+          "matches": false,
+          "liveHash": "52ddb8a91e3551e6f357dc7f18b5d55b1935893a78660ad48c757c09b82118a9",
+          "replayHash": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "onlyInLive": [
+            "bf9b54d2-00fc-4c73-970e-5cb1a31f522a",
+            "c1099735-2f0f-45a6-96cf-43aab46213d3"
+          ],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": "3adab6ab-3619-4606-9837-fd1bbd79d1c7",
+          "divergenceCause": "event_omission",
+          "downstreamCorruptedAggregates": [
+            "bf9b54d2-00fc-4c73-970e-5cb1a31f522a",
+            "c1099735-2f0f-45a6-96cf-43aab46213d3"
+          ]
+        },
+        {
+          "projection": "assignments_current",
+          "matches": false,
+          "liveHash": "4032a6a35b18c9486b769ed677424158a9c2c8c01bcb53a60d60f46a3f90facb",
+          "replayHash": "d27bedcbb6da6357056b56edc838b3b71c62bdde0f1dec9ac5c9f6cb2e75fad8",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [
+            "23ea511b-765a-4775-a161-b0f14cc2a463"
+          ],
+          "firstDivergenceEventId": "3adab6ab-3619-4606-9837-fd1bbd79d1c7",
+          "divergenceCause": "projection_mutation",
+          "downstreamCorruptedAggregates": [
+            "23ea511b-765a-4775-a161-b0f14cc2a463"
+          ]
+        },
+        {
+          "projection": "evidence_status_by_assignment",
+          "matches": true,
+          "liveHash": "e2b4596629b2da782c238d5f6a0d9b2835f84311c41e437339a9d7763394d5a0",
+          "replayHash": "e2b4596629b2da782c238d5f6a0d9b2835f84311c41e437339a9d7763394d5a0",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        },
+        {
+          "projection": "compensation_current",
+          "matches": true,
+          "liveHash": "a8be3db4e48642d5568b6abcc6c2ddecdba243838781de9d7e86fee7ad470d9c",
+          "replayHash": "a8be3db4e48642d5568b6abcc6c2ddecdba243838781de9d7e86fee7ad470d9c",
+          "onlyInLive": [],
+          "onlyInReplay": [],
+          "valueMismatches": [],
+          "firstDivergenceEventId": null,
+          "divergenceCause": "none",
+          "downstreamCorruptedAggregates": []
+        }
+      ],
+      "replayPurity": {
+        "deterministic": true,
+        "firstRunHash": "0053ebf77ad8dd4eeb81b6253e75a6d2d1f7f533ba3ff23cdb59c579778a582b",
+        "secondRunHash": "0053ebf77ad8dd4eeb81b6253e75a6d2d1f7f533ba3ff23cdb59c579778a582b"
+      },
+      "replayMatchesLive": true
+    }
+  ]
+}

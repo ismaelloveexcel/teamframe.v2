@@ -156,3 +156,24 @@
     pointer-events: none;
   }
 }
+
+/* Global focus-visible ring — Phase 5.4 design system requirement.
+   Covers all interactive elements not individually handled with inline onFocus.
+   Token values: FOCUS_RING = 0 0 0 2px #FFFFFF, 0 0 0 4px #2563EB */
+button:focus-visible,
+a:focus-visible,
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible {
+  outline: none;
+  box-shadow: 0 0 0 2px #ffffff, 0 0 0 4px #2563eb;
+}
+
+/* Suppress focus ring on mouse click — keyboard only */
+button:focus:not(:focus-visible),
+a:focus:not(:focus-visible),
+input:focus:not(:focus-visible),
+select:focus:not(:focus-visible),
+textarea:focus:not(:focus-visible) {
+  outline: none;
+}
