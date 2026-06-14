@@ -4,11 +4,11 @@
     "name": "Replay Determinism",
     "pass": true,
     "details": [
-      "Audited organizations: 40",
+      "Audited organizations: 48",
       "Mismatched organizations: 0"
     ],
     "errors": []
   },
   "mismatchedOrgs": [],
-  "auditedCount": 40
+  "auditedCount": 48
 }
