@@ -2312,114 +2312,176 @@ export function TeamFrame() {
 
     const now = Date.now();
     const orgName = organizations.find((org) => org.id === organizationId)?.name ?? "Organization";
+    const generatedAt = new Date(now);
+    const isoDate = `${generatedAt.getFullYear()}-${String(generatedAt.getMonth() + 1).padStart(2, "0")}-${String(generatedAt.getDate()).padStart(2, "0")}`;
 
-    const vacancies = positions.filter((p) => !positionAssignmentById.get(p.id));
+    // Ownership = explicit decision-ownership records (positions, not people).
+    const hasOwner = (item: Action) => Boolean(item.ownerPositionId || item.ownerPersonId);
+    const isVacant = (p: Position) => !positionAssignmentById.get(p.id);
+    const isOwnedPosition = (p: Position) => Boolean(positionOwnershipMap.get(p.id));
+    const teamHasLead = (teamId: string) => Boolean(teamOwnershipMap.get(teamId));
+    const hasJobDescription = (p: Position) => Boolean(positionDocuments[p.id]);
+    const daysOverdue = (dueDate?: string | null) => {
+      if (!dueDate) return 0;
+      const due = new Date(dueDate).getTime();
+      if (Number.isNaN(due) || due >= now) return 0;
+      return Math.max(1, Math.floor((now - due) / 86_400_000));
+    };
 
     const openActionItems = actions.filter((item) => item.status !== ActionStatus.done);
-    const overdue = openActionItems.filter((item) => {
-      if (!item.dueDate) return false;
-      const due = new Date(item.dueDate).getTime();
-      return !Number.isNaN(due) && due < now;
-    });
-    const blocked = openActionItems.filter((item) => item.blocked);
+    const overdue = openActionItems.filter((item) => daysOverdue(item.dueDate) > 0);
+    const overdueNoOwner = overdue.filter((item) => !hasOwner(item));
 
-    const complianceGaps = positions
-      .map((p) => {
-        const occupant = positionAssignmentById.get(p.id);
-        if (!occupant) return null;
-        const missing: string[] = [];
-        if (!occupant.person.email) missing.push("email");
-        if (!occupant.person.phone) missing.push("phone");
-        if (missing.length === 0) return null;
-        return { title: p.title, person: occupant.person.fullName, missing };
-      })
-      .filter((row): row is { title: string; person: string; missing: string[] } => row !== null);
+    // ── Section 1 — Ownership snapshot ──────────────────────────────────────
+    const totalPositions = positions.length;
+    const unownedPositions = positions.filter((p) => !isOwnedPosition(p));
+    const ownedCount = totalPositions - unownedPositions.length;
+    const teamsWithoutLead = teams.filter((t) => !teamHasLead(t.id));
+    const unownedActions = openActionItems.filter((item) => !hasOwner(item));
+    const coverage = totalPositions ? Math.round((ownedCount / totalPositions) * 100) : 0;
 
-    const structureRows = positions.map((p) => {
-      const occupant = positionAssignmentById.get(p.id);
-      const manager = p.reportsToPositionId ? positionMap.get(p.reportsToPositionId)?.title ?? "—" : "—";
-      const department = p.teamId ? teamMap.get(p.teamId)?.name ?? "—" : "—";
-      return {
-        title: p.title,
-        manager,
-        department,
-        occupant: occupant?.person.fullName ?? "Vacant",
-      };
-    });
+    // ── Section 2 — Single points of failure ────────────────────────────────
+    // A position is "no reporting line" only if it has no manager AND no other
+    // position reports to it (orphan). A no-manager position that others report
+    // to is the legitimate apex/root and is excluded.
+    const isReferencedAsManager = (id: string) =>
+      positions.some((p) => p.reportsToPositionId === id);
+    const noReportingLine = positions.filter(
+      (p) => !p.reportsToPositionId && !isReferencedAsManager(p.id),
+    );
+    const noJobDescription = positions.filter((p) => !hasJobDescription(p));
 
-    const section = (title: string, body: string) =>
-      `<section><h2>${esc(title)}</h2>${body}</section>`;
+    const filledByTeam = new Map<string, number>();
+    for (const p of positions) {
+      if (p.teamId && !isVacant(p)) {
+        filledByTeam.set(p.teamId, (filledByTeam.get(p.teamId) ?? 0) + 1);
+      }
+    }
+    const singlePersonTeams = teams.filter((t) => filledByTeam.get(t.id) === 1);
 
-    const list = (items: string[], empty: string) =>
+    const spofItems: string[] = [
+      ...noReportingLine.map((p) => `${esc(p.title)} — no reporting line defined`),
+      ...noJobDescription.map((p) => `${esc(p.title)} — no job description on file`),
+      ...singlePersonTeams.map((t) => `${esc(t.name)} — single-person team, no backup`),
+      ...overdueNoOwner.map((a) => `${esc(a.title)} — overdue, no owner`),
+    ];
+
+    // ── Section 3 — First handoffs ──────────────────────────────────────────
+    const openActionsForPosition = (positionId: string) =>
+      openActionItems.filter(
+        (a) => a.positionId === positionId || a.ownerPositionId === positionId,
+      ).length;
+    const openActionsForTeam = (teamId: string) =>
+      openActionItems.filter((a) => a.teamId === teamId).length;
+
+    let topVacancy: { position: Position; count: number } | null = null;
+    for (const p of positions.filter(isVacant)) {
+      const count = openActionsForPosition(p.id);
+      if (count > 0 && (!topVacancy || count > topVacancy.count)) {
+        topVacancy = { position: p, count };
+      }
+    }
+
+    let topTeam: { team: Team; count: number } | null = null;
+    for (const t of teamsWithoutLead) {
+      const count = openActionsForTeam(t.id);
+      if (count > 0 && (!topTeam || count > topTeam.count)) {
+        topTeam = { team: t, count };
+      }
+    }
+
+    let topOverdue: { action: Action; days: number } | null = null;
+    for (const a of overdueNoOwner) {
+      const days = daysOverdue(a.dueDate);
+      if (!topOverdue || days > topOverdue.days) {
+        topOverdue = { action: a, days };
+      }
+    }
+
+    const handoffItems: string[] = [];
+    if (topVacancy) {
+      handoffItems.push(
+        `Fill <b>${esc(topVacancy.position.title)}</b> — ${topVacancy.count} action${topVacancy.count === 1 ? "" : "s"} currently unrouted because this role is vacant`,
+      );
+    }
+    if (topTeam) {
+      handoffItems.push(
+        `Assign lead to <b>${esc(topTeam.team.name)}</b> — ${topTeam.count} open action${topTeam.count === 1 ? "" : "s"} belong to this team with no designated owner`,
+      );
+    }
+    if (topOverdue) {
+      handoffItems.push(
+        `Assign owner to <b>"${esc(topOverdue.action.title)}"</b> — overdue by ${topOverdue.days} day${topOverdue.days === 1 ? "" : "s"}, currently unrouted`,
+      );
+    }
+
+    const warnList = (items: string[], empty: string) =>
       items.length
-        ? `<ul>${items.map((item) => `<li>${item}</li>`).join("")}</ul>`
-        : `<p class="muted">${esc(empty)}</p>`;
+        ? `<ul class="warn">${items.map((item) => `<li><span class="mark">⚠</span> ${item}</li>`).join("")}</ul>`
+        : `<p class="clear">${esc(empty)}</p>`;
+
+    const orderedList = (items: string[], empty: string) =>
+      items.length
+        ? `<ol>${items.map((item) => `<li>${item}</li>`).join("")}</ol>`
+        : `<p class="clear">${esc(empty)}</p>`;
 
     const html = `<!doctype html>
 <html lang="en"><head><meta charset="utf-8" />
-<title>${esc(orgName)} — Org Summary</title>
+<title>${esc(orgName)} — Founder Dependency Report</title>
 <style>
-  body { font-family: Inter, system-ui, sans-serif; color: #0F172A; max-width: 820px; margin: 32px auto; padding: 0 16px; }
-  h1 { font-size: 22px; margin-bottom: 2px; }
-  .sub { color: #64748B; font-size: 13px; margin-bottom: 24px; }
-  h2 { font-size: 15px; border-bottom: 1px solid #E2E8F0; padding-bottom: 6px; margin-top: 28px; }
-  .stat { display: inline-block; margin-right: 18px; font-size: 13px; }
-  .stat b { font-size: 18px; display: block; }
-  table { width: 100%; border-collapse: collapse; font-size: 13px; }
-  th, td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #F1F5F9; }
-  th { color: #475569; }
-  ul { margin: 6px 0; padding-left: 18px; font-size: 13px; }
-  .muted { color: #94A3B8; font-size: 13px; }
+  body { font-family: Georgia, "Times New Roman", serif; color: #1f2433; margin: 0; padding: 0 0 48px; line-height: 1.5; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 0 24px; }
+  header.bar { background: #1a106b; color: #ffffff; padding: 28px 0; margin-bottom: 28px; }
+  header.bar .wrap { display: block; }
+  h1 { font-size: 24px; margin: 0 0 4px; font-weight: 700; }
+  .sub { font-size: 14px; opacity: 0.85; margin: 0; }
+  h2 { font-size: 17px; color: #1a106b; border-bottom: 2px solid #1a106b; padding-bottom: 6px; margin: 32px 0 12px; }
+  .snapshot { font-size: 15px; }
+  .snapshot div { padding: 4px 0; border-bottom: 1px solid #eee; }
+  .snapshot b { color: #1a106b; }
+  .coverage { color: #b2946b; font-weight: 700; }
+  ul, ol { margin: 8px 0; padding-left: 22px; font-size: 15px; }
+  ul.warn { list-style: none; padding-left: 0; }
+  ul.warn li { padding: 6px 0; border-bottom: 1px solid #f0ece4; color: #6b5a3e; }
+  .mark { color: #b2946b; font-weight: 700; }
+  ol li { padding: 6px 0; }
+  ol li b { color: #1a106b; }
+  .clear { color: #4a7a4a; font-weight: 600; font-size: 15px; }
+  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd; font-size: 13px; color: #8a8a8a; }
 </style></head>
 <body>
-  <h1>${esc(orgName)} — Organization Summary</h1>
-  <div class="sub">Generated ${esc(new Date().toLocaleString())}</div>
-  <div>
-    <span class="stat"><b>${positions.length}</b>Positions</span>
-    <span class="stat"><b>${positionAssignmentById.size}</b>Filled</span>
-    <span class="stat"><b>${vacancies.length}</b>Vacancies</span>
-    <span class="stat"><b>${openActionItems.length}</b>Open actions</span>
-    <span class="stat"><b>${complianceGaps.length}</b>Compliance gaps</span>
+  <header class="bar"><div class="wrap">
+    <h1>${esc(orgName)}</h1>
+    <p class="sub">Founder Dependency Report · ${esc(isoDate)}</p>
+  </div></header>
+  <div class="wrap">
+  <section>
+    <h2>Ownership Snapshot</h2>
+    <div class="snapshot">
+      <div><b>${totalPositions}</b> positions total</div>
+      <div><b>${unownedPositions.length}</b> positions unowned</div>
+      <div><b>${teamsWithoutLead.length}</b> teams without lead</div>
+      <div><b>${unownedActions.length}</b> actions without owner</div>
+      <div class="coverage">${coverage}% ownership coverage</div>
+    </div>
+  </section>
+  <section>
+    <h2>Single Points of Failure</h2>
+    ${warnList(spofItems, "NO SINGLE POINTS OF FAILURE DETECTED")}
+  </section>
+  <section>
+    <h2>Recommended First Handoffs</h2>
+    ${orderedList(handoffItems, "ALL CORE OWNERSHIPS ARE CLEAR")}
+  </section>
+  <footer>Generated by TeamFrame — ${esc(isoDate)}</footer>
   </div>
-  ${section(
-    "Vacancies",
-    list(
-      vacancies.map((p) => `${esc(p.title)}${p.teamId ? ` <span class="muted">(${esc(teamMap.get(p.teamId)?.name ?? "")})</span>` : ""}`),
-      "No vacant positions.",
-    ),
-  )}
-  ${section(
-    "Actions needing attention",
-    list(
-      [
-        ...overdue.map((item) => `<b>Overdue:</b> ${esc(item.title)}`),
-        ...blocked.map((item) => `<b>Blocked:</b> ${esc(item.title)}`),
-      ],
-      "No overdue or blocked actions.",
-    ),
-  )}
-  ${section(
-    "Compliance gaps",
-    list(
-      complianceGaps.map((row) => `${esc(row.person)} — ${esc(row.title)} <span class="muted">(missing ${esc(row.missing.join(", "))})</span>`),
-      "No compliance gaps detected.",
-    ),
-  )}
-  ${section(
-    "Team structure",
-    structureRows.length
-      ? `<table><thead><tr><th>Position</th><th>Reports to</th><th>Department</th><th>Occupant</th></tr></thead><tbody>${structureRows
-          .map((row) => `<tr><td>${esc(row.title)}</td><td>${esc(row.manager)}</td><td>${esc(row.department)}</td><td>${esc(row.occupant)}</td></tr>`)
-          .join("")}</tbody></table>`
-      : `<p class="muted">No positions yet.</p>`,
-  )}
 </body></html>`;
 
     const blob = new Blob([html], { type: "text/html;charset=utf-8" });
     const href = URL.createObjectURL(blob);
     const anchor = document.createElement("a");
     anchor.href = href;
-    anchor.download = "teamframe-org-summary.html";
+    anchor.download = `teamframe-founder-dependency-${isoDate}.html`;
     anchor.click();
     URL.revokeObjectURL(href);
   }
@@ -3806,7 +3868,7 @@ export function TeamFrame() {
                 Organization ID: {organizationId ?? "-"}
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
-                <button onClick={downloadOrgSummaryHtml}>Download Org Summary (HTML)</button>
+                <button onClick={downloadOrgSummaryHtml}>Download Founder Dependency Report</button>
                 <button onClick={downloadPayrollCsv}>Download Payroll Export</button>
                 {import.meta.env.DEV ? (
                   <>
