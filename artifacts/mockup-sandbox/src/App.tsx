@@ -131,18 +131,9 @@ function getPreviewPath(): string | null {
 
 function App() {
   const previewPath = getPreviewPath();
-  const defaultPreviewModuleKey = `./components/mockups/${DEFAULT_PREVIEW_PATH}.tsx`;
 
-  if (previewPath) {
-    return (
-      <PreviewRenderer
-        componentPath={previewPath}
-        modules={discoveredModules}
-      />
-    );
-  }
-
-  if (discoveredModules[defaultPreviewModuleKey]) {
+  // Root always loads TeamFrame — it is the product, not a gallery placeholder
+  if (!previewPath) {
     return (
       <PreviewRenderer
         componentPath={DEFAULT_PREVIEW_PATH}
@@ -151,7 +142,12 @@ function App() {
     );
   }
 
-  return <Gallery />;
+  return (
+    <PreviewRenderer
+      componentPath={previewPath}
+      modules={discoveredModules}
+    />
+  );
 }
 
 export default App;
