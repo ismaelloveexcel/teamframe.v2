@@ -3,7 +3,7 @@
   "name": "Global Determinism",
   "pass": true,
   "details": [
-    "Audited organizations=36",
+    "Audited organizations=44",
     "Organizations with mismatches=0"
   ],
   "errors": [],
@@ -977,6 +977,222 @@
         "compensationCurrent": {
           "live": "0028a3307514d81567367d9bbcf3ad8ddc8a5adf0a84f347d265c8d1322f28e4",
           "replay": "0028a3307514d81567367d9bbcf3ad8ddc8a5adf0a84f347d265c8d1322f28e4"
+        }
+      }
+    },
+    {
+      "orgId": "2389f50c-96ff-4d67-bceb-137532d23686",
+      "matches": true,
+      "mismatches": [],
+      "hashes": {
+        "positionsCurrent": {
+          "live": "84959bc7223b10d463c7be41ec8383af9ca39e06eecde230da575d34545fbf6b",
+          "replay": "84959bc7223b10d463c7be41ec8383af9ca39e06eecde230da575d34545fbf6b"
+        },
+        "assignmentsCurrent": {
+          "live": "cb78d8761bd6dc17800e5c2817d0258b26296627d4b1f5be5512a30c5a18934f",
+          "replay": "cb78d8761bd6dc17800e5c2817d0258b26296627d4b1f5be5512a30c5a18934f"
+        },
+        "evidenceStatusByAssignment": {
+          "live": "c088da24523853802a79c1c34d378afeb6c77f77763577cce26d10037c45ffa6",
+          "replay": "c088da24523853802a79c1c34d378afeb6c77f77763577cce26d10037c45ffa6"
+        },
+        "evidenceStatusByPosition": {
+          "live": "a333a8c75b58ebb46acf117e5be21dd50380ddf8e966ce4cf65dc2a704a35fdc",
+          "replay": "a333a8c75b58ebb46acf117e5be21dd50380ddf8e966ce4cf65dc2a704a35fdc"
+        },
+        "compensationCurrent": {
+          "live": "071cdc95795d90914a0d44544a096e0c0ce8b8972ab5a6f567f4a43b88df9339",
+          "replay": "071cdc95795d90914a0d44544a096e0c0ce8b8972ab5a6f567f4a43b88df9339"
+        }
+      }
+    },
+    {
+      "orgId": "ac2cb724-f46b-482c-9984-11a18c2bb492",
+      "matches": true,
+      "mismatches": [],
+      "hashes": {
+        "positionsCurrent": {
+          "live": "5075e503f2121dc912bb4caaf62578448d7e5d4e36c9fe1fe2d321ecaf9f62ea",
+          "replay": "5075e503f2121dc912bb4caaf62578448d7e5d4e36c9fe1fe2d321ecaf9f62ea"
+        },
+        "assignmentsCurrent": {
+          "live": "361acdfe2bf9e465cb87b06ebea67a44b47b84e6547de482351d9fd0ece442a6",
+          "replay": "361acdfe2bf9e465cb87b06ebea67a44b47b84e6547de482351d9fd0ece442a6"
+        },
+        "evidenceStatusByAssignment": {
+          "live": "8babf0c6a268a425ca6e88802ea00c2d6cded3632725b70aafdf614228423d86",
+          "replay": "8babf0c6a268a425ca6e88802ea00c2d6cded3632725b70aafdf614228423d86"
+        },
+        "evidenceStatusByPosition": {
+          "live": "bc3ed40b7677a3bd4b4fd1656f470da91ac7e4c4493207e7d9baabac19848c9b",
+          "replay": "bc3ed40b7677a3bd4b4fd1656f470da91ac7e4c4493207e7d9baabac19848c9b"
+        },
+        "compensationCurrent": {
+          "live": "8faec1e1244b32075468d5663ee3fc4905ce6cdbbb09681f114a10af31c2767a",
+          "replay": "8faec1e1244b32075468d5663ee3fc4905ce6cdbbb09681f114a10af31c2767a"
+        }
+      }
+    },
+    {
+      "orgId": "afd7905a-f4d7-4765-8d19-3fa856a03273",
+      "matches": true,
+      "mismatches": [],
+      "hashes": {
+        "positionsCurrent": {
+          "live": "4777164861766a90e801c6e53bc9be4ef4fad425bfdc111bac8cba2af95fb6c6",
+          "replay": "4777164861766a90e801c6e53bc9be4ef4fad425bfdc111bac8cba2af95fb6c6"
+        },
+        "assignmentsCurrent": {
+          "live": "77f21dcffae47f977b8b69e6ff2de9e6f1eee372ca86ed21763e4a3c4e073a6a",
+          "replay": "77f21dcffae47f977b8b69e6ff2de9e6f1eee372ca86ed21763e4a3c4e073a6a"
+        },
+        "evidenceStatusByAssignment": {
+          "live": "83bbdd39666a6cf7f3c8d853e82ae7c059e5ba1b6974a8556eeeebc96225ca39",
+          "replay": "83bbdd39666a6cf7f3c8d853e82ae7c059e5ba1b6974a8556eeeebc96225ca39"
+        },
+        "evidenceStatusByPosition": {
+          "live": "0671879e3c6e029f070d2a99ca7bdae6cb5a21ab11e42d9aaabc9aa496f29b38",
+          "replay": "0671879e3c6e029f070d2a99ca7bdae6cb5a21ab11e42d9aaabc9aa496f29b38"
+        },
+        "compensationCurrent": {
+          "live": "a8b5e26f7f0641b4aa1965a53cffa834b2099b8ef3a92e538c6668ccdfad0f30",
+          "replay": "a8b5e26f7f0641b4aa1965a53cffa834b2099b8ef3a92e538c6668ccdfad0f30"
+        }
+      }
+    },
+    {
+      "orgId": "d7239ea8-cace-4ebc-825c-0e8124ec9d4c",
+      "matches": true,
+      "mismatches": [],
+      "hashes": {
+        "positionsCurrent": {
+          "live": "463582db1edb35e269158d8554af8210e92a91b4c3c0359ac62cc19b670eddbb",
+          "replay": "463582db1edb35e269158d8554af8210e92a91b4c3c0359ac62cc19b670eddbb"
+        },
+        "assignmentsCurrent": {
+          "live": "1efda3adf7b72e586ae393bbd4f342e11118919da0bf4c519a1d321b807d8f2e",
+          "replay": "1efda3adf7b72e586ae393bbd4f342e11118919da0bf4c519a1d321b807d8f2e"
+        },
+        "evidenceStatusByAssignment": {
+          "live": "b570e6da368f45f5b2ea9af076cc58e9284c98a552695be0b252031c142edc53",
+          "replay": "b570e6da368f45f5b2ea9af076cc58e9284c98a552695be0b252031c142edc53"
+        },
+        "evidenceStatusByPosition": {
+          "live": "36b97be27df266de680fa0b5b2ee876ffa1206757ff9c22ecc2fd34b0ff771ae",
+          "replay": "36b97be27df266de680fa0b5b2ee876ffa1206757ff9c22ecc2fd34b0ff771ae"
+        },
+        "compensationCurrent": {
+          "live": "bcee64e38b2afbaa97d82f5744dd9cdc08651044a26b9dc8e87460bf11b59a0e",
+          "replay": "bcee64e38b2afbaa97d82f5744dd9cdc08651044a26b9dc8e87460bf11b59a0e"
+        }
+      }
+    },
+    {
+      "orgId": "fe2bc841-8e0a-4d96-aadd-87786b321beb",
+      "matches": true,
+      "mismatches": [],
+      "hashes": {
+        "positionsCurrent": {
+          "live": "b6e1c8e57a7da72c47d40a972fca5810aeb0748c88ab469c5ed0db3b194da6fb",
+          "replay": "b6e1c8e57a7da72c47d40a972fca5810aeb0748c88ab469c5ed0db3b194da6fb"
+        },
+        "assignmentsCurrent": {
+          "live": "0cd4d39f2033e593e90c619b30a03a55d183c1194d32f0bf597edbdfb27008e1",
+          "replay": "0cd4d39f2033e593e90c619b30a03a55d183c1194d32f0bf597edbdfb27008e1"
+        },
+        "evidenceStatusByAssignment": {
+          "live": "4408f3c5e1895663b4c2874781f4361507893c65903326bbb7ef0c4e8e10763b",
+          "replay": "4408f3c5e1895663b4c2874781f4361507893c65903326bbb7ef0c4e8e10763b"
+        },
+        "evidenceStatusByPosition": {
+          "live": "f68f0dd0cb096ec6af206eddf7837af5aeea7f25e2ef05943f9c1d5e0dd9ad20",
+          "replay": "f68f0dd0cb096ec6af206eddf7837af5aeea7f25e2ef05943f9c1d5e0dd9ad20"
+        },
+        "compensationCurrent": {
+          "live": "d2c52af8aaf5577ca19cffebcea5ac2f595e05e7e09f2fc29d596b726e5c16fd",
+          "replay": "d2c52af8aaf5577ca19cffebcea5ac2f595e05e7e09f2fc29d596b726e5c16fd"
+        }
+      }
+    },
+    {
+      "orgId": "b2e29d59-cea3-4c14-ae96-191cba0edfc1",
+      "matches": true,
+      "mismatches": [],
+      "hashes": {
+        "positionsCurrent": {
+          "live": "241b27d1d845646171ebd9468707a9c1099628edae15c09a8e0996d29024c800",
+          "replay": "241b27d1d845646171ebd9468707a9c1099628edae15c09a8e0996d29024c800"
+        },
+        "assignmentsCurrent": {
+          "live": "f9628ec858634d85a0d2ae86dd2013931434478571e4b8d16fade84c5a0ef359",
+          "replay": "f9628ec858634d85a0d2ae86dd2013931434478571e4b8d16fade84c5a0ef359"
+        },
+        "evidenceStatusByAssignment": {
+          "live": "f88713d8e97afdf0ca3de75b7354623902d396702deb45539ada87b9f76874f0",
+          "replay": "f88713d8e97afdf0ca3de75b7354623902d396702deb45539ada87b9f76874f0"
+        },
+        "evidenceStatusByPosition": {
+          "live": "93d05c20c19ab10dc29bdfebf1d3af7b32eee90f4c374a9c28232ba1690adf66",
+          "replay": "93d05c20c19ab10dc29bdfebf1d3af7b32eee90f4c374a9c28232ba1690adf66"
+        },
+        "compensationCurrent": {
+          "live": "8240f29ac99714cbac6c1bc8b1a6210b5cc993658ed308ca0cec8a8eeaea2110",
+          "replay": "8240f29ac99714cbac6c1bc8b1a6210b5cc993658ed308ca0cec8a8eeaea2110"
+        }
+      }
+    },
+    {
+      "orgId": "8f821a03-3279-4cf5-bb27-fbd586f76801",
+      "matches": true,
+      "mismatches": [],
+      "hashes": {
+        "positionsCurrent": {
+          "live": "c0c7e9abd96c12699b64dcf742768614d15675e6590e1440045f89d56b521c32",
+          "replay": "c0c7e9abd96c12699b64dcf742768614d15675e6590e1440045f89d56b521c32"
+        },
+        "assignmentsCurrent": {
+          "live": "9074c5aa7b756b37d04e7721b1cbf44bfb21bf71c4c8ddb81a7d30774252c2b5",
+          "replay": "9074c5aa7b756b37d04e7721b1cbf44bfb21bf71c4c8ddb81a7d30774252c2b5"
+        },
+        "evidenceStatusByAssignment": {
+          "live": "862ab0dc50cc4999a0e150397c4bd91e615f9f390b1d8f5d78e28fcb6674b60b",
+          "replay": "862ab0dc50cc4999a0e150397c4bd91e615f9f390b1d8f5d78e28fcb6674b60b"
+        },
+        "evidenceStatusByPosition": {
+          "live": "1e6acd35d9215f6a5d3205d141abeef6174966dc31d463b11e51de5d2c4c5ba7",
+          "replay": "1e6acd35d9215f6a5d3205d141abeef6174966dc31d463b11e51de5d2c4c5ba7"
+        },
+        "compensationCurrent": {
+          "live": "10f37a05fee63f16df8ee279e824217cad5a9aa11a8050690e06f6d816833b2e",
+          "replay": "10f37a05fee63f16df8ee279e824217cad5a9aa11a8050690e06f6d816833b2e"
+        }
+      }
+    },
+    {
+      "orgId": "d725ac32-ae24-444b-8c4f-c0bd1fab6019",
+      "matches": true,
+      "mismatches": [],
+      "hashes": {
+        "positionsCurrent": {
+          "live": "98772b08ecffb50f3c301a663ba540f8f0487fcbc6f082f6a1f8d55a12f57445",
+          "replay": "98772b08ecffb50f3c301a663ba540f8f0487fcbc6f082f6a1f8d55a12f57445"
+        },
+        "assignmentsCurrent": {
+          "live": "7735e23bb2dad9fedb50434f51b8d76f93b6fae13a91971c074519ab63aa101d",
+          "replay": "7735e23bb2dad9fedb50434f51b8d76f93b6fae13a91971c074519ab63aa101d"
+        },
+        "evidenceStatusByAssignment": {
+          "live": "cca2c976834ae6f46e82f687c0106ce55f8660d0a8015e02510391e7fa990d40",
+          "replay": "cca2c976834ae6f46e82f687c0106ce55f8660d0a8015e02510391e7fa990d40"
+        },
+        "evidenceStatusByPosition": {
+          "live": "f332e4239d1c044befd138899b2e4a443bdba8e07f27c479dce0a36a3c945d95",
+          "replay": "f332e4239d1c044befd138899b2e4a443bdba8e07f27c479dce0a36a3c945d95"
+        },
+        "compensationCurrent": {
+          "live": "4932103beae69ea715aab2f6a6420e2ddd9cf0fa390aa8bff54aa2ffd71ca9b3",
+          "replay": "4932103beae69ea715aab2f6a6420e2ddd9cf0fa390aa8bff54aa2ffd71ca9b3"
         }
       }
     }
