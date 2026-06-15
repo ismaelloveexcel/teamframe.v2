@@ -2267,42 +2267,6 @@ export function TeamFrame() {
     }
   }
 
-  function downloadPayrollCsv() {
-    const rows = people.map((person) => {
-      const assignment = activeAssignmentByPersonId.get(person.id);
-      const position = assignment ? positionMap.get(assignment.positionId) : null;
-      const team = position?.teamId ? teamMap.get(position.teamId) : null;
-      const startDate = assignment?.startedAt
-        ? new Date(assignment.startedAt).toISOString().slice(0, 10)
-        : "";
-      return [
-        person.id,
-        person.fullName,
-        position?.title ?? "",
-        team?.name ?? "",
-        person.email ?? "",
-        person.phone ?? "",
-        person.employmentStatus ?? "",
-        startDate,
-      ];
-    });
-
-    const csv = [
-      ["Person ID", "Full Name", "Position", "Team", "Email", "Phone", "Employment Status", "Start Date"],
-      ...rows,
-    ]
-      .map((row) => row.map((value) => `"${String(value).replaceAll('"', '""')}"`).join(","))
-      .join("\n");
-
-    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
-    const href = URL.createObjectURL(blob);
-    const anchor = document.createElement("a");
-    anchor.href = href;
-    anchor.download = "teamframe-payroll-export.csv";
-    anchor.click();
-    URL.revokeObjectURL(href);
-  }
-
   function downloadOrgSummaryHtml() {
     const esc = (value: unknown) =>
       String(value ?? "")
@@ -3754,7 +3718,6 @@ export function TeamFrame() {
               </div>
               <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
                 <button onClick={downloadOrgSummaryHtml}>Download Founder Dependency Report</button>
-                <button onClick={downloadPayrollCsv}>Download Payroll Export</button>
                 {import.meta.env.DEV ? (
                   <>
                     <button onClick={() => void handleResetDemoState()} disabled={busy}>
