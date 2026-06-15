@@ -11,7 +11,20 @@ import { mockupPreviewPlugin } from "./mockupPreviewPlugin";
 // Fail loud only when actually serving; otherwise fall back to a sane default.
 const DEFAULT_PORT = 4173;
 
-export default defineConfig(async ({ command }) => {
+// Resolve the optional Replit-only plugin at module scope (top-level await) so
+// the config factory below can stay synchronous and type-check cleanly.
+const cartographerPlugins =
+  process.env.NODE_ENV !== "production" && process.env.REPL_ID !== undefined
+    ? [
+        await import("@replit/vite-plugin-cartographer").then((m) =>
+          m.cartographer({
+            root: path.resolve(import.meta.dirname, ".."),
+          }),
+        ),
+      ]
+    : [];
+
+export default defineConfig(({ command }) => {
   const rawPort = process.env.PORT;
 
   if (command === "serve" && !rawPort) {
@@ -37,16 +50,7 @@ export default defineConfig(async ({ command }) => {
       react(),
       tailwindcss(),
       runtimeErrorOverlay(),
-      ...(process.env.NODE_ENV !== "production" &&
-      process.env.REPL_ID !== undefined
-        ? [
-            await import("@replit/vite-plugin-cartographer").then((m) =>
-              m.cartographer({
-                root: path.resolve(import.meta.dirname, ".."),
-              }),
-            ),
-          ]
-        : []),
+      ...cartographerPlugins,
     ],
     resolve: {
       alias: {
