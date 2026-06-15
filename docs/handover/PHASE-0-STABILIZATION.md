@@ -101,7 +101,9 @@ DATABASE_URL="$DATABASE_URL" \
   pnpm --filter @workspace/api-server run test:system-certification-audit
 
 # Gate 4 — frontend build (catches UI/codegen breakage)
-pnpm --filter @workspace/mockup-sandbox run build
+# NOTE: vite.config.ts requires PORT; without it the build errors with
+# "PORT environment variable is required" (config-load failure, NOT a code break).
+PORT=3000 BASE_PATH=/ pnpm --filter @workspace/mockup-sandbox run build
 ```
 
 **Pass criteria:**
