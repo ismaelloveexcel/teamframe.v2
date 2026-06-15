@@ -8,9 +8,11 @@ import {
   buildPositionGraph,
   buildTransferEvents,
   deriveAssignments,
+  type AssignmentTimeline,
   type PositionNode,
 } from "../../index";
 import { InvariantViolationError, stableHash, type EventEnvelope } from "../../event-core";
+import { uid } from "./uuid-fixture";
 
 const NOW = "2026-06-01T00:00:00.000Z";
 
@@ -40,46 +42,33 @@ test("Phase 2 gate: reparent maintains acyclic tree integrity", () => {
 });
 
 test("Phase 2 gate: no position can have more than one active assignment", () => {
-  const duplicateActiveAssignments = [
+  // Construct AssignmentTimeline[] directly to test the invariant guard.
+  // deriveAssignments() itself deduplicates, so we must bypass it here to
+  // verify that assertSingleActiveAssignmentPerPosition detects the violation.
+  const duplicateActiveAssignments: AssignmentTimeline[] = [
     {
-      aggregateType: "assignment",
-      aggregateId: "asg-1",
-      eventType: "assignment.started",
-      payload: {
-        assignmentId: "asg-1",
-        positionId: "position-1",
-        employeeId: "person-1",
-        effectiveFrom: "2026-01-01T00:00:00.000Z",
-      },
+      assignmentId: uid("asg-1"),
+      positionId: uid("position-1"),
+      employeeId: uid("person-1"),
+      effectiveFrom: "2026-01-01T00:00:00.000Z",
+      effectiveTo: null,
+      status: "active",
+      streamVersion: 1,
     },
     {
-      aggregateType: "assignment",
-      aggregateId: "asg-2",
-      eventType: "assignment.started",
-      payload: {
-        assignmentId: "asg-2",
-        positionId: "position-1",
-        employeeId: "person-2",
-        effectiveFrom: "2026-01-02T00:00:00.000Z",
-      },
+      assignmentId: uid("asg-2"),
+      positionId: uid("position-1"),
+      employeeId: uid("person-2"),
+      effectiveFrom: "2026-01-02T00:00:00.000Z",
+      effectiveTo: null,
+      status: "active",
+      streamVersion: 2,
     },
-  ].map((entry, index) => ({
-    orgId: "org-1",
-    aggregateType: entry.aggregateType,
-    aggregateId: entry.aggregateId,
-    eventType: entry.eventType,
-    version: index + 1,
-    occurredAt: `2026-01-0${index + 1}T00:00:00.000Z`,
-    actorId: "actor-1",
-    idempotencyKey: `seed-${index + 1}`,
-    schemaVersion: 1,
-    payload: entry.payload,
-    payloadHash: stableHash(entry.payload),
-  })) as EventEnvelope[];
+  ];
 
-  const assignments = deriveAssignments(duplicateActiveAssignments);
+  assert.ok(duplicateActiveAssignments.length > 0, "fixture is empty — check test setup");
   assert.throws(
-    () => assertSingleActiveAssignmentPerPosition(assignments, NOW),
+    () => assertSingleActiveAssignmentPerPosition(duplicateActiveAssignments, NOW),
     (error: unknown) => error instanceof InvariantViolationError,
   );
 });
@@ -89,7 +78,7 @@ test("Phase 2 gate: transfer emits end+start and keeps occupancy deterministic",
     {
       orgId: "org-1",
       aggregateType: "assignment",
-      aggregateId: "asg-1",
+      aggregateId: uid("asg-1"),
       eventType: "assignment.started",
       version: 0,
       occurredAt: "2026-02-01T00:00:00.000Z",
@@ -97,9 +86,9 @@ test("Phase 2 gate: transfer emits end+start and keeps occupancy deterministic",
       idempotencyKey: "seed-transfer-start",
       schemaVersion: 1,
       payload: {
-        assignmentId: "asg-1",
-        positionId: "position-1",
-        employeeId: "person-1",
+        assignmentId: uid("asg-1"),
+        positionId: uid("position-1"),
+        employeeId: uid("person-1"),
         effectiveFrom: "2026-02-01T00:00:00.000Z",
       },
       payloadHash: "",
@@ -111,10 +100,10 @@ test("Phase 2 gate: transfer emits end+start and keeps occupancy deterministic",
       orgId: "org-1",
       actorId: "actor-1",
       idempotencyKey: "transfer-1",
-      fromAssignmentId: "asg-1",
-      toAssignmentId: "asg-2",
-      toPositionId: "position-2",
-      employeeId: "person-1",
+      fromAssignmentId: uid("asg-1"),
+      toAssignmentId: uid("asg-2"),
+      toPositionId: uid("position-2"),
+      employeeId: uid("person-1"),
       effectiveFrom: "2026-02-10T00:00:00.000Z",
       effectiveTo: "2026-02-10T00:00:00.000Z",
     }),
@@ -125,57 +114,42 @@ test("Phase 2 gate: transfer emits end+start and keeps occupancy deterministic",
   assert.equal(transferEvents[1]?.eventType, "assignment.started");
 
   const replayed = deriveAssignments([...seeded, ...transferEvents]);
-  assert.equal(replayed.find((assignment) => assignment.assignmentId === "asg-1")?.status, "ended");
-  assert.equal(replayed.find((assignment) => assignment.assignmentId === "asg-2")?.status, "active");
+  assert.ok(replayed.length > 0, "derivation dropped all events — check fixture UUIDs");
+  assert.equal(replayed.find((assignment) => assignment.assignmentId === uid("asg-1"))?.status, "ended");
+  assert.equal(replayed.find((assignment) => assignment.assignmentId === uid("asg-2"))?.status, "active");
   assert.doesNotThrow(() => assertSingleActiveAssignmentPerPosition(replayed, NOW));
   assert.doesNotThrow(() => assertNoEmployeeOverlap(replayed, NOW, 1));
 });
 
 
 test("Phase 2 gate: employee overlap invariant rejects concurrent active seats", () => {
-  const events = [
+  // Construct AssignmentTimeline[] directly to test the invariant guard.
+  // deriveAssignments() itself deduplicates overlapping employees, so we must
+  // bypass it here to verify assertNoEmployeeOverlap detects the violation.
+  const overlappingAssignments: AssignmentTimeline[] = [
     {
-      orgId: "org-1",
-      aggregateType: "assignment",
-      aggregateId: "asg-10",
-      eventType: "assignment.started",
-      version: 1,
-      occurredAt: "2026-01-01T00:00:00.000Z",
-      actorId: "actor-1",
-      idempotencyKey: "overlap-1",
-      schemaVersion: 1,
-      payload: {
-        assignmentId: "asg-10",
-        positionId: "position-a",
-        employeeId: "person-z",
-        effectiveFrom: "2026-01-01T00:00:00.000Z",
-      },
-      payloadHash: "",
+      assignmentId: uid("asg-10"),
+      positionId: uid("position-a"),
+      employeeId: uid("person-z"),
+      effectiveFrom: "2026-01-01T00:00:00.000Z",
+      effectiveTo: null,
+      status: "active",
+      streamVersion: 1,
     },
     {
-      orgId: "org-1",
-      aggregateType: "assignment",
-      aggregateId: "asg-11",
-      eventType: "assignment.started",
-      version: 2,
-      occurredAt: "2026-01-01T00:00:00.000Z",
-      actorId: "actor-1",
-      idempotencyKey: "overlap-2",
-      schemaVersion: 1,
-      payload: {
-        assignmentId: "asg-11",
-        positionId: "position-b",
-        employeeId: "person-z",
-        effectiveFrom: "2026-01-01T00:00:00.000Z",
-      },
-      payloadHash: "",
+      assignmentId: uid("asg-11"),
+      positionId: uid("position-b"),
+      employeeId: uid("person-z"),
+      effectiveFrom: "2026-01-01T00:00:00.000Z",
+      effectiveTo: null,
+      status: "active",
+      streamVersion: 2,
     },
-  ] as EventEnvelope[];
+  ];
 
-  const replayed = deriveAssignments(events.map((event) => ({ ...event, payloadHash: stableHash(event.payload) })));
-
+  assert.ok(overlappingAssignments.length > 0, "fixture is empty — check test setup");
   assert.throws(
-    () => assertNoEmployeeOverlap(replayed, NOW, 1),
+    () => assertNoEmployeeOverlap(overlappingAssignments, NOW, 1),
     (error: unknown) => error instanceof InvariantViolationError,
   );
 });
@@ -185,7 +159,7 @@ test("Phase 2 gate: replay determinism holds for tie-order inputs", () => {
     {
       orgId: "org-1",
       aggregateType: "assignment",
-      aggregateId: "asg-a",
+      aggregateId: uid("asg-a"),
       eventType: "assignment.started",
       version: 1,
       occurredAt: "2026-01-01T00:00:00.000Z",
@@ -193,9 +167,9 @@ test("Phase 2 gate: replay determinism holds for tie-order inputs", () => {
       idempotencyKey: "tie-1",
       schemaVersion: 1,
       payload: {
-        assignmentId: "asg-a",
-        positionId: "pos-a",
-        employeeId: "emp-a",
+        assignmentId: uid("asg-a"),
+        positionId: uid("pos-a"),
+        employeeId: uid("emp-a"),
         effectiveFrom: "2026-01-01T00:00:00.000Z",
       },
       payloadHash: "",
@@ -203,7 +177,7 @@ test("Phase 2 gate: replay determinism holds for tie-order inputs", () => {
     {
       orgId: "org-1",
       aggregateType: "assignment",
-      aggregateId: "asg-b",
+      aggregateId: uid("asg-b"),
       eventType: "assignment.started",
       version: 1,
       occurredAt: "2026-01-01T00:00:00.000Z",
@@ -211,9 +185,9 @@ test("Phase 2 gate: replay determinism holds for tie-order inputs", () => {
       idempotencyKey: "tie-2",
       schemaVersion: 1,
       payload: {
-        assignmentId: "asg-b",
-        positionId: "pos-b",
-        employeeId: "emp-b",
+        assignmentId: uid("asg-b"),
+        positionId: uid("pos-b"),
+        employeeId: uid("emp-b"),
         effectiveFrom: "2026-01-01T00:00:00.000Z",
       },
       payloadHash: "",
@@ -223,6 +197,8 @@ test("Phase 2 gate: replay determinism holds for tie-order inputs", () => {
   const tieB = [tieA[1]!, tieA[0]!];
   const resultA = deriveAssignments(tieA.map((event) => ({ ...event, payloadHash: stableHash(event.payload) })));
   const resultB = deriveAssignments(tieB.map((event) => ({ ...event, payloadHash: stableHash(event.payload) })));
+  assert.ok(resultA.length > 0, "derivation dropped all events — check fixture UUIDs");
+  assert.ok(resultB.length > 0, "derivation dropped all events — check fixture UUIDs");
   assert.deepEqual(resultA, resultB);
 });
 
@@ -231,7 +207,7 @@ test("Phase 2 gate: replay ordering remains deterministic", () => {
     {
       orgId: "org-1",
       aggregateType: "assignment",
-      aggregateId: "asg-1",
+      aggregateId: uid("asg-1"),
       eventType: "assignment.started",
       version: 0,
       occurredAt: "2026-01-01T00:00:00.000Z",
@@ -239,9 +215,9 @@ test("Phase 2 gate: replay ordering remains deterministic", () => {
       idempotencyKey: "evt-1",
       schemaVersion: 1,
       payload: {
-        assignmentId: "asg-1",
-        positionId: "position-1",
-        employeeId: "person-1",
+        assignmentId: uid("asg-1"),
+        positionId: uid("position-1"),
+        employeeId: uid("person-1"),
         effectiveFrom: "2026-01-01T00:00:00.000Z",
       },
       payloadHash: "",
@@ -249,7 +225,7 @@ test("Phase 2 gate: replay ordering remains deterministic", () => {
     {
       orgId: "org-1",
       aggregateType: "assignment",
-      aggregateId: "asg-1",
+      aggregateId: uid("asg-1"),
       eventType: "assignment.ended",
       version: 0,
       occurredAt: "2026-02-01T00:00:00.000Z",
@@ -257,7 +233,7 @@ test("Phase 2 gate: replay ordering remains deterministic", () => {
       idempotencyKey: "evt-2",
       schemaVersion: 1,
       payload: {
-        assignmentId: "asg-1",
+        assignmentId: uid("asg-1"),
         effectiveTo: "2026-02-01T00:00:00.000Z",
       },
       payloadHash: "",
@@ -266,6 +242,6 @@ test("Phase 2 gate: replay ordering remains deterministic", () => {
 
   const resultA = deriveAssignments(seededEvents);
   const resultB = deriveAssignments(seededEvents);
+  assert.ok(resultA.length > 0, "derivation dropped all events — check fixture UUIDs");
   assert.deepEqual(resultA, resultB);
 });
-

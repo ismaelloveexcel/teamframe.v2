@@ -3,7 +3,7 @@
   "name": "Global Determinism",
   "pass": true,
   "details": [
-    "Audited organizations=52",
+    "Audited organizations=56",
     "Organizations with mismatches=0"
   ],
   "errors": [],
@@ -1409,6 +1409,114 @@
         "compensationCurrent": {
           "live": "a94f6e643e01df638de89cda1418b03e0ec107bb43da5d8d817e2d61ecf26cdf",
           "replay": "a94f6e643e01df638de89cda1418b03e0ec107bb43da5d8d817e2d61ecf26cdf"
+        }
+      }
+    },
+    {
+      "orgId": "83f1876f-8e40-4327-8834-db3104e9ed84",
+      "matches": true,
+      "mismatches": [],
+      "hashes": {
+        "positionsCurrent": {
+          "live": "003ae5566e508a4046eccaaabd3b51390b45309c534d18db9da3c92b322062b4",
+          "replay": "003ae5566e508a4046eccaaabd3b51390b45309c534d18db9da3c92b322062b4"
+        },
+        "assignmentsCurrent": {
+          "live": "42e3d967c50010b901610dad5b97d8a4887f62de514f60489df0c782a67c93a5",
+          "replay": "42e3d967c50010b901610dad5b97d8a4887f62de514f60489df0c782a67c93a5"
+        },
+        "evidenceStatusByAssignment": {
+          "live": "5c722f83c3c3d839aa8dff22847d26d761cd714e4182e1df2871882fa7d06031",
+          "replay": "5c722f83c3c3d839aa8dff22847d26d761cd714e4182e1df2871882fa7d06031"
+        },
+        "evidenceStatusByPosition": {
+          "live": "b5414cad9b23a55f0e8bb5ca259d7ee6982ad742991b53b3e94b17983246ad74",
+          "replay": "b5414cad9b23a55f0e8bb5ca259d7ee6982ad742991b53b3e94b17983246ad74"
+        },
+        "compensationCurrent": {
+          "live": "5f2fcea4610217e89940a8479751e3eb8b6c0b139c2625d13a4e36cc2f745dec",
+          "replay": "5f2fcea4610217e89940a8479751e3eb8b6c0b139c2625d13a4e36cc2f745dec"
+        }
+      }
+    },
+    {
+      "orgId": "33fbd7cd-bceb-49f0-9e5f-37f5df5de96d",
+      "matches": true,
+      "mismatches": [],
+      "hashes": {
+        "positionsCurrent": {
+          "live": "da533c8b72b956d51cfc0f6145012ef4400faf1fd86b938f23a73d4355ae2d59",
+          "replay": "da533c8b72b956d51cfc0f6145012ef4400faf1fd86b938f23a73d4355ae2d59"
+        },
+        "assignmentsCurrent": {
+          "live": "b412423d0b54b3a438b5af0d0b7d57c36151fa5711230963a63e44b5ed9a6411",
+          "replay": "b412423d0b54b3a438b5af0d0b7d57c36151fa5711230963a63e44b5ed9a6411"
+        },
+        "evidenceStatusByAssignment": {
+          "live": "bf08bcaba35165e8dee9309625b515c70c0a0aabed5f311a9714a67c2026f7ab",
+          "replay": "bf08bcaba35165e8dee9309625b515c70c0a0aabed5f311a9714a67c2026f7ab"
+        },
+        "evidenceStatusByPosition": {
+          "live": "5f32aa09e5e48f043e9bfef087cab89956bfe5bf7f5e5846bbdf44d1c32f1a2d",
+          "replay": "5f32aa09e5e48f043e9bfef087cab89956bfe5bf7f5e5846bbdf44d1c32f1a2d"
+        },
+        "compensationCurrent": {
+          "live": "63b6521b411f8213dc299e7380ccd5da4461b8b5a282d207b5444eec812e2132",
+          "replay": "63b6521b411f8213dc299e7380ccd5da4461b8b5a282d207b5444eec812e2132"
+        }
+      }
+    },
+    {
+      "orgId": "8af207b7-5e82-4a27-b69d-bc5ada4a3b1a",
+      "matches": true,
+      "mismatches": [],
+      "hashes": {
+        "positionsCurrent": {
+          "live": "072da967c28a8772296304a589efd3db1839dd4cf290cb962941d5d25b754018",
+          "replay": "072da967c28a8772296304a589efd3db1839dd4cf290cb962941d5d25b754018"
+        },
+        "assignmentsCurrent": {
+          "live": "f512aacfca3e7f2001e31df0d4df1ee03bdd076c0e7a110da8444a1da8939475",
+          "replay": "f512aacfca3e7f2001e31df0d4df1ee03bdd076c0e7a110da8444a1da8939475"
+        },
+        "evidenceStatusByAssignment": {
+          "live": "ed9449965cc4a21856cc7f0c65b119bafb1fbf8a52358c091a0b6a6cc398e153",
+          "replay": "ed9449965cc4a21856cc7f0c65b119bafb1fbf8a52358c091a0b6a6cc398e153"
+        },
+        "evidenceStatusByPosition": {
+          "live": "1a008a6d6ef6b5a154fd08de548197e0840a75e026aa3cfb86786df8bae8d81a",
+          "replay": "1a008a6d6ef6b5a154fd08de548197e0840a75e026aa3cfb86786df8bae8d81a"
+        },
+        "compensationCurrent": {
+          "live": "50127e27b4134d8b5c06bdbca3c9c1a6282c04cc11cd17824bc8522179f37b03",
+          "replay": "50127e27b4134d8b5c06bdbca3c9c1a6282c04cc11cd17824bc8522179f37b03"
+        }
+      }
+    },
+    {
+      "orgId": "0660096e-b983-465e-89b8-d05c46781595",
+      "matches": true,
+      "mismatches": [],
+      "hashes": {
+        "positionsCurrent": {
+          "live": "3c315063fb80a7dfc51aa28c00505654aec6c584128038a779cc0a5518ae56fb",
+          "replay": "3c315063fb80a7dfc51aa28c00505654aec6c584128038a779cc0a5518ae56fb"
+        },
+        "assignmentsCurrent": {
+          "live": "5f0a01e630571edc4ba8460eda185e0e7cb5a7955938481c6dbc403b53ca6032",
+          "replay": "5f0a01e630571edc4ba8460eda185e0e7cb5a7955938481c6dbc403b53ca6032"
+        },
+        "evidenceStatusByAssignment": {
+          "live": "2e2d4784cc7cc19eee3fc21ab9a58b39df8f66d565bf7bbd0805e9e5441c93ee",
+          "replay": "2e2d4784cc7cc19eee3fc21ab9a58b39df8f66d565bf7bbd0805e9e5441c93ee"
+        },
+        "evidenceStatusByPosition": {
+          "live": "8ba89887e079b65e7d5cb9072cd03e1567e80d890f566133c8e11f0e9a35cacc",
+          "replay": "8ba89887e079b65e7d5cb9072cd03e1567e80d890f566133c8e11f0e9a35cacc"
+        },
+        "compensationCurrent": {
+          "live": "10afc836d9ebcf796d9e41c872204816aa1fb376fe1c90b91f7a9abeb4cfb7d0",
+          "replay": "10afc836d9ebcf796d9e41c872204816aa1fb376fe1c90b91f7a9abeb4cfb7d0"
         }
       }
     }
