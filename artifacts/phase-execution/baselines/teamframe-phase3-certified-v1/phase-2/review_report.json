@@ -1,9 +1,0 @@
-{
-  "phase_id": "phase-2-domain-model",
-  "commit_hash": "7a15ee0bcd1cebda417662ec8edcdbb8a49460c8",
-  "snapshot_mode": "isolated_worktree",
-  "verdict": "PASS",
-  "findings": [],
-  "drift_detected": false,
-  "summary": "Independent review validated phase2 constraints with no drift."
-}

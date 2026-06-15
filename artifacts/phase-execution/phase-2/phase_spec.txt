@@ -1,7 +1,0 @@
-Phase 2 domain scope
-1) Position aggregate helpers: create/reparent/reorder primitives and acyclic tree invariant
-2) Assignment aggregate lifecycle: start/transfer/end events
-3) Occupancy derivation from events only
-4) Transfer emits atomic end+start event pair
-5) Deterministic replay for assignment state
-6) Tests proving no multiple active assignments per position and no overlap per employee

@@ -1,8 +1,0 @@
-Phase 0/1 gate scope
-1) fail-fast command order: schema/auth/invariant/OCC before writes
-2) idempotency replay + conflict
-3) multi-aggregate expected_versions OCC
-4) quarantine blocking
-5) db tables org_events/outbox_events/aggregate_versions/idempotency_records
-6) phase0 helpers dual-write/backfill/cutover
-7) deterministic tests present
