@@ -2575,6 +2575,43 @@ export function TeamFrame() {
           >
             Create organization
           </button>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              margin: "14px 0",
+              color: "#94A3B8",
+              fontSize: 12,
+            }}
+          >
+            <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
+            or
+            <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
+          </div>
+          <button
+            onClick={() =>
+              loadLocalDemoSnapshot(
+                "Demo data loaded — read-only preview. Connect a backend to create and save your own data.",
+              )
+            }
+            style={{
+              width: "100%",
+              background: "#FFFFFF",
+              color: "#1D4ED8",
+              border: "1px solid #BFDBFE",
+              borderRadius: 8,
+              padding: "10px 14px",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Explore with demo data
+          </button>
+          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 8, textAlign: "center" }}>
+            View-only sample organization — no setup required.
+          </div>
           {error ? (
             <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 10 }}>{error}</div>
           ) : null}
