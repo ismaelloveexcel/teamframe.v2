@@ -4,7 +4,6 @@ import {
   CheckSquare,
   Users,
   ShieldCheck,
-  LayoutTemplate,
   Settings,
   Plus,
 } from "lucide-react";
@@ -17,7 +16,6 @@ export type NavId =
   | "actions"
   | "team"
   | "policies"
-  | "templates"
   | "administration";
 
 type NavItem = {
@@ -31,7 +29,6 @@ const NAV_ITEMS: NavItem[] = [
   { id: "actions",        label: "Actions",         icon: <CheckSquare size={16} strokeWidth={2} /> },
   { id: "team",           label: "Team",            icon: <Users size={16} strokeWidth={2} /> },
   { id: "policies",       label: "Policies",        icon: <ShieldCheck size={16} strokeWidth={2} /> },
-  { id: "templates",      label: "Templates",       icon: <LayoutTemplate size={16} strokeWidth={2} /> },
   { id: "administration", label: "Administration",  icon: <Settings size={16} strokeWidth={2} /> },
 ];
 

@@ -3614,18 +3614,6 @@ export function TeamFrame() {
             </section>
           )}
 
-          {activeNav === "templates" && (
-            <section style={STYLE.panel}>
-              <div style={{ ...STYLE.title, fontSize: 17 }}>Templates</div>
-              <div style={{ fontSize: 12, color: "#475569", marginBottom: 12 }}>
-                Download the standard Job Description Word document.
-              </div>
-              <button onClick={() => downloadJobDescriptionTemplate()}>
-                {UI_TERMS.documents.downloadTemplate}
-              </button>
-            </section>
-          )}
-
           {activeNav === "team" && (
             <section style={STYLE.panel}>
               <div style={{ ...STYLE.title, fontSize: 17 }}>Team Directory</div>
