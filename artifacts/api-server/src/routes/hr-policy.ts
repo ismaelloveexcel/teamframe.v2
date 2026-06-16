@@ -11,6 +11,7 @@ import {
   listPolicies,
   updatePolicy,
 } from "../services/hr-policy-service.js";
+import { getEmployeeByUserId } from "../services/hr-employee-service.js";
 
 const router: IRouter = Router();
 
@@ -61,14 +62,27 @@ router.patch(
   }),
 );
 
-// Record an acknowledgement (any authed role acks for an employee).
+// Record an acknowledgement. Employees may only acknowledge as themselves
+// (employeeId is derived from the session, never trusted from the body);
+// admins may record an acknowledgement on behalf of any employee.
 router.post(
   "/policies/:id/acknowledge",
   asyncHandler(async (req, res) => {
     const actor = req.sessionActor!;
-    const { employeeId } = req.body ?? {};
-    if (!employeeId) badRequest("employeeId is required");
-    const row = await acknowledgePolicy(companyOf(req), actor.userId, String(req.params.id), employeeId);
+    const company = companyOf(req);
+    const isAdmin = actor.role === "admin" || actor.role === "super_admin";
+
+    let employeeId: string;
+    if (isAdmin) {
+      employeeId = req.body?.employeeId;
+      if (!employeeId) badRequest("employeeId is required");
+    } else {
+      const self = await getEmployeeByUserId(company, actor.userId);
+      if (!self) badRequest("No employee record linked to this user");
+      employeeId = self.id;
+    }
+
+    const row = await acknowledgePolicy(company, actor.userId, String(req.params.id), employeeId);
     if (!row) notFound("Policy not found");
     res.status(201).json(row);
   }),

@@ -11,6 +11,7 @@ import {
   listCompensation,
   updateCompensation,
 } from "../services/hr-compensation-service.js";
+import { getEmployeeByUserId } from "../services/hr-employee-service.js";
 
 const router: IRouter = Router();
 
@@ -43,11 +44,27 @@ router.post(
   }),
 );
 
+function isAdmin(req: { sessionActor?: { role?: string | null } }): boolean {
+  const role = req.sessionActor?.role;
+  return role === "admin" || role === "super_admin";
+}
+
 router.get(
   "/compensation",
   asyncHandler(async (req, res) => {
-    const employeeId = req.query.employeeId ? String(req.query.employeeId) : undefined;
-    const rows = await listCompensation(companyOf(req), employeeId);
+    const company = companyOf(req);
+    // Employee callers are scoped to their own linked employee record so they
+    // can never read coworkers' compensation or bank details.
+    let employeeId = req.query.employeeId ? String(req.query.employeeId) : undefined;
+    if (!isAdmin(req)) {
+      const self = await getEmployeeByUserId(company, req.sessionActor!.userId);
+      if (!self) {
+        res.json([]);
+        return;
+      }
+      employeeId = self.id;
+    }
+    const rows = await listCompensation(company, employeeId);
     res.json(rows.map((r) => gateComp(req, r)));
   }),
 );
@@ -55,8 +72,13 @@ router.get(
 router.get(
   "/compensation/:id",
   asyncHandler(async (req, res) => {
-    const row = await getCompensation(companyOf(req), String(req.params.id));
+    const company = companyOf(req);
+    const row = await getCompensation(company, String(req.params.id));
     if (!row) notFound("Compensation not found");
+    if (!isAdmin(req)) {
+      const self = await getEmployeeByUserId(company, req.sessionActor!.userId);
+      if (!self || row.employeeId !== self.id) notFound("Compensation not found");
+    }
     res.json(gateComp(req, row));
   }),
 );

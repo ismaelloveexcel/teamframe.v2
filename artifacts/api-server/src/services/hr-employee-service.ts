@@ -101,6 +101,18 @@ export async function getEmployee(companyId: string, id: string): Promise<HrEmpl
   return row ?? null;
 }
 
+/** Resolve the employee record linked to a given user (self-service scoping). */
+export async function getEmployeeByUserId(
+  companyId: string,
+  userId: string,
+): Promise<HrEmployee | null> {
+  const [row] = await db
+    .select()
+    .from(hrEmployeesTable)
+    .where(and(eq(hrEmployeesTable.userId, userId), eq(hrEmployeesTable.companyId, companyId)));
+  return row ?? null;
+}
+
 /**
  * Assign an employee to a position. REASSIGNMENT RULE (build-spec §3): never
  * overwrite — if an active assignment exists (end_date IS NULL), end-date it and
