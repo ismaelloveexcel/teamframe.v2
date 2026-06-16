@@ -13,7 +13,12 @@
     "audit-gate": "tsx src/__rls_check__/audit-gate.ts",
     "position-gate": "tsx src/__rls_check__/position-gate.ts",
     "employee-gate": "tsx src/__rls_check__/employee-gate.ts",
-    "orgchart-gate": "tsx src/__rls_check__/orgchart-gate.ts"
+    "orgchart-gate": "tsx src/__rls_check__/orgchart-gate.ts",
+    "compensation-gate": "tsx src/__rls_check__/compensation-gate.ts",
+    "leave-gate": "tsx src/__rls_check__/leave-gate.ts",
+    "policy-gate": "tsx src/__rls_check__/policy-gate.ts",
+    "document-gate": "tsx src/__rls_check__/document-gate.ts",
+    "offboarding-gate": "tsx src/__rls_check__/offboarding-gate.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",

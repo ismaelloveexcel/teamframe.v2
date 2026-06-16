@@ -215,6 +215,146 @@ export type HrPosition = typeof hrPositionsTable.$inferSelect;
 export type HrEmployee = typeof hrEmployeesTable.$inferSelect;
 export type HrPositionAssignment = typeof hrPositionAssignmentsTable.$inferSelect;
 
+// ── Prompt 6: CRUD modules (Compensation, Leave, Policy, Document, Offboarding) ──
+
+// 1. Compensation — pay record per employee. amount in integer minor units,
+//    currency explicit. components jsonb (basic/housing/transport/airTicket/
+//    allowances). Bank details employee-entered; salary fields admin-only (RBAC).
+export const hrCompensationTable = pgTable("hr_compensation", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  employeeId: uuid("employee_id").notNull().references(() => hrEmployeesTable.id, { onDelete: "cascade" }),
+  amount: integer("amount").notNull().default(0), // total, minor units
+  currency: text("currency").notNull(), // explicit, e.g. AED
+  components: jsonb("components").$type<Record<string, number>>(), // basic/housing/transport/airTicket/allowances
+  effectiveDate: date("effective_date"),
+  // bank details (employee-entered)
+  bankName: text("bank_name"),
+  iban: text("iban"),
+  swiftCode: text("swift_code"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
+  updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
+});
+
+// 2. Leave — UAE statutory leave types + unpaid.
+export const hrLeaveTypeEnum = pgEnum("hr_leave_type", [
+  "annual",
+  "sick",
+  "maternity",
+  "paternity",
+  "hajj",
+  "bereavement",
+  "unpaid",
+]);
+
+export const hrLeaveTable = pgTable("hr_leave", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  employeeId: uuid("employee_id").notNull().references(() => hrEmployeesTable.id, { onDelete: "cascade" }),
+  type: hrLeaveTypeEnum("type").notNull(),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date").notNull(),
+  days: integer("days").notNull(),
+  status: text("status").notNull().default("pending"), // pending|approved|rejected|cancelled
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
+  updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
+});
+
+export const hrLeaveBalanceTable = pgTable("hr_leave_balance", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  employeeId: uuid("employee_id").notNull().references(() => hrEmployeesTable.id, { onDelete: "cascade" }),
+  type: hrLeaveTypeEnum("type").notNull(),
+  balanceDays: integer("balance_days").notNull().default(0),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
+  updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
+}, (table) => [
+  unique("hr_leave_balance_employee_type_unique").on(table.employeeId, table.type),
+]);
+
+// 3. Policy + acknowledgement (versioned, per-employee ack).
+export const hrPolicyTable = pgTable("hr_policy", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  body: text("body").notNull(),
+  version: integer("version").notNull().default(1),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
+  updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
+});
+
+export const hrPolicyAcknowledgementTable = pgTable("hr_policy_acknowledgement", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  policyId: uuid("policy_id").notNull().references(() => hrPolicyTable.id, { onDelete: "cascade" }),
+  employeeId: uuid("employee_id").notNull().references(() => hrEmployeesTable.id, { onDelete: "cascade" }),
+  version: integer("version").notNull(), // policy version acknowledged
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }).defaultNow().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
+}, (table) => [
+  unique("hr_policy_ack_policy_employee_version_unique").on(table.policyId, table.employeeId, table.version),
+]);
+
+// 4. Document + Template (template-merge generation).
+export const hrTemplateTable = pgTable("hr_template", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  name: text("name").notNull(),
+  body: text("body").notNull(), // template body with {{tokens}}
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
+  updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
+});
+
+export const hrDocumentTable = pgTable("hr_document", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  employeeId: uuid("employee_id").references(() => hrEmployeesTable.id, { onDelete: "cascade" }),
+  templateId: uuid("template_id").references(() => hrTemplateTable.id, { onDelete: "set null" }),
+  name: text("name").notNull(),
+  content: text("content"), // rendered/merged text
+  attachments: jsonb("attachments").$type<Record<string, unknown>[]>(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
+  updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
+});
+
+// 5. Offboarding — frozen exit record with computed EOSG.
+export const hrOffboardingTable = pgTable("hr_offboarding", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  employeeId: uuid("employee_id").notNull().references(() => hrEmployeesTable.id, { onDelete: "cascade" }),
+  exitDate: date("exit_date").notNull(),
+  reason: text("reason"),
+  // EOSG inputs (frozen) + computed value
+  eosgInputs: jsonb("eosg_inputs").$type<Record<string, unknown>>(), // { basicMonthlyPay, joinDate, exitDate, yearsOfService }
+  gratuityAmount: integer("gratuity_amount"), // computed EOSG, minor units
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
+  updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
+});
+
+export type HrCompensation = typeof hrCompensationTable.$inferSelect;
+export type HrLeave = typeof hrLeaveTable.$inferSelect;
+export type HrLeaveBalance = typeof hrLeaveBalanceTable.$inferSelect;
+export type HrPolicy = typeof hrPolicyTable.$inferSelect;
+export type HrPolicyAcknowledgement = typeof hrPolicyAcknowledgementTable.$inferSelect;
+export type HrTemplate = typeof hrTemplateTable.$inferSelect;
+export type HrDocument = typeof hrDocumentTable.$inferSelect;
+export type HrOffboarding = typeof hrOffboardingTable.$inferSelect;
+
 export const organizationMembershipsTable = pgTable(
   "organization_memberships",
   {
