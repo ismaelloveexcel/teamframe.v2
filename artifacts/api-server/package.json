@@ -12,7 +12,8 @@
     "rls-gate": "tsx src/__rls_check__/rls-gate.ts",
     "audit-gate": "tsx src/__rls_check__/audit-gate.ts",
     "position-gate": "tsx src/__rls_check__/position-gate.ts",
-    "employee-gate": "tsx src/__rls_check__/employee-gate.ts"
+    "employee-gate": "tsx src/__rls_check__/employee-gate.ts",
+    "orgchart-gate": "tsx src/__rls_check__/orgchart-gate.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
