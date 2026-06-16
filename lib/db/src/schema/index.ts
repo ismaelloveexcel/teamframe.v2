@@ -74,12 +74,66 @@ export const organizationsTable = pgTable("organizations", {
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ---------------------------------------------------------------------------
+// HR v2: enums + new tables (companies, memberships, sessions)
+// ---------------------------------------------------------------------------
+
+export const hrUserStatusEnum = pgEnum("hr_user_status", [
+  "invited",
+  "active",
+  "inactive",
+]);
+export const hrMembershipRoleEnum = pgEnum("hr_membership_role", [
+  "admin",
+  "employee",
+  "super_admin",
+]);
+
 export const usersTable = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
   email: text("email").notNull().unique(),
   fullName: text("full_name"),
+  // HR v2 additions
+  passwordHash: text("password_hash"),
+  status: hrUserStatusEnum("status").notNull().default("invited"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// HR v2: companies (tenant root)
+export const companiesTable = pgTable("companies", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  name: text("name").notNull(),
+  jurisdiction: text("jurisdiction"),
+  currency: text("currency").notNull().default("USD"),
+  config: jsonb("config").$type<Record<string, unknown>>().default({}).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
+// HR v2: memberships (user <-> company + role)
+export const membershipsTable = pgTable("memberships", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  companyId: uuid("company_id")
+    .notNull()
+    .references(() => companiesTable.id, { onDelete: "cascade" }),
+  role: hrMembershipRoleEnum("role").notNull().default("employee"),
+});
+
+// HR v2: sessions
+export const sessionsTable = pgTable("sessions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  token: text("token").notNull().unique(),
+  companyId: uuid("company_id").references(() => companiesTable.id, {
+    onDelete: "set null",
+  }),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
 export const organizationMembershipsTable = pgTable(
@@ -959,6 +1013,11 @@ export const projectionIntegrityChecksTable = pgTable(
 
 export const createOrgEventSchema = createInsertSchema(orgEventsTable);
 export const createIdempotencyRecordSchema = createInsertSchema(idempotencyRecordsTable);
+
+// HR v2 types
+export type Company = typeof companiesTable.$inferSelect;
+export type Membership = typeof membershipsTable.$inferSelect;
+export type Session = typeof sessionsTable.$inferSelect;
 
 export type OrgEvent = typeof orgEventsTable.$inferSelect;
 export type IdempotencyRecord = typeof idempotencyRecordsTable.$inferSelect;
