@@ -4,6 +4,7 @@ import organizationsRouter from "./organizations";
 import opsRouter from "./ops";
 import authRouter from "./auth";
 import hrPositionsRouter from "./hr-positions";
+import hrEmployeesRouter from "./hr-employees";
 import { requireActorContext } from "../middlewares/actor-context";
 
 const router: IRouter = Router();
@@ -14,6 +15,7 @@ router.use(authRouter);
 
 // HR v2 routes (session-authed + role-gated internally)
 router.use(hrPositionsRouter);
+router.use(hrEmployeesRouter);
 
 // Legacy routes (header-trusted actor context for backward compat)
 router.use(requireActorContext);
