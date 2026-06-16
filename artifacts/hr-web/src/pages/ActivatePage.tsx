@@ -24,10 +24,13 @@ export function ActivatePage() {
     mutation.mutate();
   };
 
-  // The /auth/activate route ships on feat/hr-backend-prereqs; until merged it
-  // 404s. Surface that explicitly rather than a generic failure.
+  // The /auth/activate route ships on feat/hr-backend-prereqs; until merged the
+  // path is unknown. Depending on backend route ordering an unknown public path
+  // can surface as 404 (no such route) or 401 (auth middleware runs first), so
+  // we treat both as "not available yet" and surface that explicitly.
   const notYetAvailable =
-    mutation.error instanceof ApiError && mutation.error.status === 404;
+    mutation.error instanceof ApiError &&
+    (mutation.error.status === 404 || mutation.error.status === 401);
 
   if (!token) {
     return (
