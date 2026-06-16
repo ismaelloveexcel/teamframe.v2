@@ -9,7 +9,8 @@
     "start": "node --enable-source-maps ./dist/index.mjs",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "test:phase-core": "tsx --test \"src/domain/**/__tests__/*.test.ts\"",
-    "rls-gate": "tsx src/__rls_check__/rls-gate.ts"
+    "rls-gate": "tsx src/__rls_check__/rls-gate.ts",
+    "audit-gate": "tsx src/__rls_check__/audit-gate.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",

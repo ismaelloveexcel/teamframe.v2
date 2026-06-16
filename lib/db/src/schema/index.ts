@@ -136,6 +136,22 @@ export const sessionsTable = pgTable("sessions", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// HR audit log — one append-only row per mutation, written in the SAME
+// transaction as the mutation (build-spec §4). before/after capture the change.
+export const hrAuditLogTable = pgTable("hr_audit_log", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id")
+    .notNull()
+    .references(() => companiesTable.id, { onDelete: "cascade" }),
+  entityType: text("entity_type").notNull(),
+  entityId: uuid("entity_id").notNull(),
+  action: text("action").notNull(), // 'create' | 'update' | 'delete'
+  before: jsonb("before").$type<Record<string, unknown> | null>(),
+  after: jsonb("after").$type<Record<string, unknown> | null>(),
+  actorId: uuid("actor_id").references(() => usersTable.id, { onDelete: "set null" }),
+  timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export const organizationMembershipsTable = pgTable(
   "organization_memberships",
   {
@@ -1018,6 +1034,7 @@ export const createIdempotencyRecordSchema = createInsertSchema(idempotencyRecor
 export type Company = typeof companiesTable.$inferSelect;
 export type Membership = typeof membershipsTable.$inferSelect;
 export type Session = typeof sessionsTable.$inferSelect;
+export type HrAuditLog = typeof hrAuditLogTable.$inferSelect;
 
 export type OrgEvent = typeof orgEventsTable.$inferSelect;
 export type IdempotencyRecord = typeof idempotencyRecordsTable.$inferSelect;
