@@ -1,1384 +1,3760 @@
-import { useState, useMemo } from "react";
-import { SEED, Position } from "../../../teamframe/data/seed";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { LayoutGrid, UserCheck, FileText } from "lucide-react";
+import { AppShell, type NavId as ShellNavId } from "./AppShell";
+import { LoadingScreen } from "./LoadingScreen";
+import { EmptyOrgGuide } from "./EmptyOrgGuide";
+import { OrgReadyBanner } from "./OrgReadyBanner";
+import { OrgHealthSummary } from "./OrgHealthSummary";
+import { DrillDownPanel, type DrillDownMode } from "./DrillDownPanel";
+import { SetupProgressCard } from "./SetupProgressCard";
 import {
-  ControlState,
-  UIState,
-  OrgNode,
-  Signal,
-  Action,
-  PositionEdit,
-  RiskItem,
-  SCENARIOS,
-  computeUIState,
-} from "../../../teamframe/engine/compute";
+  ApiError,
+  ActionStatus,
+  EmploymentStatus,
+  PolicyScope,
+  PositionLifecycleStatus,
+  assignPositionOwnership,
+  assignTeamOwnership,
+  attachPolicyScope,
+  createAction,
+  createOrganization,
+  createPerson,
+  createPolicy,
+  createPosition,
+  createTeam,
+  deleteAction,
+  deletePerson,
+  deletePolicy,
+  deletePosition,
+  deleteTeam,
+  listActions,
+  listOrganizations,
+  listPeople,
+  listPolicies,
+  listPositionOwnerships,
+  listPositions,
+  listTeamOwnerships,
+  listTeams,
+  listAssignments,
+  startAssignment,
+  endAssignment,
+  transferAssignment,
+  resetOrganizationDemoState,
+  setBaseUrl,
+  transitionActionStatus,
+  updatePosition,
+  type Action,
+  type Assignment,
+  type Organization,
+  type Person,
+  type Policy,
+  type Position,
+  type PositionOwnership,
+  type Team,
+  type TeamOwnership,
+} from "@workspace/api-client-react";
+import { UI_TERMS } from "./ui-terms";
 
-const SCENARIO_LABELS: Record<string, string> = {
-  DEFAULT_VIEW: "Default View",
-  VACANT_POSITION_FOCUS: "Vacant Position",
-  ON_LEAVE_EMPLOYEE_FOCUS: "On Leave Focus",
-  OFFBOARDING_EMPLOYEE_FOCUS: "Offboarding Focus",
-  MISSING_COMPLIANCE_FOCUS: "Compliance Issue",
-  FULL_ORGANIZATION_VIEW: "Full Org View",
+type NavId = ShellNavId;
+type OwnerType = "person" | "position";
+type PositionLevel = "Executive" | "Director" | "Manager" | "IC";
+type PositionPanelTab = "position" | "assignment" | "documents";
+type AssignmentRuntimeStatus = "active" | "scheduled" | "ended";
+
+const ACTOR = {
+  userId: "11111111-1111-4111-8111-111111111111",
+  email: "operator@teamframe.local",
+  name: "TeamFrame Operator",
 };
 
-const NAV_ITEMS = [
-  { id: "org", label: "Org Chart", icon: "⬡" },
-  { id: "risk", label: "Risk Heatmap", icon: "🔥", badge: true },
-  { id: "employees", label: "Employees", icon: "◉" },
-  { id: "signals", label: "Signals", icon: "△", badge: true },
-  { id: "actions", label: "Actions", icon: "⚡", badge: true },
-  { id: "compliance", label: "Compliance", icon: "✓" },
-  { id: "reports", label: "Reports", icon: "≡" },
-  { id: "settings", label: "Settings", icon: "⚙" },
-];
+const STYLE = {
+  page: {
+    minHeight: "100vh",
+    background: "#F1F5F9",
+    color: "#0F172A",
+    fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+  } as const,
+  shell: {
+    maxWidth: 1540,
+    margin: "0 auto",
+    padding: 20,
+    display: "grid",
+    gridTemplateColumns: "176px 1fr",
+    gap: 14,
+  } as const,
+  sidebar: {
+    background: "#0B1220",
+    border: "1px solid #111827",
+    borderRadius: 14,
+    padding: 12,
+    height: "fit-content",
+    color: "#E2E8F0",
+    boxShadow: "0 20px 40px rgba(2, 6, 23, 0.35)",
+  } as const,
+  panel: {
+    background: "#FFFFFF",
+    border: "1px solid #E5E7EB",
+    borderRadius: 12,
+    padding: 12,
+  } as const,
+  title: {
+    fontSize: 20,
+    fontWeight: 800,
+    marginBottom: 10,
+  } as const,
+  subTitle: {
+    fontSize: 11,
+    textTransform: "uppercase",
+    color: "#64748B",
+    letterSpacing: "0.06em",
+    fontWeight: 700,
+    marginBottom: 8,
+  } as const,
+};
 
-function Avatar({ initials, color, size = 36 }: { initials: string; color: string; size?: number }) {
-  return (
-    <div
-      style={{
-        width: size, height: size, borderRadius: "50%", background: color,
-        display: "flex", alignItems: "center", justifyContent: "center",
-        fontSize: size * 0.35, fontWeight: 600, color: "#fff", flexShrink: 0,
-        border: "2px solid rgba(255,255,255,0.15)",
-      }}
-    >
-      {initials}
-    </div>
-  );
+function formatDateLabel(input: string | null | undefined): string {
+  if (!input) return "-";
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) return input;
+  return date.toISOString().slice(0, 10);
 }
 
-function StatusDot({ status }: { status: "active" | "on_leave" | "offboarding" | "vacant" }) {
-  const colors: Record<string, string> = {
-    active: "#22c55e",
-    on_leave: "#f59e0b",
-    offboarding: "#ef4444",
-    vacant: "#6b7280",
+function defaultOrgSlug(): string {
+  return `teamframe-v1-${Date.now()}`;
+}
+
+function createIdempotencyKey(prefix: string): string {
+  const nonce =
+    typeof globalThis.crypto !== "undefined" && typeof globalThis.crypto.randomUUID === "function"
+      ? globalThis.crypto.randomUUID()
+      : `${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
+  return `${prefix}-${nonce}`;
+}
+
+function initials(fullName: string): string {
+  const parts = fullName
+    .split(" ")
+    .map((part) => part.trim())
+    .filter(Boolean);
+  if (parts.length === 0) return "NA";
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+const API_TIMEOUT_MS = 10_000;
+const API_MAX_RETRIES = 1;
+
+function requestOptions(): RequestInit {
+  return {
+    headers: {
+      "x-user-id": ACTOR.userId,
+      "x-user-email": ACTOR.email,
+      "x-user-name": ACTOR.name,
+    },
   };
-  return (
-    <span style={{
-      display: "inline-block", width: 8, height: 8, borderRadius: "50%",
-      background: colors[status] ?? "#6b7280", flexShrink: 0,
-    }} />
-  );
 }
 
-function SignalBadge({ level }: { level: "critical" | "warning" | "info" }) {
-  const cfg = {
-    critical: { bg: "rgba(239,68,68,0.2)", color: "#ef4444", icon: "●" },
-    warning: { bg: "rgba(245,158,11,0.2)", color: "#f59e0b", icon: "▲" },
-    info: { bg: "rgba(99,102,241,0.2)", color: "#818cf8", icon: "ℹ" },
-  };
-  const { bg, color, icon } = cfg[level];
-  return (
-    <span style={{
-      display: "inline-flex", alignItems: "center", gap: 4,
-      padding: "2px 7px", borderRadius: 12, background: bg, color, fontSize: 11, fontWeight: 600,
-    }}>
-      {icon} {level.charAt(0).toUpperCase() + level.slice(1)}
-    </span>
-  );
+function isRetryableError(error: unknown): boolean {
+  if (error instanceof ApiError) return error.status >= 500;
+  return error instanceof DOMException && error.name === "AbortError";
 }
 
-function OrgNodeCard({
-  node,
-  selectedPositionId,
-  onSelect,
-}: {
-  node: OrgNode;
-  selectedPositionId: string;
-  onSelect: (id: string) => void;
-}) {
-  const emp = node.employee;
-  const isSelected = node.position.id === selectedPositionId;
-  const isVacant = !emp;
-  const isOffboarding = emp?.status === "offboarding";
-  const isOnLeave = emp?.status === "on_leave";
+function errorStatus(error: unknown): number | null {
+  if (error instanceof ApiError) return error.status;
+  if (error && typeof error === "object" && "cause" in error) {
+    return errorStatus((error as { cause?: unknown }).cause);
+  }
+  return null;
+}
 
-  let borderColor = "rgba(255,255,255,0.08)";
-  if (isSelected) borderColor = "#6366f1";
-  else if (isOffboarding || node.signalLevel === "critical") borderColor = "rgba(239,68,68,0.5)";
-  else if (node.signalLevel === "warning") borderColor = "rgba(245,158,11,0.4)";
-  else if (isOnLeave || isVacant) borderColor = "rgba(245,158,11,0.35)";
+function describeError(label: string, error: unknown): string {
+  if (error instanceof ApiError) {
+    return `${label} failed (${error.status}): ${error.message}`;
+  }
+  if (error instanceof DOMException && error.name === "AbortError") {
+    return `${label} timed out after ${API_TIMEOUT_MS / 1000}s`;
+  }
+  if (error instanceof Error) {
+    return `${label} failed: ${error.message}`;
+  }
+  return `${label} failed`;
+}
+
+type LocalDemoState = {
+  organizationId: string;
+  teams: Team[];
+  positions: Position[];
+  people: Array<Person & { positionId?: string | null }>;
+  assignments: Assignment[];
+  actions: Action[];
+  policies: Policy[];
+  teamOwnerships: TeamOwnership[];
+  positionOwnerships: PositionOwnership[];
+};
+
+type AssignmentRuntime = {
+  status: AssignmentRuntimeStatus;
+  startDate: string;
+  endDate: string;
+  actualSalary: string;
+};
+
+type UploadedPositionDocument = {
+  fileName: string;
+  uploadedAt: string;
+  sizeLabel: string;
+  objectUrl: string;
+  state: "draft" | "in_review" | "signed" | "outdated";
+};
+
+type PositionNodeComputedState = "filled" | "vacant" | "needs_attention";
+
+type OrgCardForbiddenFields = {
+  dates?: never;
+  assignmentType?: never;
+  documents?: never;
+  notes?: never;
+  signatures?: never;
+  kpis?: never;
+};
+
+type OrgCardContract = OrgCardForbiddenFields & {
+  department: string;
+  positionTitle: string;
+  personLine: string;
+  statusLabel: string;
+  statusBg: string;
+  statusColor: string;
+  isSelected: boolean;
+  isRoot: boolean;
+  onSelect: () => void;
+};
+
+function OrgChartNodeCard(props: OrgCardContract) {
+  if (import.meta.env.DEV) {
+    const forbiddenFields = ["dates", "kpis", "documents", "notes", "signatures"] as const;
+    for (const field of forbiddenFields) {
+      if ((props as Record<string, unknown>)[field] !== undefined) {
+        console.warn(`Org card contract violation: ${field} is forbidden.`);
+      }
+    }
+  }
+
+  const {
+    department,
+    positionTitle,
+    personLine,
+    statusLabel,
+    statusBg,
+    statusColor,
+    isSelected,
+    isRoot,
+    onSelect,
+  } = props;
 
   return (
     <button
-      onClick={() => onSelect(node.position.id)}
+      type="button"
+      title={UI_TERMS.feedback.hover.viewDetails}
+      onClick={onSelect}
       style={{
-        background: isSelected ? "rgba(99,102,241,0.18)" : "rgba(255,255,255,0.04)",
-        border: `1px solid ${borderColor}`,
-        borderRadius: 10, padding: "10px 13px",
-        cursor: "pointer", textAlign: "left", width: 148,
-        transition: "all 0.15s ease",
-        outline: "none",
-        position: "relative",
+        width: "100%",
+        maxWidth: isRoot ? 316 : 276,
+        border: `${isSelected ? 2 : 1}px solid ${isSelected ? "#2563EB" : "#D1D5DB"}`,
+        borderRadius: 12,
+        padding: isRoot ? 14 : 12,
+        background: "#FFFFFF",
+        boxShadow: isSelected
+          ? "0 0 0 3px rgba(37,99,235,0.2), 0 14px 26px rgba(15,23,42,0.16)"
+          : "0 4px 10px rgba(15,23,42,0.05)",
+        textAlign: "left",
+        cursor: "pointer",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-        {emp ? (
-          <Avatar initials={emp.avatarInitials} color={emp.avatarColor} size={28} />
-        ) : (
-          <div style={{
-            width: 28, height: 28, borderRadius: "50%",
-            background: "rgba(255,255,255,0.06)", border: "1.5px dashed rgba(255,255,255,0.2)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 13, color: "#6b7280",
-          }}>?</div>
-        )}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ fontSize: 11, fontWeight: 600, color: "#fff", lineHeight: 1.3, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {emp?.name ?? "Vacant"}
-          </div>
-        </div>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+        <span style={{ fontSize: 10, color: "#64748B", textTransform: "uppercase", fontWeight: 700 }}>
+          {department}
+        </span>
+        <span
+          style={{
+            fontSize: 10,
+            fontWeight: 700,
+            borderRadius: 999,
+            padding: "2px 7px",
+            background: statusBg,
+            color: statusColor,
+          }}
+        >
+          {statusLabel}
+        </span>
       </div>
-      <div style={{ fontSize: 10, color: "#94a3b8", lineHeight: 1.3, marginBottom: 4 }}>
-        {node.position.title}
+      <div
+        style={{
+          fontSize: isRoot ? 16 : 14,
+          fontWeight: 800,
+          color: "#0F172A",
+          marginBottom: 6,
+          lineHeight: 1.25,
+        }}
+      >
+        {positionTitle}
       </div>
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-        <span style={{ fontSize: 9, color: "#64748b", fontFamily: "monospace" }}>{node.position.id}</span>
-        <StatusDot status={isVacant ? "vacant" : (emp?.status ?? "active")} />
-      </div>
+      <div style={{ fontSize: 11, color: "#334155", fontWeight: 500 }}>{personLine}</div>
     </button>
   );
 }
 
-function OrgLevel({
-  nodes,
-  selectedPositionId,
-  onSelect,
-}: {
-  nodes: OrgNode[];
-  selectedPositionId: string;
-  onSelect: (id: string) => void;
-}) {
-  if (!nodes.length) return null;
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0 }}>
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", justifyContent: "center" }}>
-        {nodes.map((node) => (
-          <div key={node.position.id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-            <OrgNodeCard node={node} selectedPositionId={selectedPositionId} onSelect={onSelect} />
-            {node.children.length > 0 && (
-              <>
-                <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
-                <OrgLevel nodes={node.children} selectedPositionId={selectedPositionId} onSelect={onSelect} />
-              </>
-            )}
-          </div>
-        ))}
-      </div>
-    </div>
-  );
+const LOCAL_DEMO_STATE: LocalDemoState = {
+  organizationId: "00000000-0000-4000-8000-000000000111",
+  teams: [
+    {
+      id: "10000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      name: "Executive",
+      code: "EXEC",
+      parentTeamId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "10000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      name: "Finance",
+      code: "FIN",
+      parentTeamId: "10000000-0000-4000-8000-000000000001",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "10000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      name: "Operations",
+      code: "OPS",
+      parentTeamId: "10000000-0000-4000-8000-000000000001",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "10000000-0000-4000-8000-000000000004",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      name: "Sales",
+      code: "SLS",
+      parentTeamId: "10000000-0000-4000-8000-000000000001",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  positions: [
+    {
+      id: "20000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000001",
+      title: "Chief Executive Officer",
+      reportsToPositionId: null,
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000002",
+      title: "Head of Finance",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000001",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000003",
+      title: "Head of Operations",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000001",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000004",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000004",
+      title: "Head of Sales",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000001",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000005",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000003",
+      title: "Operations Manager",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000003",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000006",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000002",
+      title: "Finance Manager",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000002",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000007",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000004",
+      title: "Sales Manager",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000004",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "20000000-0000-4000-8000-000000000008",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000003",
+      title: "Operations Specialist",
+      reportsToPositionId: "20000000-0000-4000-8000-000000000005",
+      lifecycleStatus: PositionLifecycleStatus.filled,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  people: [
+    {
+      id: "30000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "Alex Morgan",
+      email: "alex@demo.teamframe",
+      phone: "+971500000001",
+      positionId: "20000000-0000-4000-8000-000000000001",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "Sarah Lee",
+      email: "sarah@demo.teamframe",
+      phone: "+971500000002",
+      positionId: "20000000-0000-4000-8000-000000000002",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "David Chen",
+      email: "david@demo.teamframe",
+      phone: "+971500000003",
+      positionId: "20000000-0000-4000-8000-000000000003",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000004",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "Michael Scott",
+      email: "michael@demo.teamframe",
+      phone: "+971500000004",
+      positionId: "20000000-0000-4000-8000-000000000004",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000005",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "Lisa Brown",
+      email: "lisa@demo.teamframe",
+      phone: "+971500000005",
+      positionId: "20000000-0000-4000-8000-000000000005",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000006",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "John Kim",
+      email: "john@demo.teamframe",
+      phone: "+971500000006",
+      positionId: "20000000-0000-4000-8000-000000000006",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000007",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "Jim Halpert",
+      email: "jim@demo.teamframe",
+      phone: "+971500000007",
+      positionId: "20000000-0000-4000-8000-000000000007",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "30000000-0000-4000-8000-000000000008",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      fullName: "Anna Patel",
+      email: "anna@demo.teamframe",
+      phone: "+971500000008",
+      positionId: "20000000-0000-4000-8000-000000000008",
+      employmentStatus: EmploymentStatus.active,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  assignments: [
+    {
+      id: "31000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000001",
+      positionId: "20000000-0000-4000-8000-000000000001",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000002",
+      positionId: "20000000-0000-4000-8000-000000000002",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000003",
+      positionId: "20000000-0000-4000-8000-000000000003",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000004",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000004",
+      positionId: "20000000-0000-4000-8000-000000000004",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000005",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000005",
+      positionId: "20000000-0000-4000-8000-000000000005",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000006",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000006",
+      positionId: "20000000-0000-4000-8000-000000000006",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000007",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000007",
+      positionId: "20000000-0000-4000-8000-000000000007",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "31000000-0000-4000-8000-000000000008",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      personId: "30000000-0000-4000-8000-000000000008",
+      positionId: "20000000-0000-4000-8000-000000000008",
+      startedAt: "2026-01-01T00:00:00.000Z",
+      endedAt: null,
+      status: "active",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  teamOwnerships: [
+    {
+      id: "40000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000002",
+      ownerPersonId: "30000000-0000-4000-8000-000000000002",
+      ownerPositionId: null,
+      responsibilityContext: "Finance controls and payroll accuracy",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "40000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000003",
+      ownerPersonId: "30000000-0000-4000-8000-000000000003",
+      ownerPositionId: null,
+      responsibilityContext: "Operational execution and onboarding readiness",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "40000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      teamId: "10000000-0000-4000-8000-000000000004",
+      ownerPersonId: "30000000-0000-4000-8000-000000000004",
+      ownerPositionId: null,
+      responsibilityContext: "Revenue pipeline accountability",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  positionOwnerships: [
+    {
+      id: "50000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      positionId: "20000000-0000-4000-8000-000000000005",
+      ownerPersonId: "30000000-0000-4000-8000-000000000005",
+      ownerPositionId: null,
+      responsibilityContext: "Weekly operations standup cadence",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "50000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      positionId: "20000000-0000-4000-8000-000000000007",
+      ownerPersonId: "30000000-0000-4000-8000-000000000007",
+      ownerPositionId: null,
+      responsibilityContext: "Sales follow-up execution",
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  actions: [
+    {
+      id: "60000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Finalize Q3 hiring budget sign-off",
+      description: "CEO and finance alignment required",
+      status: ActionStatus.open,
+      dueDate: "2026-01-05",
+      blocked: false,
+      ownerPersonId: "30000000-0000-4000-8000-000000000002",
+      ownerPositionId: null,
+      teamId: "10000000-0000-4000-8000-000000000002",
+      positionId: null,
+      personId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "60000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Resolve onboarding process bottleneck",
+      description: "Escalation pending owner confirmation",
+      status: ActionStatus.in_progress,
+      dueDate: "2026-01-04",
+      blocked: true,
+      ownerPersonId: "30000000-0000-4000-8000-000000000003",
+      ownerPositionId: null,
+      teamId: "10000000-0000-4000-8000-000000000003",
+      positionId: null,
+      personId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "60000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Create sales territory ownership map",
+      description: "Ensure every territory has explicit owner",
+      status: ActionStatus.open,
+      dueDate: "2030-02-15",
+      blocked: false,
+      ownerPersonId: "30000000-0000-4000-8000-000000000007",
+      ownerPositionId: null,
+      teamId: "10000000-0000-4000-8000-000000000004",
+      positionId: null,
+      personId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "60000000-0000-4000-8000-000000000004",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Audit policy ownership gaps",
+      description: "Policy scope-owner mapping review",
+      status: ActionStatus.done,
+      dueDate: "2026-01-02",
+      blocked: false,
+      ownerPersonId: "30000000-0000-4000-8000-000000000001",
+      ownerPositionId: null,
+      teamId: null,
+      positionId: "20000000-0000-4000-8000-000000000001",
+      personId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "60000000-0000-4000-8000-000000000005",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Close finance reconciliation checklist",
+      description: "Owner escalation currently blocked",
+      status: ActionStatus.in_progress,
+      dueDate: "2030-01-10",
+      blocked: true,
+      ownerPersonId: "30000000-0000-4000-8000-000000000006",
+      ownerPositionId: null,
+      teamId: null,
+      positionId: "20000000-0000-4000-8000-000000000006",
+      personId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+  policies: [
+    {
+      id: "70000000-0000-4000-8000-000000000001",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Operating Rhythm",
+      body: "Leadership reviews ownership and blockers every Monday 09:00.",
+      scope: PolicyScope.organization,
+      teamId: null,
+      positionId: null,
+      ownerPersonId: "30000000-0000-4000-8000-000000000001",
+      ownerPositionId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "70000000-0000-4000-8000-000000000002",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Finance Spend Controls",
+      body: "All unplanned spend above threshold requires Head of Finance approval.",
+      scope: PolicyScope.team,
+      teamId: "10000000-0000-4000-8000-000000000002",
+      positionId: null,
+      ownerPersonId: "30000000-0000-4000-8000-000000000002",
+      ownerPositionId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+    {
+      id: "70000000-0000-4000-8000-000000000003",
+      organizationId: "00000000-0000-4000-8000-000000000111",
+      title: "Operations Onboarding SLA",
+      body: "New hires must complete role ownership map within week one.",
+      scope: PolicyScope.position,
+      teamId: null,
+      positionId: "20000000-0000-4000-8000-000000000005",
+      ownerPersonId: "30000000-0000-4000-8000-000000000003",
+      ownerPositionId: null,
+      createdAt: "2026-01-01T00:00:00.000Z",
+      updatedAt: "2026-01-01T00:00:00.000Z",
+    },
+  ],
+};
+
+function cloneLocalDemoState(): LocalDemoState {
+  return {
+    organizationId: LOCAL_DEMO_STATE.organizationId,
+    teams: LOCAL_DEMO_STATE.teams.map((item) => ({ ...item })),
+    positions: LOCAL_DEMO_STATE.positions.map((item) => ({ ...item })),
+    people: LOCAL_DEMO_STATE.people.map((item) => ({ ...item })),
+    assignments: LOCAL_DEMO_STATE.assignments.map((item) => ({ ...item })),
+    actions: LOCAL_DEMO_STATE.actions.map((item) => ({ ...item })),
+    policies: LOCAL_DEMO_STATE.policies.map((item) => ({ ...item })),
+    teamOwnerships: LOCAL_DEMO_STATE.teamOwnerships.map((item) => ({ ...item })),
+    positionOwnerships: LOCAL_DEMO_STATE.positionOwnerships.map((item) => ({ ...item })),
+  };
 }
 
-function OrgTreeView({
-  uiState,
-  onSelectPosition,
-}: {
-  uiState: UIState;
-  onSelectPosition: (id: string) => void;
-}) {
-  if (!uiState.orgTree.length) {
-    return <div style={{ color: "#6b7280", padding: 32 }}>No org data available</div>;
+export function TeamFrame() {
+  const [activeNav, setActiveNav] = useState<NavId>("org");
+  const [organizationId, setOrganizationId] = useState<string | null>(null);
+  const [organizations, setOrganizations] = useState<Organization[]>([]);
+  const [orgNameDraft, setOrgNameDraft] = useState("");
+
+  const [loading, setLoading] = useState(true);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [demoResetSummary, setDemoResetSummary] = useState<string>("");
+  const [isLocalDemoMode, setIsLocalDemoMode] = useState(false);
+  const [focusPositionId, setFocusPositionId] = useState<string | null>(null);
+  const [hoveredPositionId, setHoveredPositionId] = useState<string | null>(null);
+
+  const [mutationStatusText, setMutationStatusText] = useState<string | null>(null);
+  const [feedbackToast, setFeedbackToast] = useState<
+    { message: string; tone: "success" | "error" | "info" } | null
+  >(null);
+  const [showOrgReadyBanner, setShowOrgReadyBanner] = useState(false);
+  const [prevPositionCount, setPrevPositionCount] = useState(0);
+  const [prevFilledCount, setPrevFilledCount] = useState(0);
+  const assignPersonSelectRef = useRef<HTMLSelectElement>(null);
+
+  // Flow #3: drill-down panel + setup progress card
+  const [drillDownMode, setDrillDownMode] = useState<DrillDownMode>(null);
+  const [showSetupProgress, setShowSetupProgress] = useState(false);
+  const [setupProgressPositionId, setSetupProgressPositionId] = useState<string | null>(null);
+
+  const [teams, setTeams] = useState<Team[]>([]);
+  const [positions, setPositions] = useState<Position[]>([]);
+  const [people, setPeople] = useState<Array<Person & { positionId?: string | null }>>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [actions, setActions] = useState<Action[]>([]);
+  const [policies, setPolicies] = useState<Policy[]>([]);
+  const [teamOwnerships, setTeamOwnerships] = useState<TeamOwnership[]>([]);
+  const [positionOwnerships, setPositionOwnerships] = useState<PositionOwnership[]>([]);
+
+  const [assignmentRuntimeByPosition, setAssignmentRuntimeByPosition] = useState<Record<string, AssignmentRuntime>>({});
+  const [positionDocuments, setPositionDocuments] = useState<Record<string, UploadedPositionDocument>>({});
+  const [positionPanelTab, setPositionPanelTab] = useState<PositionPanelTab>("position");
+  const [focusedSubtreeRootId, setFocusedSubtreeRootId] = useState<string | null>(null);
+
+  const [assignmentDraftEmployeeId, setAssignmentDraftEmployeeId] = useState<string>("");
+  const [assignmentDraftStatus, setAssignmentDraftStatus] = useState<AssignmentRuntimeStatus>("active");
+  const [assignmentDraftStartDate, setAssignmentDraftStartDate] = useState("");
+  const [assignmentDraftEndDate, setAssignmentDraftEndDate] = useState("");
+  const [assignmentDraftActualSalary, setAssignmentDraftActualSalary] = useState("");
+
+  const [vacateLastWorkingDay, setVacateLastWorkingDay] = useState("");
+
+  // Inline structure editors (replace window.prompt for B3/B4)
+  const [quickInsert, setQuickInsert] = useState<{
+    mode: "above" | "below" | "parallel";
+    title: string;
+  } | null>(null);
+  const [editingReportingLine, setEditingReportingLine] = useState(false);
+  const [reportingLineDraftId, setReportingLineDraftId] = useState<string>("");
+
+  const [newTeamName, setNewTeamName] = useState("");
+  const [newTeamParentId, setNewTeamParentId] = useState<string>("");
+
+  const [newPositionTitle, setNewPositionTitle] = useState("");
+  const [newPositionTeamId, setNewPositionTeamId] = useState<string>("");
+  const [newPositionReportsToId, setNewPositionReportsToId] = useState<string>("");
+
+  const [newPersonName, setNewPersonName] = useState("");
+  const [newPersonEmail, setNewPersonEmail] = useState("");
+  const [newPersonPhone, setNewPersonPhone] = useState("");
+  const [newPersonPositionId, setNewPersonPositionId] = useState<string>("");
+  const [newPersonStatus, setNewPersonStatus] = useState<"active" | "on_leave" | "offboarding">(
+    EmploymentStatus.active,
+  );
+
+  const [teamOwnershipTargetId, setTeamOwnershipTargetId] = useState<string>("");
+  const [teamOwnershipOwnerType, setTeamOwnershipOwnerType] = useState<OwnerType>("person");
+  const [teamOwnershipOwnerId, setTeamOwnershipOwnerId] = useState<string>("");
+  const [teamOwnershipContext, setTeamOwnershipContext] = useState("");
+
+  const [positionOwnershipTargetId, setPositionOwnershipTargetId] = useState<string>("");
+  const [positionOwnershipOwnerType, setPositionOwnershipOwnerType] = useState<OwnerType>("person");
+  const [positionOwnershipOwnerId, setPositionOwnershipOwnerId] = useState<string>("");
+  const [positionOwnershipContext, setPositionOwnershipContext] = useState("");
+
+  const [newActionTitle, setNewActionTitle] = useState("");
+  const [newActionDueDate, setNewActionDueDate] = useState("");
+  const [newActionOwnerId, setNewActionOwnerId] = useState<string>("");
+  const [newActionLinkId, setNewActionLinkId] = useState<string>("");
+
+  const [newPolicyTitle, setNewPolicyTitle] = useState("");
+  const [newPolicyBody, setNewPolicyBody] = useState("");
+  const [newPolicyScope, setNewPolicyScope] = useState<"organization" | "team" | "position">(
+    PolicyScope.organization,
+  );
+  const [newPolicyTeamId, setNewPolicyTeamId] = useState<string>("");
+  const [newPolicyPositionId, setNewPolicyPositionId] = useState<string>("");
+  const [newPolicyOwnerType, setNewPolicyOwnerType] = useState<OwnerType>("person");
+  const [newPolicyOwnerId, setNewPolicyOwnerId] = useState<string>("");
+
+  const [policyRetargetPolicyId, setPolicyRetargetPolicyId] = useState<string>("");
+  const [policyRetargetScope, setPolicyRetargetScope] = useState<"organization" | "team" | "position">(
+    PolicyScope.organization,
+  );
+  const [policyRetargetTeamId, setPolicyRetargetTeamId] = useState<string>("");
+  const [policyRetargetPositionId, setPolicyRetargetPositionId] = useState<string>("");
+
+  const teamMap = useMemo(() => new Map(teams.map((item) => [item.id, item])), [teams]);
+  const positionMap = useMemo(
+    () => new Map(positions.map((item) => [item.id, item])),
+    [positions],
+  );
+  const personMap = useMemo(() => new Map(people.map((item) => [item.id, item])), [people]);
+  const teamOwnershipMap = useMemo(
+    () => new Map(teamOwnerships.map((item) => [item.teamId, item])),
+    [teamOwnerships],
+  );
+  const positionOwnershipMap = useMemo(
+    () => new Map(positionOwnerships.map((item) => [item.positionId, item])),
+    [positionOwnerships],
+  );
+
+  const positionsByManager = useMemo(() => {
+    const map = new Map<string, Position[]>();
+    for (const position of positions) {
+      const key = position.reportsToPositionId ?? "root";
+      const bucket = map.get(key) ?? [];
+      bucket.push(position);
+      map.set(key, bucket);
+    }
+    for (const entry of map.values()) {
+      entry.sort((a, b) => a.title.localeCompare(b.title));
+    }
+    return map;
+  }, [positions]);
+
+  const activeAssignments = useMemo(
+    () => assignments.filter((item) => item.status === "active"),
+    [assignments],
+  );
+
+  const activeAssignmentByPersonId = useMemo(() => {
+    const map = new Map<string, Assignment>();
+    for (const assignment of activeAssignments) {
+      map.set(assignment.personId, assignment);
+    }
+    return map;
+  }, [activeAssignments]);
+
+  const peopleByPosition = useMemo(() => {
+    const map = new Map<string, Person[]>();
+    for (const assignment of activeAssignments) {
+      const person = personMap.get(assignment.personId);
+      if (!person) continue;
+      const bucket = map.get(assignment.positionId) ?? [];
+      bucket.push(person);
+      map.set(assignment.positionId, bucket);
+    }
+    return map;
+  }, [activeAssignments, personMap]);
+
+  const positionAssignmentById = useMemo(() => {
+    const map = new Map<string, { person: Person; assignment: Assignment; runtime: AssignmentRuntime }>();
+    for (const assignment of activeAssignments) {
+      const person = personMap.get(assignment.personId);
+      if (!person) continue;
+      const runtime = assignmentRuntimeByPosition[assignment.positionId] ?? {
+        status: assignment.status,
+        startDate: formatDateLabel(assignment.startedAt?.toString()),
+        endDate: formatDateLabel(assignment.endedAt?.toString() ?? ""),
+        actualSalary: "",
+      };
+      map.set(assignment.positionId, { person, assignment, runtime });
+    }
+    return map;
+  }, [activeAssignments, assignmentRuntimeByPosition, personMap]);
+
+  const positionActionStats = useMemo(() => {
+    const map = new Map<string, { open: number; overdue: number; blocked: number }>();
+    for (const position of positions) {
+      const scopedActions = actions.filter(
+        (item) => item.positionId === position.id || item.ownerPositionId === position.id,
+      );
+      map.set(position.id, {
+        open: scopedActions.filter((item) => item.status !== ActionStatus.done).length,
+        overdue: scopedActions.filter((item) => {
+          if (item.status === ActionStatus.done || !item.dueDate) return false;
+          const due = new Date(item.dueDate).getTime();
+          return !Number.isNaN(due) && due < Date.now();
+        }).length,
+        blocked: scopedActions.filter(
+          (item) => item.status !== ActionStatus.done && item.blocked,
+        ).length,
+      });
+    }
+    return map;
+  }, [actions, positions]);
+
+  const positionComplianceAlerts = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const position of positions) {
+      const assignment = positionAssignmentById.get(position.id);
+      if (!assignment) {
+        map.set(position.id, 0);
+        continue;
+      }
+      let alerts = 0;
+      if (!assignment.person.email) alerts += 1;
+      if (!assignment.person.phone) alerts += 1;
+      map.set(position.id, alerts);
+    }
+    return map;
+  }, [positionAssignmentById, positions]);
+
+  const selectedPositionId = focusPositionId ?? positionsByManager.get("root")?.[0]?.id ?? null;
+  const selectedPosition = selectedPositionId ? positionMap.get(selectedPositionId) ?? null : null;
+  const selectedAssignment = selectedPositionId
+    ? positionAssignmentById.get(selectedPositionId) ?? null
+    : null;
+
+  function formatFileSize(bytes: number): string {
+    if (bytes < 1024) return `${bytes} B`;
+    const kb = Math.round(bytes / 1024);
+    if (kb < 1024) return `${kb} KB`;
+    return `${(kb / 1024).toFixed(1)} MB`;
   }
 
-  const root = uiState.orgTree[0];
-  if (!root) return null;
+  function handleUploadPositionDocument(positionId: string, file: File | null) {
+    if (!file) return;
+    const objectUrl = URL.createObjectURL(file);
+    setPositionDocuments((current) => {
+      const previous = current[positionId];
+      if (previous) URL.revokeObjectURL(previous.objectUrl);
+      return {
+        ...current,
+        [positionId]: {
+          fileName: file.name,
+          uploadedAt: new Date().toISOString(),
+          sizeLabel: formatFileSize(file.size),
+          objectUrl,
+          state: "draft",
+        },
+      };
+    });
+  }
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 0, minWidth: 900 }}>
-      <OrgNodeCard
-        node={root}
-        selectedPositionId={uiState.selectedPosition?.id ?? ""}
-        onSelect={onSelectPosition}
-      />
-      {root.children.length > 0 && (
-        <>
-          <div style={{ width: 1, height: 24, background: "rgba(255,255,255,0.1)" }} />
-          <div style={{ display: "flex", gap: 16, alignItems: "flex-start" }}>
-            {root.children.map((child) => (
-              <div key={child.position.id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                <OrgNodeCard
-                  node={child}
-                  selectedPositionId={uiState.selectedPosition?.id ?? ""}
-                  onSelect={onSelectPosition}
-                />
-                {child.children.length > 0 && (
-                  <>
-                    <div style={{ width: 1, height: 20, background: "rgba(255,255,255,0.1)" }} />
-                    <div style={{ display: "flex", gap: 10, flexWrap: "wrap", justifyContent: "center" }}>
-                      {child.children.map((gc) => (
-                        <div key={gc.position.id} style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
-                          <OrgNodeCard
-                            node={gc}
-                            selectedPositionId={uiState.selectedPosition?.id ?? ""}
-                            onSelect={onSelectPosition}
-                          />
-                        </div>
-                      ))}
-                    </div>
-                  </>
-                )}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
-      <div style={{ display: "flex", gap: 20, marginTop: 24, flexWrap: "wrap", justifyContent: "center" }}>
-        {[
-          { color: "#22c55e", label: "Filled" },
-          { color: "#6b7280", label: "Vacant" },
-          { color: "#f59e0b", label: "On Leave" },
-          { color: "#ef4444", label: "Offboarding" },
-          { color: "#f87171", label: "Critical" },
-        ].map(({ color, label }) => (
-          <div key={label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "#94a3b8" }}>
-            <span style={{ width: 8, height: 8, borderRadius: "50%", background: color, display: "inline-block" }} />
-            {label}
-          </div>
-        ))}
-      </div>
+  function updatePositionDocumentState(
+    positionId: string,
+    nextState: UploadedPositionDocument["state"],
+  ) {
+    setPositionDocuments((current) => {
+      const existing = current[positionId];
+      if (!existing) return current;
+      return {
+        ...current,
+        [positionId]: {
+          ...existing,
+          state: nextState,
+        },
+      };
+    });
+  }
+
+  function downloadJobDescriptionTemplate(context?: {
+    positionName: string;
+    departmentName: string;
+    reportingLine: string;
+  }) {
+    const positionName = context?.positionName ?? "[Position Name]";
+    const departmentName = context?.departmentName ?? "[Department]";
+    const reportingLine = context?.reportingLine ?? "[Reporting Line]";
+
+    const wordHtml = `<!DOCTYPE html>
+<html xmlns:o="urn:schemas-microsoft-com:office:office"
+      xmlns:w="urn:schemas-microsoft-com:office:word"
+      xmlns="http://www.w3.org/TR/REC-html40">
+<head>
+  <meta charset="utf-8" />
+  <title>Job Description</title>
+  <style>
+    body { font-family: Calibri, Arial, sans-serif; margin: 36px; color: #111827; }
+    h1 { margin: 0 0 10px 0; font-size: 24px; }
+    .row { margin: 6px 0; }
+    .section-title { margin-top: 16px; font-weight: 700; }
+    .line-box { border: 1px solid #D1D5DB; min-height: 72px; margin-top: 6px; padding: 8px; }
+    .signatures { margin-top: 24px; display: table; width: 100%; }
+    .sig-cell { display: table-cell; width: 50%; padding-right: 18px; vertical-align: top; }
+    .sig-line { border-top: 1px solid #111827; margin-top: 42px; padding-top: 6px; }
+  </style>
+</head>
+<body>
+  <h1>Job Description</h1>
+  <div class="row"><strong>Name of position:</strong> ${positionName}</div>
+  <div class="row"><strong>Department:</strong> ${departmentName}</div>
+  <div class="row"><strong>Reporting line:</strong> ${reportingLine}</div>
+  <div class="row"><strong>Location:</strong> __________________________________</div>
+  <div class="row"><strong>Date prepared:</strong> ____________________________</div>
+
+  <div class="section-title">Objective</div>
+  <div class="line-box"></div>
+
+  <div class="section-title">Key responsibilities</div>
+  <div class="line-box"></div>
+
+  <div class="section-title">KPIs</div>
+  <div class="line-box"></div>
+
+  <div class="signatures">
+    <div class="sig-cell">
+      <div class="sig-line"><strong>Signed by MANAGER</strong></div>
     </div>
-  );
-}
-
-function RiskHeatmapView({
-  uiState,
-  onSelectPosition,
-}: {
-  uiState: UIState;
-  onSelectPosition: (id: string) => void;
-}) {
-  const rb = uiState.riskBreakdown;
-  const maxScore = Math.max(rb.vacancy, rb.offboarding, rb.leave, rb.compliance, rb.overload, rb.single_point, 1);
-  const total = uiState.riskScore;
-  const riskLevel = total >= 150 ? "critical" : total >= 80 ? "warning" : "healthy";
-  const riskColor = riskLevel === "critical" ? "#ef4444" : riskLevel === "warning" ? "#f59e0b" : "#22c55e";
-  const riskBg = riskLevel === "critical" ? "rgba(239,68,68,0.12)" : riskLevel === "warning" ? "rgba(245,158,11,0.12)" : "rgba(34,197,94,0.12)";
-
-  const bars = [
-    { label: "Vacancy", value: rb.vacancy, color: "#f59e0b" },
-    { label: "Offboarding", value: rb.offboarding, color: "#ef4444" },
-    { label: "On Leave", value: rb.leave, color: "#f59e0b" },
-    { label: "Compliance", value: rb.compliance, color: "#f97316" },
-    { label: "Overload", value: rb.overload, color: "#8b5cf6" },
-    { label: "Single Point", value: rb.single_point, color: "#ec4899" },
-  ];
-
-  const categoryMeta: Record<string, { label: string; color: string; icon: string }> = {
-    vacancy: { label: "Vacancy", color: "#f59e0b", icon: "◈" },
-    offboarding: { label: "Offboarding", color: "#ef4444", icon: "❌" },
-    leave: { label: "Leave", color: "#f59e0b", icon: "△" },
-    compliance: { label: "Compliance", color: "#f97316", icon: "⚠" },
-    overload: { label: "Overload", color: "#8b5cf6", icon: "⚡" },
-    single_point: { label: "Single Point", color: "#ec4899", icon: "✶" },
-  };
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 20 }}>
-      {/* Top Score Card */}
-      <div style={{
-        display: "flex", gap: 16, alignItems: "stretch",
-      }}>
-        <div style={{
-          flex: 1, padding: "20px 24px", borderRadius: 14,
-          background: riskBg, border: `1.5px solid ${riskColor}40`,
-          display: "flex", alignItems: "center", gap: 20,
-        }}>
-          <div style={{
-            width: 72, height: 72, borderRadius: "50%",
-            border: `3px solid ${riskColor}`, display: "flex",
-            alignItems: "center", justifyContent: "center",
-            fontSize: 28, fontWeight: 800, color: riskColor,
-          }}>
-            {total}
-          </div>
-          <div>
-            <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em" }}>
-              Organization Risk Score
-            </div>
-            <div style={{ fontSize: 22, fontWeight: 800, color: riskColor, marginTop: 4 }}>
-              {riskLevel === "critical" ? "CRITICAL RISK" : riskLevel === "warning" ? "MODERATE RISK" : "HEALTHY"}
-            </div>
-            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>
-              {uiState.risks.length} active risk items across {uiState.stats.totalPositions} positions
-            </div>
-          </div>
-        </div>
-        <div style={{
-          width: 340, padding: "20px 24px", borderRadius: 14,
-          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-        }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
-            Risk Breakdown
-          </div>
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {bars.map(({ label, value, color }) => (
-              <div key={label} style={{ display: "flex", alignItems: "center", gap: 10 }}>
-                <span style={{ width: 80, fontSize: 10, color: "#94a3b8", fontWeight: 500 }}>{label}</span>
-                <div style={{ flex: 1, height: 8, borderRadius: 4, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
-                  <div style={{
-                    height: "100%", borderRadius: 4, background: color,
-                    width: `${(value / maxScore) * 100}%`,
-                    transition: "width 0.3s ease",
-                  }} />
-                </div>
-                <span style={{ width: 28, fontSize: 10, fontWeight: 700, color, textAlign: "right" }}>{value}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Risk Heatmap Grid */}
-      <div style={{
-        padding: "20px 24px", borderRadius: 14,
-        background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.06)",
-      }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 14 }}>
-          People Risk Map
-        </div>
-        <div style={{
-          display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: 10,
-        }}>
-          {uiState.risks.map((risk) => {
-            const meta = categoryMeta[risk.category] ?? categoryMeta.compliance;
-            return (
-              <div
-                key={`${risk.positionId}-${risk.category}`}
-                onClick={() => onSelectPosition(risk.positionId)}
-                style={{
-                  padding: "12px 14px", borderRadius: 10, textAlign: "left",
-                  background: risk.level === "critical" ? "rgba(239,68,68,0.08)"
-                    : risk.level === "warning" ? "rgba(245,158,11,0.08)"
-                    : "rgba(99,102,241,0.08)",
-                  border: `1.5px solid ${risk.level === "critical" ? "rgba(239,68,68,0.25)"
-                    : risk.level === "warning" ? "rgba(245,158,11,0.25)"
-                    : "rgba(99,102,241,0.25)"}`,
-                  cursor: "pointer",
-                }}
-              >
-                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                  <span style={{ fontSize: 14, color: meta.color }}>{meta.icon}</span>
-                  <span style={{ fontSize: 10, fontWeight: 700, color: meta.color, textTransform: "uppercase", letterSpacing: "0.05em" }}>
-                    {meta.label}
-                  </span>
-                  <span style={{
-                    marginLeft: "auto", fontSize: 10, fontWeight: 800,
-                    color: risk.level === "critical" ? "#ef4444" : risk.level === "warning" ? "#f59e0b" : "#818cf8",
-                  }}>
-                    +{risk.score}
-                  </span>
-                </div>
-                <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0", marginBottom: 2 }}>
-                  {risk.positionTitle}
-                </div>
-                <div style={{ fontSize: 10, color: "#94a3b8" }}>
-                  {risk.message}
-                </div>
-                <div style={{ fontSize: 9, color: "#64748b", marginTop: 2 }}>
-                  {risk.detail}
-                </div>
-              </div>
-            );
-          })}
-        </div>
-        {uiState.risks.length === 0 && (
-          <div style={{ color: "#22c55e", fontSize: 14, padding: "40px 0", textAlign: "center" }}>
-            ✓ No risks detected — organization is healthy
-          </div>
-        )}
-      </div>
+    <div class="sig-cell">
+      <div class="sig-line"><strong>Acknowledged by EMPLOYEE</strong></div>
     </div>
+  </div>
+</body>
+</html>`;
+
+    const blob = new Blob([wordHtml], { type: "application/msword;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    const slug = positionName.toLowerCase().replaceAll(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    anchor.download = `${slug || "job-description"}-template.doc`;
+    anchor.click();
+    URL.revokeObjectURL(href);
+  }
+
+  useEffect(() => {
+    if (positionPanelTab !== "assignment" || !selectedPositionId) return;
+    setAssignmentDraftEmployeeId(selectedAssignment?.person.id ?? "");
+    setAssignmentDraftStatus(selectedAssignment?.runtime.status ?? "active");
+    setAssignmentDraftStartDate(selectedAssignment?.runtime.startDate ?? "");
+    setAssignmentDraftEndDate(selectedAssignment?.runtime.endDate ?? "");
+    setAssignmentDraftActualSalary(selectedAssignment?.runtime.actualSalary ?? "");
+  }, [positionPanelTab, selectedAssignment, selectedPositionId]);
+
+  function hasPositionStructuralIssue(positionId: string): boolean {
+    const position = positionMap.get(positionId);
+    if (!position) return true;
+
+    if (position.reportsToPositionId && !positionMap.has(position.reportsToPositionId)) {
+      return true;
+    }
+
+    const runtime = assignmentRuntimeByPosition[positionId];
+    if (runtime?.status === "ended" && (peopleByPosition.get(positionId)?.length ?? 0) > 0) {
+      return true;
+    }
+
+    return false;
+  }
+
+  function resolvePositionNodeState(positionId: string): PositionNodeComputedState {
+    if (hasPositionStructuralIssue(positionId)) return "needs_attention";
+    const assignment = positionAssignmentById.get(positionId);
+    if (!assignment) return "vacant";
+    return "filled";
+  }
+
+  const positionDepthMap = useMemo(() => {
+    const depth = new Map<string, number>();
+    const roots = positionsByManager.get("root") ?? [];
+    const queue = roots.map((position) => ({ id: position.id, depth: 0 }));
+
+    while (queue.length > 0) {
+      const current = queue.shift();
+      if (!current) continue;
+      if (depth.has(current.id)) continue;
+
+      depth.set(current.id, current.depth);
+      const children = positionsByManager.get(current.id) ?? [];
+      for (const child of children) {
+        queue.push({ id: child.id, depth: current.depth + 1 });
+      }
+    }
+
+    return depth;
+  }, [positionsByManager]);
+
+  function resolvePositionLevel(positionId: string): PositionLevel {
+    const depth = positionDepthMap.get(positionId);
+    if (depth === 0) return "Executive";
+    if (depth === 1) return "Director";
+    if (depth === 2) return "Manager";
+    return "IC";
+  }
+
+  const decisionMakerPositions = useMemo(
+    () => positions.filter((position) => resolvePositionLevel(position.id) !== "IC"),
+    [positions, positionDepthMap],
   );
-}
 
-function PositionForm({
-  position,
-  onSave,
-  onCancel,
-}: {
-  position: Position;
-  onSave: (edit: PositionEdit) => void;
-  onCancel: () => void;
-}) {
-  const [title, setTitle] = useState(position.title);
-  const [department, setDepartment] = useState(position.department);
-
-  return (
-    <div style={{
-      padding: "14px 20px",
-      borderBottom: "1px solid rgba(255,255,255,0.07)",
-    }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
-        Edit Position
-      </div>
-      <div style={{ marginBottom: 12 }}>
-        <label style={{ display: "block", fontSize: 10, color: "#64748b", marginBottom: 4, fontWeight: 600 }}>
-          Title
-        </label>
-        <input
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          style={{
-            width: "100%", padding: "8px 10px", fontSize: 12, color: "#e2e8f0",
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 6, outline: "none",
-          }}
-        />
-      </div>
-      <div style={{ marginBottom: 14 }}>
-        <label style={{ display: "block", fontSize: 10, color: "#64748b", marginBottom: 4, fontWeight: 600 }}>
-          Department
-        </label>
-        <input
-          value={department}
-          onChange={(e) => setDepartment(e.target.value)}
-          style={{
-            width: "100%", padding: "8px 10px", fontSize: 12, color: "#e2e8f0",
-            background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.1)",
-            borderRadius: 6, outline: "none",
-          }}
-        />
-      </div>
-      <div style={{ display: "flex", gap: 8 }}>
-        <button
-          onClick={() => onSave({ id: position.id, title, department })}
-          style={{
-            flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 600,
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff",
-            border: "none", borderRadius: 6, cursor: "pointer",
-          }}
-        >
-          Save Changes
-        </button>
-        <button
-          onClick={onCancel}
-          style={{
-            flex: 1, padding: "8px 0", fontSize: 11, fontWeight: 600,
-            background: "rgba(255,255,255,0.06)", color: "#94a3b8",
-            border: "1px solid rgba(255,255,255,0.1)", borderRadius: 6, cursor: "pointer",
-          }}
-        >
-          Cancel
-        </button>
-      </div>
-    </div>
+  const overdueActions = useMemo(
+    () =>
+      actions.filter((item) => {
+        if (item.status === ActionStatus.done || !item.dueDate) return false;
+        const due = new Date(item.dueDate).getTime();
+        if (Number.isNaN(due)) return false;
+        return due < Date.now();
+      }).length,
+    [actions],
   );
-}
 
-function RightPanel({
-  uiState,
-  onResolveAction,
-  onCompleteOnboarding,
-  onClose,
-  onEditPosition,
-  isEditing,
-  onSaveEdit,
-  onCancelEdit,
-  expandedAction,
-  onToggleAction,
-}: {
-  uiState: UIState;
-  onResolveAction: (id: string) => void;
-  onCompleteOnboarding: (empId: string) => void;
-  onClose: () => void;
-  onEditPosition: () => void;
-  isEditing: boolean;
-  onSaveEdit: (edit: PositionEdit) => void;
-  onCancelEdit: () => void;
-  expandedAction: string | null;
-  onToggleAction: (id: string) => void;
-}) {
-  const emp = uiState.selectedEmployee;
-  const pos = uiState.selectedPosition;
-  const signals = uiState.signals.filter(
-    (s) => s.positionId === pos?.id
+  const blockedActions = useMemo(
+    () => actions.filter((item) => item.status !== ActionStatus.done && item.blocked).length,
+    [actions],
   );
-  const actions = uiState.actions.filter(
-    (a) => a.positionId === pos?.id || a.positionId === "1-001"
-  ).slice(0, 4);
 
-  if (!pos) {
+  function applyStateSnapshot(snapshot: Omit<LocalDemoState, "organizationId">) {
+    setTeams(snapshot.teams);
+    setPositions(snapshot.positions);
+    setPeople(snapshot.people);
+    setAssignments(snapshot.assignments);
+    setActions(snapshot.actions);
+    setPolicies(snapshot.policies);
+    setTeamOwnerships(snapshot.teamOwnerships);
+    setPositionOwnerships(snapshot.positionOwnerships);
+  }
+
+  function loadLocalDemoSnapshot(message: string) {
+    const snapshot = cloneLocalDemoState();
+    setOrganizationId(snapshot.organizationId);
+    applyStateSnapshot(snapshot);
+    setIsLocalDemoMode(true);
+    setError(message);
+    setDemoResetSummary(
+      `Local demo snapshot loaded: ${snapshot.teams.length} teams, ${snapshot.positions.length} positions, ${snapshot.people.length} people, ${snapshot.assignments.length} assignments, ${snapshot.actions.length} actions, ${snapshot.policies.length} policies.`,
+    );
+  }
+
+  async function executeApiCall<T>(
+    label: string,
+    operation: (options: RequestInit) => Promise<T>,
+    retries = API_MAX_RETRIES,
+  ): Promise<T> {
+    let attempt = 0;
+    let lastError: unknown;
+
+    while (attempt <= retries) {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), API_TIMEOUT_MS);
+      try {
+        return await operation({ ...requestOptions(), signal: controller.signal });
+      } catch (error) {
+        lastError = error;
+        if (attempt >= retries || !isRetryableError(error)) {
+          break;
+        }
+      } finally {
+        clearTimeout(timeout);
+      }
+      attempt += 1;
+    }
+
+    throw new Error(describeError(label, lastError), { cause: lastError });
+  }
+
+  async function loadOrganizations(): Promise<Organization[]> {
+    const orgs = await executeApiCall("Load organizations", (options) => listOrganizations(options));
+    setOrganizations(orgs.items);
+    return orgs.items;
+  }
+
+  async function bootstrapOrganizationContext(): Promise<string> {
+    const orgs = await executeApiCall("Load organizations", (options) => listOrganizations(options));
+    setOrganizations(orgs.items);
+    let orgId = orgs.items[0]?.id ?? null;
+
+    if (!orgId) {
+      const created = await executeApiCall("Create organization", (options) =>
+        createOrganization(
+          {
+            name: "TeamFrame Workspace",
+            slug: defaultOrgSlug(),
+          },
+          options,
+        ),
+      );
+      orgId = created.id;
+      setOrganizations((current) => [...current, created]);
+    }
+
+    return orgId;
+  }
+
+  async function handleSelectOrganization(targetOrganizationId: string) {
+    if (!targetOrganizationId || targetOrganizationId === organizationId) return;
+    setLoading(true);
+    setError(null);
+    try {
+      setOrganizationId(targetOrganizationId);
+      await loadOrganizationState(targetOrganizationId);
+      setActiveNav("org");
+    } catch (error) {
+      setError(describeError("Switch organization", error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleCreateOrganization(name: string) {
+    const cleanName = name.trim();
+    if (!cleanName) {
+      setError("Organization name is required");
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    try {
+      const created = await executeApiCall("Create organization", (options) =>
+        createOrganization({ name: cleanName, slug: defaultOrgSlug() }, options),
+      );
+      await loadOrganizations();
+      setOrgNameDraft("");
+      setOrganizationId(created.id);
+      await loadOrganizationState(created.id);
+      setActiveNav("org");
+      setFeedbackToast({ tone: "success", message: `Created "${cleanName}"` });
+    } catch (error) {
+      setError(describeError("Create organization", error));
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function loadOrganizationState(targetOrganizationId: string) {
+    const [teamData, positionData, peopleData, assignmentData, actionData, policyData, teamOwnerData, positionOwnerData] =
+      await Promise.all([
+        executeApiCall("Load teams", (options) => listTeams(targetOrganizationId, options)),
+        executeApiCall("Load positions", (options) => listPositions(targetOrganizationId, options)),
+        executeApiCall("Load people", (options) => listPeople(targetOrganizationId, options)),
+        executeApiCall("Load assignments", (options) => listAssignments(targetOrganizationId, options)),
+        executeApiCall("Load actions", (options) => listActions(targetOrganizationId, options)),
+        executeApiCall("Load policies", (options) => listPolicies(targetOrganizationId, options)),
+        executeApiCall("Load team ownership", (options) =>
+          listTeamOwnerships(targetOrganizationId, options),
+        ),
+        executeApiCall("Load position ownership", (options) =>
+          listPositionOwnerships(targetOrganizationId, options),
+        ),
+      ]);
+
+    applyStateSnapshot({
+      teams: teamData.items,
+      positions: positionData.items,
+      people: peopleData.items,
+      assignments: assignmentData.items,
+      actions: actionData.items,
+      policies: policyData.items,
+      teamOwnerships: teamOwnerData.items,
+      positionOwnerships: positionOwnerData.items,
+    });
+    setIsLocalDemoMode(false);
+  }
+
+  async function recoverOrganizationContext(reason: string) {
+    const recoveredOrganizationId = await bootstrapOrganizationContext();
+    setOrganizationId(recoveredOrganizationId);
+    await loadOrganizationState(recoveredOrganizationId);
+    setError(`${reason} Recovery complete. Re-synced organization context.`);
+  }
+
+  async function refreshState() {
+    if (!organizationId || isLocalDemoMode) return;
+
+    try {
+      await loadOrganizationState(organizationId);
+    } catch (error) {
+      const status = errorStatus(error);
+      if (status === 403 || status === 404) {
+        await recoverOrganizationContext("Organization context became invalid.");
+        return;
+      }
+      throw error;
+    }
+  }
+
+  useEffect(() => {
+    if (!feedbackToast) return;
+    const timeoutId = window.setTimeout(() => {
+      setFeedbackToast(null);
+    }, 2600);
+    return () => window.clearTimeout(timeoutId);
+  }, [feedbackToast]);
+
+  useEffect(() => {
+    const apiBase = (import.meta.env.VITE_API_BASE_URL as string | undefined)?.trim();
+    setBaseUrl(apiBase ? apiBase : null);
+
+    let cancelled = false;
+
+    async function bootstrap() {
+      setLoading(true);
+      setError(null);
+      try {
+        const orgs = await loadOrganizations();
+        if (cancelled) return;
+        const firstOrgId = orgs[0]?.id ?? null;
+        setOrganizationId(firstOrgId);
+        if (firstOrgId) {
+          await loadOrganizationState(firstOrgId);
+        }
+      } catch (error) {
+        if (!cancelled) {
+          setError(describeError("Bootstrap", error));
+          setDemoResetSummary("");
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    void bootstrap();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  async function runMutation(
+    task: () => Promise<void>,
+    options?: {
+      successMessage?: string;
+      loadingMessage?: string;
+      failureMessage?: string;
+    },
+  ) {
+    if (isLocalDemoMode) {
+      setError(UI_TERMS.errors.localDemoReadonly);
+      setFeedbackToast({ message: UI_TERMS.errors.changesNotSaved, tone: "error" });
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    setMutationStatusText(options?.loadingMessage ?? UI_TERMS.feedback.loading.syncingChanges);
+    try {
+      await task();
+      await refreshState();
+      if (options?.successMessage) {
+        setFeedbackToast({ message: options.successMessage, tone: "success" });
+      }
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setError(message);
+      setFeedbackToast({
+        message: options?.failureMessage ?? UI_TERMS.errors.cannotUpdateStructure,
+        tone: "error",
+      });
+    } finally {
+      setBusy(false);
+      setMutationStatusText(null);
+    }
+  }
+
+  async function handleQuickInsertPosition(
+    mode: "above" | "below" | "parallel",
+    targetPositionId: string,
+    title: string,
+  ) {
+    if (!organizationId) return;
+    const target = positionMap.get(targetPositionId);
+    if (!target) return;
+
+    const cleanTitle = title.trim();
+    if (!cleanTitle) {
+      setError("Position title is required");
+      return;
+    }
+
+    let reportsToPositionId: string | null = null;
+    if (mode === "below") reportsToPositionId = target.id;
+    if (mode === "parallel") reportsToPositionId = target.reportsToPositionId ?? null;
+    if (mode === "above") reportsToPositionId = target.reportsToPositionId ?? null;
+
+    await runMutation(
+      async () => {
+        const inserted = await executeApiCall("Create position", (options) =>
+          createPosition(
+            organizationId,
+            {
+              title: cleanTitle,
+              teamId: target.teamId ?? undefined,
+              reportsToPositionId: reportsToPositionId ?? undefined,
+              lifecycleStatus: PositionLifecycleStatus.vacant,
+            },
+            options,
+          ),
+        );
+
+        if (mode === "above") {
+          await executeApiCall("Rewire reporting line", (options) =>
+            updatePosition(
+              organizationId,
+              target.id,
+              {
+                reportsToPositionId: inserted.id,
+              },
+              options,
+            ),
+          );
+        }
+
+        setFocusPositionId(inserted.id);
+        setPositionPanelTab("position");
+        setQuickInsert(null);
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.updatingStructure,
+        successMessage:
+          mode === "above"
+            ? "Position inserted above"
+            : mode === "parallel"
+              ? "Position inserted alongside"
+              : "Position inserted below",
+        failureMessage: UI_TERMS.errors.cannotUpdateStructure,
+      },
+    );
+  }
+
+  async function handleUpdateReportingLine(
+    positionId: string,
+    nextManagerId: string | null,
+  ) {
+    if (!organizationId) return;
+    const position = positionMap.get(positionId);
+    if (!position) return;
+
+    const normalized = (nextManagerId ?? "").trim();
+    if (!normalized) {
+      await runMutation(
+        async () => {
+          await executeApiCall("Set root reporting line", (requestOptions) =>
+            updatePosition(
+              organizationId,
+              positionId,
+              {
+                reportsToPositionId: null,
+              },
+              requestOptions,
+            ),
+          );
+        },
+        {
+          loadingMessage: UI_TERMS.feedback.loading.updatingStructure,
+          successMessage: UI_TERMS.feedback.success.reportingLineUpdated,
+          failureMessage: UI_TERMS.errors.cannotUpdateStructure,
+        },
+      );
+      setEditingReportingLine(false);
+      return;
+    }
+
+    const nextManager = positions.find((candidate) => candidate.id === normalized);
+    if (!nextManager || nextManager.id === positionId) {
+      setError(UI_TERMS.errors.cannotUpdateStructure);
+      return;
+    }
+
+    // Prevent loops by checking if the target manager reports into this position.
+    let cursor: Position | undefined = nextManager;
+    while (cursor?.reportsToPositionId) {
+      if (cursor.reportsToPositionId === positionId) {
+        setError(UI_TERMS.errors.cannotUpdateStructure);
+        return;
+      }
+      cursor = positionMap.get(cursor.reportsToPositionId);
+    }
+
+    await runMutation(
+      async () => {
+        await executeApiCall("Update reporting line", (requestOptions) =>
+          updatePosition(
+            organizationId,
+            positionId,
+            {
+              reportsToPositionId: nextManager.id,
+            },
+            requestOptions,
+          ),
+        );
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.updatingStructure,
+        successMessage: UI_TERMS.feedback.success.reportingLineUpdated,
+        failureMessage: UI_TERMS.errors.cannotUpdateStructure,
+      },
+    );
+    setEditingReportingLine(false);
+  }
+
+  function ownerLabel(ownerPersonId?: string | null, ownerPositionId?: string | null): string {
+    if (ownerPersonId) {
+      const person = personMap.get(ownerPersonId);
+      return person ? person.fullName : ownerPersonId;
+    }
+    if (ownerPositionId) {
+      const position = positionMap.get(ownerPositionId);
+      return position ? position.title : ownerPositionId;
+    }
+    return "Not set";
+  }
+
+  function linkLabel(action: Action): string {
+    if (action.teamId) return `Team: ${teamMap.get(action.teamId)?.name ?? action.teamId}`;
+    if (action.positionId) {
+      return `Position: ${positionMap.get(action.positionId)?.title ?? action.positionId}`;
+    }
+    if (action.personId) return `Person: ${personMap.get(action.personId)?.fullName ?? action.personId}`;
+    return "Unknown link";
+  }
+
+  function actionStatusLabel(status: ActionStatus): string {
+    if (status === ActionStatus.in_progress) return UI_TERMS.actions.states.inProgress;
+    if (status === ActionStatus.done) return UI_TERMS.actions.states.done;
+    return UI_TERMS.actions.states.open;
+  }
+
+  function documentStateLabel(state: UploadedPositionDocument["state"]): string {
+    if (state === "in_review") return UI_TERMS.documents.states.inReview;
+    if (state === "signed") return UI_TERMS.documents.states.signed;
+    if (state === "outdated") return UI_TERMS.documents.states.outdated;
+    return UI_TERMS.documents.states.draft;
+  }
+
+  function statePresentation(state: PositionNodeComputedState) {
+    if (state === "vacant") {
+      return { label: UI_TERMS.actions.states.open, bg: "#F1F5F9", color: "#334155", border: "#CBD5E1" };
+    }
+    if (state === "needs_attention") {
+      return { label: UI_TERMS.entities.needsAttention, bg: "#FEF3C7", color: "#92400E", border: "#F59E0B" };
+    }
+    return { label: "Active", bg: "#DCFCE7", color: "#166534", border: "#22C55E" };
+  }
+
+  function renderPositionNode(positionId: string) {
+    const position = positionMap.get(positionId);
+    if (!position) return <></>;
+
+    const assignment = positionAssignmentById.get(positionId);
+    const assignedPerson = assignment?.person ?? null;
+    const children = positionsByManager.get(positionId) ?? [];
+    const depth = positionDepthMap.get(positionId) ?? 2;
+    const isRoot = depth === 0;
+    const visibleChildren = children;
+    const teamName = position.teamId ? teamMap.get(position.teamId)?.name ?? "Not set" : "Not set";
+    const nodeState = resolvePositionNodeState(positionId);
+    const stateUi = statePresentation(nodeState);
+    const isSelected = selectedPositionId === positionId;
+    const showHoverActions = hoveredPositionId === positionId;
+
+    const cardProps = {
+      department: teamName,
+      positionTitle: position.title,
+      personLine:
+        nodeState === "needs_attention"
+          ? UI_TERMS.entities.needsAttention
+          : assignedPerson?.fullName ?? UI_TERMS.entities.openRole,
+      statusLabel: stateUi.label,
+      statusBg: stateUi.bg,
+      statusColor: stateUi.color,
+      isSelected,
+      isRoot,
+      onSelect: () => {
+        setFocusPositionId(positionId);
+        setPositionPanelTab("position");
+      },
+    } satisfies OrgCardContract;
+
     return (
-      <div style={{ color: "#6b7280", padding: 24, fontSize: 13 }}>
-        Select a position to view details
+      <div
+        key={positionId}
+        style={{
+          display: "flex",
+          flexDirection: "column",
+          alignItems: "center",
+          gap: isRoot ? 30 : depth === 1 ? 24 : 20,
+          minWidth: isRoot ? 310 : 248,
+        }}
+      >
+        <div
+          style={{ position: "relative", width: "100%", maxWidth: isRoot ? 316 : 276 }}
+          onMouseEnter={() => setHoveredPositionId(positionId)}
+          onMouseLeave={() => setHoveredPositionId((current) => (current === positionId ? null : current))}
+        >
+          <OrgChartNodeCard {...cardProps} />
+          {showHoverActions ? (
+            <div
+              style={{
+                position: "absolute",
+                left: "50%",
+                transform: "translateX(-50%)",
+                top: "calc(100% + 6px)",
+                background: "#FFFFFF",
+                border: "1px solid #E2E8F0",
+                borderRadius: 999,
+                boxShadow: "0 8px 18px rgba(15, 23, 42, 0.14)",
+                padding: "5px 8px",
+                display: "flex",
+                gap: 6,
+                zIndex: 3,
+              }}
+            >
+              <button
+                style={{
+                  fontSize: 10,
+                  padding: "3px 7px",
+                  borderRadius: 999,
+                  border: "1px solid #CBD5E1",
+                  background: "#F8FAFC",
+                  fontWeight: 600,
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  cardProps.onSelect();
+                }}
+                title={UI_TERMS.feedback.hover.viewDetails}
+              >
+                View details
+              </button>
+              <button
+                style={{
+                  fontSize: 10,
+                  padding: "3px 7px",
+                  borderRadius: 999,
+                  border: "1px solid #CBD5E1",
+                  background: "#F8FAFC",
+                  fontWeight: 600,
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setFocusPositionId(positionId);
+                  setPositionPanelTab("position");
+                  setEditingReportingLine(false);
+                  setQuickInsert({ mode: "below", title: "" });
+                }}
+                title={UI_TERMS.feedback.hover.addRelatedPosition}
+              >
+                Add related position
+              </button>
+              <button
+                style={{
+                  fontSize: 10,
+                  padding: "3px 7px",
+                  borderRadius: 999,
+                  border: "1px solid #CBD5E1",
+                  background: "#F8FAFC",
+                  fontWeight: 600,
+                }}
+                onClick={(event) => {
+                  event.stopPropagation();
+                  setActiveNav("actions");
+                  setNewActionOwnerId(positionId);
+                  setNewActionLinkId(positionId);
+                }}
+                title={UI_TERMS.feedback.hover.createAction}
+              >
+                Create action
+              </button>
+            </div>
+          ) : null}
+        </div>
+
+        {visibleChildren.length > 0 ? (
+          <>
+            <div style={{ width: 1, height: isRoot ? 26 : 20, background: "#CBD5E1" }} />
+            <div
+              style={{
+                display: "flex",
+                flexWrap: "wrap",
+                justifyContent: "center",
+                alignItems: "flex-start",
+                gap: depth === 0 ? 26 : 18,
+              }}
+            >
+              {visibleChildren.map((child) => renderPositionNode(child.id))}
+            </div>
+          </>
+        ) : null}
       </div>
     );
   }
 
-  return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", overflow: "hidden" }}>
-      <div style={{
-        padding: "16px 20px", borderBottom: "1px solid rgba(255,255,255,0.07)",
-        display: "flex", alignItems: "flex-start", justifyContent: "space-between",
-      }}>
-        <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
-          {emp ? (
-            <Avatar initials={emp.avatarInitials} color={emp.avatarColor} size={44} />
-          ) : (
-            <div style={{
-              width: 44, height: 44, borderRadius: "50%",
-              background: "rgba(255,255,255,0.06)", border: "1.5px dashed rgba(255,255,255,0.2)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 18, color: "#6b7280",
-            }}>?</div>
-          )}
-          <div>
-            <div style={{ fontWeight: 700, fontSize: 15, color: "#fff" }}>
-              {emp?.name ?? "Vacant Position"}
-            </div>
-            <div style={{ fontSize: 11, color: "#94a3b8", marginTop: 2 }}>{pos.title}</div>
-            <div style={{ fontSize: 10, color: "#64748b", marginTop: 1 }}>
-              {emp ? "Employee" : "No employee"} · {pos.id}
-            </div>
-            {emp?.status === "offboarding" && (
-              <div style={{
-                marginTop: 6, display: "inline-flex", alignItems: "center", gap: 4,
-                background: "rgba(239,68,68,0.15)", color: "#ef4444",
-                padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600,
-              }}>
-                ● Critical
-              </div>
-            )}
-            {emp?.status === "on_leave" && (
-              <div style={{
-                marginTop: 6, display: "inline-flex", alignItems: "center", gap: 4,
-                background: "rgba(245,158,11,0.15)", color: "#f59e0b",
-                padding: "2px 8px", borderRadius: 4, fontSize: 11, fontWeight: 600,
-              }}>
-                ▲ On Leave
-              </div>
-            )}
+  const organizationRootPositions = positionsByManager.get("root") ?? [];
+  const rootPositions = useMemo(() => {
+    if (!focusedSubtreeRootId) return organizationRootPositions;
+    const focusedRoot = positionMap.get(focusedSubtreeRootId);
+    return focusedRoot ? [focusedRoot] : organizationRootPositions;
+  }, [focusedSubtreeRootId, organizationRootPositions, positionMap]);
+
+  const selectedPositionDocument = selectedPositionId
+    ? positionDocuments[selectedPositionId] ?? null
+    : null;
+  const selectedHasStructuralIssue = selectedPosition
+    ? hasPositionStructuralIssue(selectedPosition.id)
+    : false;
+  const selectedHasNoReportingLine = selectedPosition
+    ? !selectedPosition.reportsToPositionId && selectedPosition.id !== organizationRootPositions[0]?.id
+    : false;
+
+
+  async function handleSaveAssignment() {
+    if (!organizationId || !selectedPositionId || !assignmentDraftEmployeeId) return;
+
+    const selectedEmployee = personMap.get(assignmentDraftEmployeeId);
+    if (!selectedEmployee) {
+      setError(UI_TERMS.errors.selectPersonToAssign);
+      return;
+    }
+
+    await runMutation(
+      async () => {
+        const currentOccupant = positionAssignmentById.get(selectedPositionId);
+        if (currentOccupant && currentOccupant.person.id !== assignmentDraftEmployeeId) {
+          await executeApiCall("Vacate current occupant", (options) =>
+            endAssignment(
+              organizationId,
+              currentOccupant.assignment.id,
+              {
+                idempotencyKey: createIdempotencyKey("assignment-vacate"),
+              },
+              options,
+            ),
+          );
+        }
+
+        const activePersonAssignment = activeAssignmentByPersonId.get(selectedEmployee.id);
+        if (activePersonAssignment && activePersonAssignment.positionId !== selectedPositionId) {
+          await executeApiCall("Transfer assignment", (options) =>
+            transferAssignment(
+              organizationId,
+              {
+                personId: selectedEmployee.id,
+                toPositionId: selectedPositionId,
+                idempotencyKey: createIdempotencyKey("assignment-transfer"),
+              },
+              options,
+            ),
+          );
+          return;
+        }
+
+        if (!activePersonAssignment) {
+          await executeApiCall("Start assignment", (options) =>
+            startAssignment(
+              organizationId,
+              {
+                personId: selectedEmployee.id,
+                positionId: selectedPositionId,
+                startedAt: assignmentDraftStartDate
+                  ? new Date(assignmentDraftStartDate).toISOString()
+                  : undefined,
+                idempotencyKey: createIdempotencyKey("assignment-start"),
+              },
+              options,
+            ),
+          );
+        }
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.savingAssignment,
+        successMessage: UI_TERMS.feedback.success.assignmentUpdated,
+        failureMessage: UI_TERMS.errors.changesNotSaved,
+      },
+    );
+
+    setAssignmentRuntimeByPosition((current) => ({
+      ...current,
+      [selectedPositionId]: {
+        status: assignmentDraftStatus,
+        startDate: assignmentDraftStartDate || new Date().toISOString().slice(0, 10),
+        endDate: assignmentDraftEndDate,
+        actualSalary: assignmentDraftActualSalary,
+      },
+    }));
+  }
+
+  async function handleVacateSelectedPosition() {
+    if (!organizationId || !selectedPositionId) return;
+    const occupant = positionAssignmentById.get(selectedPositionId);
+    if (!occupant) return;
+
+    const lastWorkingDay = vacateLastWorkingDay
+      ? new Date(vacateLastWorkingDay).toISOString()
+      : undefined;
+
+    await runMutation(
+      async () => {
+        await executeApiCall("Vacate position", (options) =>
+          endAssignment(
+            organizationId,
+            occupant.assignment.id,
+            {
+              endedAt: lastWorkingDay,
+              idempotencyKey: createIdempotencyKey("assignment-vacate"),
+            },
+            options,
+          ),
+        );
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.savingAssignment,
+        successMessage: UI_TERMS.feedback.success.assignmentEnded,
+        failureMessage: UI_TERMS.errors.changesNotSaved,
+      },
+    );
+
+    setAssignmentRuntimeByPosition((current) => ({
+      ...current,
+      [selectedPositionId]: {
+        status: "ended",
+        startDate: current[selectedPositionId]?.startDate ?? "",
+        endDate: (vacateLastWorkingDay || new Date().toISOString().slice(0, 10)),
+        actualSalary: current[selectedPositionId]?.actualSalary ?? "",
+      },
+    }));
+    setVacateLastWorkingDay("");
+  }
+
+  async function handleCreateTeam() {
+    if (!organizationId || !newTeamName.trim()) return;
+    await runMutation(
+      async () => {
+        await executeApiCall("Create team", (options) =>
+          createTeam(
+            organizationId,
+            {
+              name: newTeamName.trim(),
+              parentTeamId: newTeamParentId || undefined,
+            },
+            options,
+          ),
+        );
+        setNewTeamName("");
+        setNewTeamParentId("");
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.updatingStructure,
+        successMessage: UI_TERMS.feedback.success.structureUpdated,
+      },
+    );
+  }
+
+  async function handleCreatePosition() {
+    if (!organizationId || !newPositionTitle.trim()) return;
+    await runMutation(
+      async () => {
+        const created = await executeApiCall("Create position", (options) =>
+          createPosition(
+            organizationId,
+            {
+              title: newPositionTitle.trim(),
+              teamId: newPositionTeamId || undefined,
+              reportsToPositionId: newPositionReportsToId || undefined,
+              lifecycleStatus: PositionLifecycleStatus.vacant,
+            },
+            options,
+          ),
+        );
+        setNewPositionTitle("");
+        setNewPositionTeamId("");
+        setNewPositionReportsToId("");
+        // Auto-focus newly created position — matches hover-insert path behaviour
+        if (created?.id) {
+          setFocusPositionId(created.id);
+          setPositionPanelTab("position");
+        }
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.updatingStructure,
+        successMessage: UI_TERMS.feedback.success.positionCreated,
+        failureMessage: UI_TERMS.errors.cannotUpdateStructure,
+      },
+    );
+  }
+
+  async function handleCreatePerson() {
+    if (!organizationId || !newPersonName.trim()) return;
+    await runMutation(
+      async () => {
+        const created = await executeApiCall("Create person", (options) =>
+          createPerson(
+            organizationId,
+            {
+              fullName: newPersonName.trim(),
+              email: newPersonEmail || undefined,
+              phone: newPersonPhone || undefined,
+              employmentStatus: newPersonStatus,
+            },
+            options,
+          ),
+        );
+
+        if (newPersonPositionId) {
+          await executeApiCall("Start assignment", (options) =>
+            startAssignment(
+              organizationId,
+              {
+                personId: created.id,
+                positionId: newPersonPositionId,
+                idempotencyKey: createIdempotencyKey("assignment-start"),
+              },
+              options,
+            ),
+          );
+        }
+
+        setNewPersonName("");
+        setNewPersonEmail("");
+        setNewPersonPhone("");
+        setNewPersonPositionId("");
+        setNewPersonStatus(EmploymentStatus.active);
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.syncingChanges,
+        successMessage: UI_TERMS.feedback.success.structureUpdated,
+      },
+    );
+  }
+
+  async function handleAssignTeamOwnership() {
+    if (!organizationId || !teamOwnershipTargetId || !teamOwnershipOwnerId) return;
+    await runMutation(async () => {
+      await executeApiCall("Assign team ownership", (options) =>
+        assignTeamOwnership(
+          organizationId,
+          teamOwnershipTargetId,
+          {
+            ownerPersonId: teamOwnershipOwnerType === "person" ? teamOwnershipOwnerId : null,
+            ownerPositionId: teamOwnershipOwnerType === "position" ? teamOwnershipOwnerId : null,
+            responsibilityContext: teamOwnershipContext,
+          },
+          options,
+        ),
+      );
+      setTeamOwnershipContext("");
+    });
+  }
+
+  async function handleAssignPositionOwnership() {
+    if (!organizationId || !positionOwnershipTargetId || !positionOwnershipOwnerId) return;
+    await runMutation(async () => {
+      await executeApiCall("Assign position ownership", (options) =>
+        assignPositionOwnership(
+          organizationId,
+          positionOwnershipTargetId,
+          {
+            ownerPersonId:
+              positionOwnershipOwnerType === "person" ? positionOwnershipOwnerId : null,
+            ownerPositionId:
+              positionOwnershipOwnerType === "position" ? positionOwnershipOwnerId : null,
+            responsibilityContext: positionOwnershipContext,
+          },
+          options,
+        ),
+      );
+      setPositionOwnershipContext("");
+    });
+  }
+
+  async function handleCreateAction() {
+    if (!organizationId) return;
+    if (!newActionTitle.trim()) {
+      setError(UI_TERMS.actions.prompts.whatNeedsToBeDone);
+      return;
+    }
+    if (!newActionOwnerId) {
+      setError(UI_TERMS.errors.selectResponsibleOwner);
+      return;
+    }
+    if (!newActionLinkId) {
+      setError(UI_TERMS.errors.actionNeedsLink);
+      return;
+    }
+    if (
+      actions.some(
+        (item) =>
+          item.ownerPositionId === newActionOwnerId &&
+          item.positionId === newActionLinkId &&
+          item.status !== ActionStatus.done,
+      )
+    ) {
+      setError(UI_TERMS.errors.actionActiveOwner);
+      return;
+    }
+
+    await runMutation(
+      async () => {
+        await executeApiCall("Create action", (options) =>
+          createAction(
+            organizationId,
+            {
+              title: newActionTitle.trim(),
+              dueDate: newActionDueDate || undefined,
+              owner: {
+                ownerPersonId: null,
+                ownerPositionId: newActionOwnerId,
+              },
+              link: {
+                teamId: null,
+                positionId: newActionLinkId,
+                personId: null,
+              },
+            },
+            options,
+          ),
+        );
+        setNewActionTitle("");
+        setNewActionDueDate("");
+        setNewActionOwnerId("");
+        setNewActionLinkId("");
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.syncingChanges,
+        successMessage: UI_TERMS.feedback.success.actionCreated,
+        failureMessage: UI_TERMS.errors.changesNotSaved,
+      },
+    );
+  }
+
+  async function handleTransitionAction(action: Action) {
+    if (!organizationId) return;
+    const nextStatus =
+      action.status === ActionStatus.open
+        ? ActionStatus.in_progress
+        : action.status === ActionStatus.in_progress
+          ? ActionStatus.done
+          : null;
+    if (!nextStatus) return;
+
+    await runMutation(
+      async () => {
+        await executeApiCall("Transition action", (options) =>
+          transitionActionStatus(
+            organizationId,
+            action.id,
+            {
+              status: nextStatus,
+            },
+            options,
+          ),
+        );
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.syncingChanges,
+        successMessage: UI_TERMS.feedback.success.structureUpdated,
+      },
+    );
+  }
+
+  async function handleCreatePolicy() {
+    if (!organizationId || !newPolicyTitle.trim() || !newPolicyBody.trim() || !newPolicyOwnerId) return;
+
+    await runMutation(async () => {
+      await executeApiCall("Create policy", (options) =>
+        createPolicy(
+          organizationId,
+          {
+            title: newPolicyTitle.trim(),
+            body: newPolicyBody.trim(),
+            scope: newPolicyScope,
+            teamId: newPolicyScope === PolicyScope.team ? newPolicyTeamId || undefined : undefined,
+            positionId:
+              newPolicyScope === PolicyScope.position ? newPolicyPositionId || undefined : undefined,
+            owner: {
+              ownerPersonId: newPolicyOwnerType === "person" ? newPolicyOwnerId : null,
+              ownerPositionId: newPolicyOwnerType === "position" ? newPolicyOwnerId : null,
+            },
+          },
+          options,
+        ),
+      );
+
+      setNewPolicyTitle("");
+      setNewPolicyBody("");
+      setNewPolicyTeamId("");
+      setNewPolicyPositionId("");
+      setNewPolicyOwnerId("");
+    });
+  }
+
+  async function handleAttachPolicyScope() {
+    if (!organizationId || !policyRetargetPolicyId) return;
+    await runMutation(async () => {
+      await executeApiCall("Attach policy scope", (options) =>
+        attachPolicyScope(
+          organizationId,
+          policyRetargetPolicyId,
+          {
+            scope: policyRetargetScope,
+            teamId: policyRetargetScope === PolicyScope.team ? policyRetargetTeamId || null : null,
+            positionId:
+              policyRetargetScope === PolicyScope.position
+                ? policyRetargetPositionId || null
+                : null,
+          },
+          options,
+        ),
+      );
+    });
+  }
+
+  async function handleDeleteEntity(
+    type: "team" | "position" | "person" | "action" | "policy",
+    id: string,
+  ) {
+    if (!organizationId) return;
+    await runMutation(async () => {
+      if (type === "team") {
+        await executeApiCall("Delete team", (options) => deleteTeam(organizationId, id, options));
+      }
+      if (type === "position") {
+        await executeApiCall("Delete position", (options) =>
+          deletePosition(organizationId, id, options),
+        );
+      }
+      if (type === "person") {
+        await executeApiCall("Delete person", (options) => deletePerson(organizationId, id, options));
+      }
+      if (type === "action") {
+        await executeApiCall("Delete action", (options) => deleteAction(organizationId, id, options));
+      }
+      if (type === "policy") {
+        await executeApiCall("Delete policy", (options) => deletePolicy(organizationId, id, options));
+      }
+    });
+  }
+
+  async function handleResetDemoState() {
+    if (!organizationId) return;
+
+    if (isLocalDemoMode) {
+      setError("Local demo snapshot mode is disabled. Connect API to continue.");
+      return;
+    }
+
+    await runMutation(
+      async () => {
+        const result = await executeApiCall("Reset demo state", (options) =>
+          resetOrganizationDemoState(organizationId, options),
+        );
+        setDemoResetSummary(
+          `Reset complete: ${result.teams} teams, ${result.positions} positions, ${result.people} people, ${result.actions} actions, ${result.policies} policies.`,
+        );
+      },
+      {
+        loadingMessage: UI_TERMS.feedback.loading.syncingChanges,
+        successMessage: UI_TERMS.feedback.success.structureUpdated,
+      },
+    );
+  }
+
+  async function handleInvalidOrgRecoveryCheck() {
+    if (isLocalDemoMode) {
+      setError("Invalid-org recovery check is available in API mode. Local demo snapshot is already isolated.");
+      return;
+    }
+
+    setBusy(true);
+    setError(null);
+    try {
+      await loadOrganizationState("00000000-0000-4000-8000-000000000000");
+      setError("Recovery check did not trigger as expected.");
+    } catch (_error) {
+      await recoverOrganizationContext("Invalid organization context detected.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function downloadOrgSummaryHtml() {
+    const esc = (value: unknown) =>
+      String(value ?? "")
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;");
+
+    const now = Date.now();
+    const orgName = organizations.find((org) => org.id === organizationId)?.name ?? "Organization";
+    const generatedAt = new Date(now);
+    const isoDate = `${generatedAt.getFullYear()}-${String(generatedAt.getMonth() + 1).padStart(2, "0")}-${String(generatedAt.getDate()).padStart(2, "0")}`;
+
+    // Ownership = explicit decision-ownership records (positions, not people).
+    const isVacant = (p: Position) => !positionAssignmentById.get(p.id);
+    // An action is "routed" only if a real human is accountable: a person owner,
+    // or a position owner whose seat is actually filled. An action owned by a
+    // vacant position is effectively unrouted — the founder still carries it.
+    const isRouted = (item: Action) => {
+      if (item.ownerPersonId) return true;
+      if (item.ownerPositionId) return Boolean(positionAssignmentById.get(item.ownerPositionId));
+      return false;
+    };
+    const isOwnedPosition = (p: Position) => Boolean(positionOwnershipMap.get(p.id));
+    const teamHasLead = (teamId: string) => Boolean(teamOwnershipMap.get(teamId));
+    const hasJobDescription = (p: Position) => Boolean(positionDocuments[p.id]);
+    const daysOverdue = (dueDate?: string | null) => {
+      if (!dueDate) return 0;
+      const due = new Date(dueDate).getTime();
+      if (Number.isNaN(due) || due >= now) return 0;
+      return Math.max(1, Math.floor((now - due) / 86_400_000));
+    };
+
+    const openActionItems = actions.filter((item) => item.status !== ActionStatus.done);
+    const overdue = openActionItems.filter((item) => daysOverdue(item.dueDate) > 0);
+    const overdueNoOwner = overdue.filter((item) => !isRouted(item));
+
+    // ── Section 1 — Ownership snapshot ──────────────────────────────────────
+    const totalPositions = positions.length;
+    const unownedPositions = positions.filter((p) => !isOwnedPosition(p));
+    const ownedCount = totalPositions - unownedPositions.length;
+    const teamsWithoutLead = teams.filter((t) => !teamHasLead(t.id));
+    const unownedActions = openActionItems.filter((item) => !isRouted(item));
+    const coverage = totalPositions ? Math.round((ownedCount / totalPositions) * 100) : 0;
+
+    // ── Section 2 — Single points of failure ────────────────────────────────
+    // A position is "no reporting line" only if it has no manager AND no other
+    // position reports to it (orphan). A no-manager position that others report
+    // to is the legitimate apex/root and is excluded.
+    const isReferencedAsManager = (id: string) =>
+      positions.some((p) => p.reportsToPositionId === id);
+    const noReportingLine = positions.filter(
+      (p) => !p.reportsToPositionId && !isReferencedAsManager(p.id),
+    );
+    const noJobDescription = positions.filter((p) => !hasJobDescription(p));
+
+    const filledByTeam = new Map<string, number>();
+    for (const p of positions) {
+      if (p.teamId && !isVacant(p)) {
+        filledByTeam.set(p.teamId, (filledByTeam.get(p.teamId) ?? 0) + 1);
+      }
+    }
+    const singlePersonTeams = teams.filter((t) => filledByTeam.get(t.id) === 1);
+
+    const spofItems: string[] = [
+      ...noReportingLine.map((p) => `${esc(p.title)} — no reporting line defined`),
+      ...noJobDescription.map((p) => `${esc(p.title)} — no job description on file`),
+      ...singlePersonTeams.map((t) => `${esc(t.name)} — single-person team, no backup`),
+      ...overdueNoOwner.map((a) => `${esc(a.title)} — overdue, no owner`),
+    ];
+
+    // ── Section 3 — First handoffs ──────────────────────────────────────────
+    const openActionsForPosition = (positionId: string) =>
+      openActionItems.filter(
+        (a) => a.positionId === positionId || a.ownerPositionId === positionId,
+      ).length;
+    const openActionsForTeam = (teamId: string) =>
+      openActionItems.filter((a) => a.teamId === teamId).length;
+
+    let topVacancy: { position: Position; count: number } | null = null;
+    for (const p of positions.filter(isVacant)) {
+      const count = openActionsForPosition(p.id);
+      if (count > 0 && (!topVacancy || count > topVacancy.count)) {
+        topVacancy = { position: p, count };
+      }
+    }
+
+    let topTeam: { team: Team; count: number } | null = null;
+    for (const t of teamsWithoutLead) {
+      const count = openActionsForTeam(t.id);
+      if (count > 0 && (!topTeam || count > topTeam.count)) {
+        topTeam = { team: t, count };
+      }
+    }
+
+    let topOverdue: { action: Action; days: number } | null = null;
+    for (const a of overdueNoOwner) {
+      const days = daysOverdue(a.dueDate);
+      if (!topOverdue || days > topOverdue.days) {
+        topOverdue = { action: a, days };
+      }
+    }
+
+    const handoffItems: string[] = [];
+    if (topVacancy) {
+      handoffItems.push(
+        `Fill <b>${esc(topVacancy.position.title)}</b> — ${topVacancy.count} action${topVacancy.count === 1 ? "" : "s"} currently unrouted because this role is vacant`,
+      );
+    }
+    if (topTeam) {
+      handoffItems.push(
+        `Assign lead to <b>${esc(topTeam.team.name)}</b> — ${topTeam.count} open action${topTeam.count === 1 ? "" : "s"} belong to this team with no designated owner`,
+      );
+    }
+    if (topOverdue) {
+      handoffItems.push(
+        `Assign owner to <b>"${esc(topOverdue.action.title)}"</b> — overdue by ${topOverdue.days} day${topOverdue.days === 1 ? "" : "s"}, currently unrouted`,
+      );
+    }
+
+    const warnList = (items: string[], empty: string) =>
+      items.length
+        ? `<ul class="warn">${items.map((item) => `<li><span class="mark">⚠</span> ${item}</li>`).join("")}</ul>`
+        : `<p class="clear">${esc(empty)}</p>`;
+
+    const orderedList = (items: string[], empty: string) =>
+      items.length
+        ? `<ol>${items.map((item) => `<li>${item}</li>`).join("")}</ol>`
+        : `<p class="clear">${esc(empty)}</p>`;
+
+    const html = `<!doctype html>
+<html lang="en"><head><meta charset="utf-8" />
+<title>${esc(orgName)} — Founder Dependency Report</title>
+<style>
+  body { font-family: Georgia, "Times New Roman", serif; color: #1f2433; margin: 0; padding: 0 0 48px; line-height: 1.5; }
+  .wrap { max-width: 780px; margin: 0 auto; padding: 0 24px; }
+  header.bar { background: #1a106b; color: #ffffff; padding: 28px 0; margin-bottom: 28px; }
+  header.bar .wrap { display: block; }
+  h1 { font-size: 24px; margin: 0 0 4px; font-weight: 700; }
+  .sub { font-size: 14px; opacity: 0.85; margin: 0; }
+  h2 { font-size: 17px; color: #1a106b; border-bottom: 2px solid #1a106b; padding-bottom: 6px; margin: 32px 0 12px; }
+  .snapshot { font-size: 15px; }
+  .snapshot div { padding: 4px 0; border-bottom: 1px solid #eee; }
+  .snapshot b { color: #1a106b; }
+  .coverage { color: #b2946b; font-weight: 700; }
+  ul, ol { margin: 8px 0; padding-left: 22px; font-size: 15px; }
+  ul.warn { list-style: none; padding-left: 0; }
+  ul.warn li { padding: 6px 0; border-bottom: 1px solid #f0ece4; color: #6b5a3e; }
+  .mark { color: #b2946b; font-weight: 700; }
+  ol li { padding: 6px 0; }
+  ol li b { color: #1a106b; }
+  .clear { color: #4a7a4a; font-weight: 600; font-size: 15px; }
+  footer { margin-top: 40px; padding-top: 16px; border-top: 1px solid #ddd; font-size: 13px; color: #8a8a8a; }
+</style></head>
+<body>
+  <header class="bar"><div class="wrap">
+    <h1>${esc(orgName)}</h1>
+    <p class="sub">Founder Dependency Report · ${esc(isoDate)}</p>
+  </div></header>
+  <div class="wrap">
+  <section>
+    <h2>Ownership Snapshot</h2>
+    <div class="snapshot">
+      <div><b>${totalPositions}</b> positions total</div>
+      <div><b>${unownedPositions.length}</b> positions unowned</div>
+      <div><b>${teamsWithoutLead.length}</b> teams without lead</div>
+      <div><b>${unownedActions.length}</b> actions without owner</div>
+      <div class="coverage">${coverage}% ownership coverage</div>
+    </div>
+  </section>
+  <section>
+    <h2>Single Points of Failure</h2>
+    ${warnList(spofItems, "NO SINGLE POINTS OF FAILURE DETECTED")}
+  </section>
+  <section>
+    <h2>Recommended First Handoffs</h2>
+    ${orderedList(handoffItems, "ALL CORE OWNERSHIPS ARE CLEAR")}
+  </section>
+  <footer>Generated by TeamFrame — ${esc(isoDate)}</footer>
+  </div>
+</body></html>`;
+
+    const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+    const href = URL.createObjectURL(blob);
+    const anchor = document.createElement("a");
+    anchor.href = href;
+    anchor.download = `teamframe-founder-dependency-${isoDate}.html`;
+    anchor.click();
+    URL.revokeObjectURL(href);
+  }
+
+  // Trigger org-ready banner and setup progress card when positions/assignments change
+  useEffect(() => {
+    const currentFilled = positionAssignmentById.size;
+    const currentPositions = positions.length;
+    const justAddedFirstPosition = prevPositionCount === 0 && currentPositions === 1;
+    const justFilledFirstPosition = prevFilledCount === 0 && currentFilled === 1;
+    if (justAddedFirstPosition || justFilledFirstPosition) {
+      setShowOrgReadyBanner(true);
+    }
+    // Show setup progress card whenever a new assignment is created (any position, not just first)
+    if (currentFilled > prevFilledCount && selectedPositionId) {
+      setSetupProgressPositionId(selectedPositionId);
+      setShowSetupProgress(true);
+    }
+    setPrevPositionCount(currentPositions);
+    setPrevFilledCount(currentFilled);
+  }, [positions.length, positionAssignmentById.size, selectedPositionId]);
+
+  if (loading) {
+    return <LoadingScreen />;
+  }
+
+  if (!isLocalDemoMode && organizations.length === 0) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#F1F5F9",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontFamily: "Inter, ui-sans-serif, system-ui, sans-serif",
+          padding: 24,
+        }}
+      >
+        <div
+          style={{
+            width: "100%",
+            maxWidth: 420,
+            background: "#FFFFFF",
+            border: "1px solid #D8E0EC",
+            borderRadius: 12,
+            padding: 24,
+            boxShadow: "0 10px 30px rgba(15,23,42,0.08)",
+          }}
+        >
+          <div style={{ fontSize: 18, fontWeight: 800, color: "#0F172A", marginBottom: 6 }}>
+            Create your first organization
           </div>
-        </div>
-        <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+          <div style={{ fontSize: 13, color: "#64748B", marginBottom: 16 }}>
+            Name the company you're setting up. You can add and switch between more
+            organizations later.
+          </div>
+          <input
+            autoFocus
+            value={orgNameDraft}
+            onChange={(event) => setOrgNameDraft(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Enter" && orgNameDraft.trim()) {
+                void handleCreateOrganization(orgNameDraft);
+              }
+            }}
+            placeholder="Organization name"
+            style={{ width: "100%", marginBottom: 12, padding: "9px 12px" }}
+          />
           <button
-            onClick={onEditPosition}
+            onClick={() => void handleCreateOrganization(orgNameDraft)}
+            disabled={!orgNameDraft.trim()}
             style={{
-              fontSize: 10, color: "#818cf8", background: "rgba(99,102,241,0.1)",
-              border: "1px solid rgba(99,102,241,0.3)", borderRadius: 4,
-              padding: "4px 10px", cursor: "pointer", fontWeight: 600,
+              width: "100%",
+              background: orgNameDraft.trim() ? "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)" : "#E2E8F0",
+              color: orgNameDraft.trim() ? "#FFFFFF" : "#94A3B8",
+              border: "none",
+              borderRadius: 8,
+              padding: "10px 14px",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: orgNameDraft.trim() ? "pointer" : "not-allowed",
             }}
           >
-            Edit
+            Create organization
           </button>
-          <button onClick={onClose} style={{
-            background: "none", border: "none", color: "#64748b",
-            cursor: "pointer", fontSize: 18, padding: "0 4px", lineHeight: 1,
-          }}>×</button>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              margin: "14px 0",
+              color: "#94A3B8",
+              fontSize: 12,
+            }}
+          >
+            <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
+            or
+            <div style={{ flex: 1, height: 1, background: "#E2E8F0" }} />
+          </div>
+          <button
+            onClick={() =>
+              loadLocalDemoSnapshot(
+                "Demo data loaded — read-only preview. Connect a backend to create and save your own data.",
+              )
+            }
+            style={{
+              width: "100%",
+              background: "#FFFFFF",
+              color: "#1D4ED8",
+              border: "1px solid #BFDBFE",
+              borderRadius: 8,
+              padding: "10px 14px",
+              fontSize: 14,
+              fontWeight: 700,
+              cursor: "pointer",
+            }}
+          >
+            Explore with demo data
+          </button>
+          <div style={{ fontSize: 11, color: "#94A3B8", marginTop: 8, textAlign: "center" }}>
+            View-only sample organization — no setup required.
+          </div>
+          {error ? (
+            <div style={{ fontSize: 12, color: "#B91C1C", marginTop: 10 }}>{error}</div>
+          ) : null}
         </div>
       </div>
+    );
+  }
 
-      {isEditing && pos && (
-        <PositionForm
-          position={pos}
-          onSave={onSaveEdit}
-          onCancel={onCancelEdit}
+  const openActions = actions.filter((item) => item.status !== ActionStatus.done).length;
+  const needsAttention = overdueActions + blockedActions;
+  const vacantCount = positions.length - positionAssignmentById.size;
+  const totalComplianceAlerts = [...positionComplianceAlerts.values()].reduce((a, b) => a + b, 0);
+
+  // Drill-down data — derived from existing computed state, no new fetches
+  const vacancyRows = positions
+    .filter((p) => !positionAssignmentById.get(p.id))
+    .map((p) => ({
+      positionId: p.id,
+      title: p.title,
+      teamName: p.teamId ? teamMap.get(p.teamId)?.name ?? null : null,
+      reportsToTitle: p.reportsToPositionId
+        ? positionMap.get(p.reportsToPositionId)?.title ?? null
+        : null,
+      vacantSince: p.updatedAt?.toString() ?? null,
+    }));
+
+  const actionRows = actions
+    .filter((item) => item.status !== ActionStatus.done && (item.blocked || (() => {
+      if (!item.dueDate) return false;
+      const due = new Date(item.dueDate).getTime();
+      return !Number.isNaN(due) && due < Date.now();
+    })()))
+    .map((item) => ({
+      actionId: item.id,
+      title: item.title,
+      ownerName: item.ownerPersonId ? people.find((p) => p.id === item.ownerPersonId)?.fullName ?? null : null,
+      positionTitle: item.positionId ? positionMap.get(item.positionId)?.title ?? null : null,
+      dueDate: item.dueDate?.toString() ?? null,
+      status: item.status,
+      overdue: !!item.dueDate && (() => {
+        const due = new Date(item.dueDate!).getTime();
+        return !Number.isNaN(due) && due < Date.now();
+      })(),
+      blocked: item.blocked ?? false,
+    }));
+
+  // Include all open actions when drill-down opened (not just urgent ones)
+  const actionRowsAll = actions
+    .filter((item) => item.status !== ActionStatus.done)
+    .map((item) => ({
+      actionId: item.id,
+      title: item.title,
+      ownerName: item.ownerPersonId ? people.find((p) => p.id === item.ownerPersonId)?.fullName ?? null : null,
+      positionTitle: item.positionId ? positionMap.get(item.positionId)?.title ?? null : null,
+      dueDate: item.dueDate?.toString() ?? null,
+      status: item.status,
+      overdue: !!item.dueDate && (() => {
+        const due = new Date(item.dueDate!).getTime();
+        return !Number.isNaN(due) && due < Date.now();
+      })(),
+      blocked: item.blocked ?? false,
+    }))
+    .sort((a, b) => {
+      if (a.overdue && !b.overdue) return -1;
+      if (!a.overdue && b.overdue) return 1;
+      if (a.blocked && !b.blocked) return -1;
+      if (!a.blocked && b.blocked) return 1;
+      return 0;
+    });
+
+  const complianceRows = positions
+    .filter((p) => (positionComplianceAlerts.get(p.id) ?? 0) > 0)
+    .map((p) => {
+      const assignment = positionAssignmentById.get(p.id);
+      return {
+        positionId: p.id,
+        positionTitle: p.title,
+        personName: assignment?.person.fullName ?? "Unknown",
+        missingEmail: !assignment?.person.email,
+        missingPhone: !assignment?.person.phone,
+      };
+    });
+
+  // Setup progress for card
+  const progressPositionDoc = setupProgressPositionId
+    ? positionDocuments[setupProgressPositionId]
+    : null;
+  const progressHasEvidence = !!progressPositionDoc && progressPositionDoc.state === "signed";
+  const progressHasAssignment = setupProgressPositionId
+    ? !!positionAssignmentById.get(setupProgressPositionId)
+    : false;
+  const progressPositionTitle = setupProgressPositionId
+    ? positionMap.get(setupProgressPositionId)?.title ?? ""
+    : "";
+  const totalSigned = Object.values(positionDocuments).filter((d) => d.state === "signed").length;
+  const compliancePct = positions.length > 0
+    ? Math.round((totalSigned / positions.length) * 100)
+    : 0;
+
+  return (
+    <AppShell
+      activeNav={activeNav}
+      onNavChange={setActiveNav}
+      health={[
+        { label: "positions", value: positions.length },
+        {
+          label: "filled",
+          value: positionAssignmentById.size,
+        },
+        {
+          label: "vacant",
+          value: vacantCount,
+          onClick: vacantCount > 0 ? () => setDrillDownMode("vacancies") : undefined,
+        },
+        {
+          label: "open actions",
+          value: openActions,
+          onClick: openActions > 0 ? () => setDrillDownMode("actions") : undefined,
+        },
+        {
+          label: "needs attention",
+          value: needsAttention,
+          urgent: true,
+          onClick: needsAttention > 0 ? () => setDrillDownMode("actions") : undefined,
+        },
+      ]}
+      statusMessage={mutationStatusText}
+      errorMessage={error}
+      isDemoMode={isLocalDemoMode}
+      organizations={organizations.map((org) => ({ id: org.id, name: org.name }))}
+      activeOrganizationId={organizationId}
+      onSelectOrganization={isLocalDemoMode ? undefined : (id) => void handleSelectOrganization(id)}
+      onCreateOrganization={isLocalDemoMode ? undefined : (name) => void handleCreateOrganization(name)}
+    >
+      {showOrgReadyBanner && (
+        <OrgReadyBanner
+          positionCount={positions.length}
+          filledCount={positionAssignmentById.size}
+          onAssignPerson={() => {
+            // Deep-link: ensure org nav is active, panel is open on Assignment tab, first field focused
+            setActiveNav("org");
+            setPositionPanelTab("assignment");
+            setShowOrgReadyBanner(false);
+            // Defer focus until after render cycle
+            setTimeout(() => {
+              assignPersonSelectRef.current?.focus();
+            }, 80);
+          }}
+          onDismiss={() => setShowOrgReadyBanner(false)}
         />
       )}
 
-      <div style={{ flex: 1, overflowY: "auto", padding: "0 0 16px" }}>
-        {emp && (
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-            {[
-              { label: "Reports To", value: SEED.positions.find(p => p.id === pos.reportsToId)?.title ?? "None" },
-              { label: "Department", value: pos.department },
-              { label: "Location", value: emp.location },
-              { label: "Email", value: emp.email },
-              { label: "Phone", value: emp.phone },
-              { label: "Start Date", value: emp.startDate },
-              { label: "Salary", value: `$${emp.salary.toLocaleString()}` },
-              { label: "Bank", value: `${emp.bankName} · ****${emp.bankAccount.slice(-4)}` },
-              { label: "Onboarding", value: emp.onboardingStatus === "complete" ? "Complete" : emp.onboardingStatus === "in_progress" ? "In Progress" : "Not Started" },
-            ].map(({ label, value }) => (
-              <div key={label} style={{
-                display: "flex", justifyContent: "space-between",
-                padding: "7px 0", borderBottom: "1px solid rgba(255,255,255,0.04)",
-                fontSize: 12,
-              }}>
-                <span style={{ color: "#64748b" }}>{label}</span>
-                <span style={{ color: "#cbd5e1", fontWeight: 500, textAlign: "right", maxWidth: "55%", wordBreak: "break-all" }}>{value}</span>
-              </div>
-            ))}
-          </div>
-        )}
+      {/* Flow #3 — Drill-down panel (vacancy / actions / compliance) */}
+      <DrillDownPanel
+        mode={drillDownMode}
+        onClose={() => setDrillDownMode(null)}
+        vacancies={vacancyRows}
+        actions={actionRowsAll}
+        compliance={complianceRows}
+        onSelectPosition={(positionId) => {
+          setActiveNav("org");
+          setFocusPositionId(positionId);
+          setPositionPanelTab("position");
+        }}
+      />
 
-        {uiState.directReports.length > 0 && (
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
-              Direct Reports ({uiState.directReports.length})
-            </div>
-            {uiState.directReports.slice(0, 4).map(({ position, employee: dr }) => (
-              <div key={position.id} style={{
-                display: "flex", alignItems: "center", gap: 10, padding: "6px 0",
-                borderBottom: "1px solid rgba(255,255,255,0.04)",
-              }}>
-                {dr ? (
-                  <Avatar initials={dr.avatarInitials} color={dr.avatarColor} size={28} />
-                ) : (
-                  <div style={{
-                    width: 28, height: 28, borderRadius: "50%",
-                    background: "rgba(255,255,255,0.06)", border: "1.5px dashed rgba(255,255,255,0.2)",
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    fontSize: 13, color: "#6b7280",
-                  }}>?</div>
-                )}
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0" }}>{position.title}</div>
-                  <div style={{ fontSize: 10, color: "#64748b" }}>{position.id}</div>
-                </div>
-              </div>
-            ))}
-            {uiState.directReports.length > 4 && (
-              <button style={{
-                marginTop: 8, fontSize: 11, color: "#818cf8", background: "none",
-                border: "none", cursor: "pointer", padding: 0,
-              }}>
-                View All Reports
-              </button>
+      {/* Flow #3 — Setup progress card (evidence completion guidance) */}
+      {showSetupProgress && setupProgressPositionId && (
+        <SetupProgressCard
+          positionTitle={progressPositionTitle}
+          hasAssignment={progressHasAssignment}
+          hasEvidence={progressHasEvidence}
+          compliancePct={compliancePct}
+          onCompleteEvidence={() => {
+            setActiveNav("org");
+            setFocusPositionId(setupProgressPositionId);
+            setPositionPanelTab("documents");
+            setShowSetupProgress(false);
+          }}
+          onDismiss={() => setShowSetupProgress(false)}
+        />
+      )}
+
+      <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+
+          {activeNav === "org" && (
+            <>
+            {/* Flow #3 — Org Health Summary (persistent, uses existing computed state only) */}
+            {positions.length > 0 && (
+              <OrgHealthSummary
+                totalPositions={positions.length}
+                filledPositions={positionAssignmentById.size}
+                vacantPositions={vacantCount}
+                openActions={openActions}
+                overdueActions={overdueActions}
+                blockedActions={blockedActions}
+                complianceAlerts={totalComplianceAlerts}
+                onClickVacancies={() => setDrillDownMode("vacancies")}
+                onClickActions={() => setDrillDownMode("actions")}
+                onClickCompliance={() => setDrillDownMode("compliance")}
+              />
             )}
-          </div>
-        )}
 
-        {signals.length > 0 && (
-          <div style={{ padding: "14px 20px", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
-              Signals ({signals.length})
-            </div>
-            {signals.map((sig) => (
-              <div key={sig.id} style={{
-                padding: "8px 10px", borderRadius: 8, marginBottom: 8,
-                background: sig.level === "critical" ? "rgba(239,68,68,0.08)" : sig.level === "warning" ? "rgba(245,158,11,0.08)" : "rgba(99,102,241,0.08)",
-                border: `1px solid ${sig.level === "critical" ? "rgba(239,68,68,0.2)" : sig.level === "warning" ? "rgba(245,158,11,0.2)" : "rgba(99,102,241,0.2)"}`,
-              }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6, marginBottom: 3 }}>
-                  <SignalBadge level={sig.level} />
-                  <span style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0" }}>{sig.message}</span>
-                </div>
-                <div style={{ fontSize: 11, color: "#94a3b8" }}>{sig.detail}</div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {actions.length > 0 && (
-          <div style={{ padding: "14px 20px" }}>
-            <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 10 }}>
-              Actions ({actions.length})
-            </div>
-            {actions.map((act) => (
-              <div key={act.id} style={{ marginBottom: 6 }}>
-                <div style={{
-                  display: "flex", alignItems: "center", justifyContent: "space-between",
-                  padding: "8px 10px", borderRadius: 8,
-                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                }}>
-                  <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                    <div style={{
-                      width: 28, height: 28, borderRadius: 6,
-                      background: "rgba(99,102,241,0.15)", display: "flex",
-                      alignItems: "center", justifyContent: "center", fontSize: 13, color: "#818cf8",
-                    }}>⚡</div>
-                    <div>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: "#e2e8f0" }}>{act.label}</div>
-                      <div style={{ fontSize: 10, color: "#64748b" }}>{act.dueIn}</div>
-                    </div>
-                  </div>
-                  <button
-                    onClick={() => {
-                      if (act.type === "assign_employee" || act.type === "fix_compliance" || act.type === "complete_offboarding" || act.type === "review_capacity" || act.type === "update_descriptions") {
-                        onResolveAction(act.id);
-                      } else {
-                        onToggleAction(act.id);
-                      }
-                    }}
-                    style={{
-                      fontSize: 10, color: "#818cf8", background: "rgba(99,102,241,0.1)",
-                      border: "1px solid rgba(99,102,241,0.3)", borderRadius: 4,
-                      padding: "3px 8px", cursor: "pointer", fontWeight: 600,
-                    }}
-                  >
-                    {act.type === "update_job_desc" || act.type === "assign_document" || act.type === "complete_onboarding" ? "Open" : "Resolve"}
-                  </button>
-                </div>
-                {expandedAction === act.id && (
-                  <div style={{
-                    padding: "10px 12px", borderRadius: "0 0 8px 8px",
-                    background: "rgba(0,0,0,0.2)", border: "1px solid rgba(255,255,255,0.05)",
-                    borderTop: "none",
-                  }}>
-                    {act.type === "update_job_desc" && (
-                      <div>
-                        <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>Upload updated job description file</div>
-                        <div style={{
-                          border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 6,
-                          padding: "12px", textAlign: "center", fontSize: 11, color: "#64748b",
-                          marginBottom: 8,
-                        }}>
-                          📄 Drop file here or click to browse
-                        </div>
-                        <button
-                          onClick={() => onResolveAction(act.id)}
-                          style={{
-                            padding: "5px 12px", fontSize: 11, fontWeight: 600,
-                            background: "rgba(99,102,241,0.2)", color: "#818cf8",
-                            border: "1px solid rgba(99,102,241,0.3)", borderRadius: 4,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Submit & Complete
-                        </button>
-                      </div>
-                    )}
-                    {act.type === "assign_document" && (
-                      <div>
-                        <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>Select document to assign</div>
-                        <div style={{
-                          border: "1px dashed rgba(255,255,255,0.15)", borderRadius: 6,
-                          padding: "12px", textAlign: "center", fontSize: 11, color: "#64748b",
-                          marginBottom: 8,
-                        }}>
-                          📄 Drop file here or click to browse
-                        </div>
-                        <button
-                          onClick={() => onResolveAction(act.id)}
-                          style={{
-                            padding: "5px 12px", fontSize: 11, fontWeight: 600,
-                            background: "rgba(99,102,241,0.2)", color: "#818cf8",
-                            border: "1px solid rgba(99,102,241,0.3)", borderRadius: 4,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Assign Document
-                        </button>
-                      </div>
-                    )}
-                    {act.type === "complete_onboarding" && emp && (
-                      <div>
-                        <div style={{ fontSize: 11, color: "#94a3b8", marginBottom: 8 }}>
-                          Complete onboarding for {emp.name}
-                        </div>
-                        <div style={{ fontSize: 11, color: "#64748b", marginBottom: 8 }}>
-                          Current status: {emp.onboardingStatus === "complete" ? "Complete" : emp.onboardingStatus === "in_progress" ? "In Progress" : "Not Started"}
-                        </div>
-                        <button
-                          onClick={() => onCompleteOnboarding(emp.id)}
-                          style={{
-                            padding: "5px 12px", fontSize: 11, fontWeight: 600,
-                            background: "rgba(34,197,94,0.2)", color: "#22c55e",
-                            border: "1px solid rgba(34,197,94,0.3)", borderRadius: 4,
-                            cursor: "pointer",
-                          }}
-                        >
-                          Mark Onboarding Complete
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function JsonInspectorPanel({ seed, controlState, uiState }: {
-  seed: typeof SEED;
-  controlState: ControlState;
-  uiState: UIState;
-}) {
-  const [tab, setTab] = useState<"seed" | "control" | "ui">("control");
-  const data = tab === "seed" ? { positions: seed.positions.length, employees: seed.employees.length, compliance: seed.compliance.length }
-    : tab === "control" ? controlState
-    : { selectedPosition: uiState.selectedPosition?.id, selectedEmployee: uiState.selectedEmployee?.id, signals: uiState.signals.length, actions: uiState.actions.length };
-
-  return (
-    <div style={{
-      background: "rgba(0,0,0,0.3)", border: "1px solid rgba(255,255,255,0.07)",
-      borderRadius: 10, overflow: "hidden",
-    }}>
-      <div style={{ display: "flex", borderBottom: "1px solid rgba(255,255,255,0.07)" }}>
-        {(["seed", "control", "ui"] as const).map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            style={{
-              flex: 1, padding: "8px 0", fontSize: 10, fontWeight: 600,
-              background: tab === t ? "rgba(99,102,241,0.2)" : "none",
-              color: tab === t ? "#818cf8" : "#64748b",
-              border: "none", cursor: "pointer", textTransform: "uppercase", letterSpacing: "0.06em",
-            }}
-          >
-            {t}
-          </button>
-        ))}
-      </div>
-      <pre style={{
-        margin: 0, padding: "12px 14px", fontSize: 9.5, color: "#94a3b8",
-        overflowX: "auto", maxHeight: 180, overflowY: "auto", lineHeight: 1.6,
-      }}>
-        {JSON.stringify(data, null, 2)}
-      </pre>
-    </div>
-  );
-}
-
-export function TeamFrame() {
-  const [activeNav, setActiveNav] = useState("org");
-  const [controlState, setControlState] = useState<ControlState>({
-    scenarioId: "DEFAULT_VIEW",
-    selectedPositionId: "1-001",
-    selectedEmployeeId: "e-001",
-    resolvedActions: [],
-    positionEdits: [],
-    onboardingCompleted: [],
-  });
-  const [expandedAction, setExpandedAction] = useState<string | null>(null);
-  const [employeeSearch, setEmployeeSearch] = useState("");
-  const [showJson, setShowJson] = useState(false);
-  const [editingPosition, setEditingPosition] = useState<string | null>(null);
-
-  const uiState = useMemo(() => computeUIState(SEED, controlState), [controlState]);
-
-  const setScenario = (scenarioId: string) => {
-    setControlState((prev) => ({ ...prev, scenarioId }));
-  };
-  const setSelectedPositionId = (id: string) => {
-    const emp = SEED.employees.find((e) => e.positionId === id);
-    setControlState((prev) => ({
-      ...prev,
-      selectedPositionId: id,
-      selectedEmployeeId: emp?.id ?? null,
-      scenarioId: "DEFAULT_VIEW",
-    }));
-  };
-  const resolveAction = (actionId: string) => {
-    setControlState((prev) => ({
-      ...prev,
-      resolvedActions: [...prev.resolvedActions, actionId],
-    }));
-    setExpandedAction(null);
-  };
-  const completeOnboarding = (empId: string) => {
-    setControlState((prev) => ({
-      ...prev,
-      onboardingCompleted: [...prev.onboardingCompleted, empId],
-      resolvedActions: [...prev.resolvedActions, "act-complete-onboarding"],
-    }));
-  };
-  const updatePosition = (edit: PositionEdit) => {
-    setControlState((prev) => {
-      const existing = prev.positionEdits.find((e) => e.id === edit.id);
-      const nextEdits = existing
-        ? prev.positionEdits.map((e) => (e.id === edit.id ? edit : e))
-        : [...prev.positionEdits, edit];
-      return { ...prev, positionEdits: nextEdits };
-    });
-  };
-  const updateEmployee = (empId: string, positionId: string) => {
-    setControlState((prev) => ({
-      ...prev,
-      selectedEmployeeId: empId,
-      selectedPositionId: positionId,
-    }));
-  };
-
-  return (
-    <div style={{
-      display: "flex", height: "100vh", width: "100vw",
-      background: "#0f1117", color: "#e2e8f0", fontFamily: "'Inter', system-ui, sans-serif",
-      overflow: "hidden",
-    }}>
-      {/* Sidebar */}
-      <div style={{
-        width: 200, flexShrink: 0, background: "#13161f",
-        borderRight: "1px solid rgba(255,255,255,0.06)",
-        display: "flex", flexDirection: "column",
-      }}>
-        {/* Logo */}
-        <div style={{
-          padding: "16px 16px 12px",
-          borderBottom: "1px solid rgba(255,255,255,0.06)",
-          display: "flex", alignItems: "center", gap: 8,
-        }}>
-          <div style={{
-            width: 28, height: 28, borderRadius: 8,
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-            display: "flex", alignItems: "center", justifyContent: "center",
-            fontSize: 14, fontWeight: 700, color: "#fff",
-          }}>T</div>
-          <span style={{ fontWeight: 700, fontSize: 14, color: "#fff" }}>TeamFrame V2</span>
-        </div>
-
-        {/* Nav */}
-        <nav style={{ flex: 1, padding: "8px 0" }}>
-          {NAV_ITEMS.map((item) => {
-            const isActive = activeNav === item.id;
-            const count = item.id === "signals" ? uiState.signals.length
-              : item.id === "actions" ? uiState.actions.length
-              : item.id === "risk" ? uiState.risks.length
-              : 0;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveNav(item.id)}
+            <section style={STYLE.panel}>
+              <div
                 style={{
-                  display: "flex", alignItems: "center", gap: 10,
-                  width: "100%", padding: "9px 16px", textAlign: "left",
-                  background: isActive ? "rgba(99,102,241,0.15)" : "none",
-                  borderLeft: `2px solid ${isActive ? "#6366f1" : "transparent"}`,
-                  color: isActive ? "#818cf8" : "#64748b",
-                  cursor: "pointer", fontSize: 12, fontWeight: isActive ? 600 : 400,
-                  transition: "all 0.1s ease",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "space-between",
+                  marginBottom: 12,
                 }}
               >
-                <span style={{ fontSize: 13 }}>{item.icon}</span>
-                <span style={{ flex: 1 }}>{item.label}</span>
-                {item.badge && count > 0 && (
-                  <span style={{
-                    background: item.id === "signals" ? "rgba(239,68,68,0.8)" : "rgba(99,102,241,0.8)",
-                    color: "#fff", borderRadius: 8, padding: "1px 6px", fontSize: 10, fontWeight: 700,
-                  }}>{count}</span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
-
-        {/* Org Overview */}
-        <div style={{
-          padding: "12px 16px", borderTop: "1px solid rgba(255,255,255,0.06)",
-          background: "rgba(0,0,0,0.15)",
-        }}>
-          <div style={{ fontSize: 10, fontWeight: 700, color: "#475569", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 8 }}>
-            Organization Overview
-          </div>
-          {[
-            { label: "Total Positions", value: uiState.stats.totalPositions, color: "#e2e8f0" },
-            { label: "Filled Positions", value: `${uiState.stats.filledPositions}`, pct: `${uiState.stats.filledPct}%`, color: "#22c55e" },
-            { label: "Vacant Positions", value: `${uiState.stats.vacantPositions}`, pct: `${uiState.stats.vacantPct}%`, color: "#f59e0b" },
-            { label: "On Leave", value: `${uiState.stats.onLeaveCount}`, pct: `${uiState.stats.onLeavePct}%`, color: "#f59e0b" },
-            { label: "Offboarding", value: `${uiState.stats.offboardingCount}`, pct: `${uiState.stats.offboardingPct}%`, color: "#ef4444" },
-          ].map(({ label, value, pct, color }) => (
-            <div key={label} style={{ marginBottom: 6 }}>
-              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-                <span style={{ fontSize: 10, color: "#64748b" }}>{label}</span>
-                <div style={{ display: "flex", alignItems: "baseline", gap: 4 }}>
-                  <span style={{ fontSize: 13, fontWeight: 700, color }}>{value}</span>
-                  {pct && <span style={{ fontSize: 9, color: "#475569" }}>{pct}</span>}
+                <div>
+                  <div style={{ ...STYLE.title, fontSize: 17, marginBottom: 2 }}>
+                    {positions.length === 0 ? "Build your org chart" : "Org Chart"}
+                  </div>
+                  <div style={{ fontSize: 12, color: "#64748B" }}>
+                    {positions.length === 0
+                      ? "Map your team structure and track every position."
+                      : `${positions.length} position${positions.length === 1 ? "" : "s"} · ${positionAssignmentById.size} filled`}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
 
-          <div style={{ marginTop: 10, borderTop: "1px solid rgba(255,255,255,0.05)", paddingTop: 10 }}>
-            <div style={{ fontSize: 10, fontWeight: 600, color: "#475569", marginBottom: 6 }}>Signal Summary</div>
-            {[
-              { label: "Critical", count: uiState.signalSummary.critical, color: "#ef4444" },
-              { label: "High", count: uiState.signalSummary.high, color: "#f59e0b" },
-              { label: "Medium", count: uiState.signalSummary.medium, color: "#eab308" },
-              { label: "Low", count: uiState.signalSummary.low, color: "#22c55e" },
-            ].map(({ label, count, color }) => (
-              <div key={label} style={{ display: "flex", justifyContent: "space-between", marginBottom: 4 }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ width: 6, height: 6, borderRadius: "50%", background: color, display: "inline-block" }} />
-                  <span style={{ fontSize: 10, color: "#64748b" }}>{label}</span>
-                </div>
-                <span style={{ fontSize: 11, fontWeight: 700, color }}>{count}</span>
-              </div>
-            ))}
-            <button style={{
-              marginTop: 6, width: "100%", padding: "5px 0", fontSize: 10, fontWeight: 600,
-              background: "rgba(99,102,241,0.1)", color: "#818cf8",
-              border: "1px solid rgba(99,102,241,0.2)", borderRadius: 6, cursor: "pointer",
-            }}>
-              View All Signals
-            </button>
-          </div>
-        </div>
-      </div>
+              <div
+                style={{
+                  display: "grid",
+                  gridTemplateColumns: "minmax(0, 1fr) 304px",
+                  gap: 12,
+                  alignItems: "start",
+                }}
+              >
+                <div
+                  style={{
+                    ...STYLE.panel,
+                    border: "1px solid #D8E0EC",
+                    background: "#FFFFFF",
+                    minHeight: 620,
+                  }}
+                >
+                  <div style={{ ...STYLE.subTitle, marginBottom: 8 }}>Org Chart</div>
+                  <div style={{ marginBottom: 10, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <div style={{ fontSize: 11, color: "#475569" }}>
+                      Selected: <strong>{selectedPosition?.title ?? "No position selected"}</strong>
+                    </div>
+                    {focusedSubtreeRootId ? (
+                      <button onClick={() => setFocusedSubtreeRootId(null)}>Reset view</button>
+                    ) : null}
+                  </div>
 
-      {/* Main Area */}
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden" }}>
-        {/* Top Header */}
-        <div style={{
-          height: 52, flexShrink: 0,
-          background: "#13161f", borderBottom: "1px solid rgba(255,255,255,0.06)",
-          display: "flex", alignItems: "center", padding: "0 20px", gap: 16,
-        }}>
-          <div style={{ flex: 1 }}>
-            <h1 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: "#fff" }}>
-              {activeNav === "org" ? "Organization Chart"
-                : activeNav === "risk" ? "People Risk Heatmap"
-                : activeNav === "signals" ? "Signals"
-                : activeNav === "actions" ? "Actions"
-                : activeNav === "compliance" ? "Compliance"
-                : activeNav === "employees" ? "Employee Directory"
-                : activeNav === "reports" ? "Reports"
-                : activeNav.charAt(0).toUpperCase() + activeNav.slice(1)}
-            </h1>
-            <div style={{ fontSize: 10, color: "#475569", marginTop: 1 }}>
-              Position-centric · See reporting relationships at a glance
-            </div>
-          </div>
-
-          {/* Search */}
-          <div style={{
-            display: "flex", alignItems: "center", gap: 8,
-            background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)",
-            borderRadius: 8, padding: "6px 12px", width: 220,
-          }}>
-            <span style={{ color: "#64748b", fontSize: 12 }}>🔍</span>
-            <span style={{ fontSize: 11, color: "#475569" }}>Search positions or employees...</span>
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-            <button
-              onClick={() => setShowJson(!showJson)}
-              style={{
-                padding: "5px 12px", fontSize: 10, fontWeight: 600,
-                background: showJson ? "rgba(99,102,241,0.2)" : "rgba(255,255,255,0.06)",
-                color: showJson ? "#818cf8" : "#64748b",
-                border: `1px solid ${showJson ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.08)"}`,
-                borderRadius: 6, cursor: "pointer",
-              }}
-            >
-              {"{}"} JSON Inspector
-            </button>
-            <div style={{
-              width: 32, height: 32, borderRadius: "50%",
-              background: "linear-gradient(135deg, #6366f1, #8b5cf6)",
-              display: "flex", alignItems: "center", justifyContent: "center",
-              fontSize: 12, fontWeight: 700, color: "#fff", cursor: "pointer",
-            }}>SJ</div>
-          </div>
-        </div>
-
-        {/* Scenario Bar */}
-        <div style={{
-          height: 40, flexShrink: 0, padding: "0 20px",
-          background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.05)",
-          display: "flex", alignItems: "center", gap: 8,
-        }}>
-          <span style={{ fontSize: 10, color: "#475569", fontWeight: 600, textTransform: "uppercase", letterSpacing: "0.06em", marginRight: 4 }}>
-            Scenario:
-          </span>
-          {Object.entries(SCENARIO_LABELS).map(([id, label]) => (
-            <button
-              key={id}
-              onClick={() => setScenario(id)}
-              style={{
-                padding: "3px 10px", fontSize: 10, fontWeight: 600,
-                background: controlState.scenarioId === id ? "rgba(99,102,241,0.25)" : "rgba(255,255,255,0.04)",
-                color: controlState.scenarioId === id ? "#818cf8" : "#64748b",
-                border: `1px solid ${controlState.scenarioId === id ? "rgba(99,102,241,0.4)" : "rgba(255,255,255,0.07)"}`,
-                borderRadius: 5, cursor: "pointer", whiteSpace: "nowrap",
-                transition: "all 0.1s ease",
-              }}
-            >
-              {label}
-            </button>
-          ))}
-          <div style={{ flex: 1 }} />
-          <button style={{
-            padding: "3px 10px", fontSize: 10, fontWeight: 600,
-            background: "rgba(255,255,255,0.04)", color: "#64748b",
-            border: "1px solid rgba(255,255,255,0.07)", borderRadius: 5, cursor: "pointer",
-          }}>
-            ⊞ Filters
-          </button>
-          <button style={{
-            padding: "3px 10px", fontSize: 10, fontWeight: 600,
-            background: "rgba(255,255,255,0.04)", color: "#64748b",
-            border: "1px solid rgba(255,255,255,0.07)", borderRadius: 5, cursor: "pointer",
-          }}>
-            ☰ View Options
-          </button>
-          <button style={{
-            padding: "3px 12px", fontSize: 10, fontWeight: 700,
-            background: "linear-gradient(135deg, #6366f1, #8b5cf6)", color: "#fff",
-            border: "none", borderRadius: 5, cursor: "pointer",
-          }}>
-            + Add Position
-          </button>
-        </div>
-
-        {/* Content Area */}
-        <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
-          {/* Org / Main Panel */}
-          <div style={{ flex: 1, overflowX: "auto", overflowY: "auto", padding: "28px 24px" }}>
-            {activeNav === "org" && (
-              <OrgTreeView uiState={uiState} onSelectPosition={setSelectedPositionId} />
-            )}
-            {activeNav === "risk" && (
-              <RiskHeatmapView uiState={uiState} onSelectPosition={setSelectedPositionId} />
-            )}
-            {activeNav === "signals" && (
-              <div>
-                <div style={{ marginBottom: 16, fontSize: 13, color: "#94a3b8" }}>
-                  {uiState.signals.length} active signals across the organization
-                </div>
-                {uiState.signals.map((sig) => {
-                  const pos = SEED.positions.find((p) => p.id === sig.positionId);
-                  const emp = SEED.employees.find((e) => e.positionId === sig.positionId);
-                  return (
-                    <div key={sig.id} style={{
-                      padding: "12px 16px", borderRadius: 10, marginBottom: 10,
-                      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                      display: "flex", alignItems: "center", gap: 14,
-                    }}>
-                      <SignalBadge level={sig.level} />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: "#e2e8f0", marginBottom: 2 }}>{sig.message}</div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>{sig.detail}</div>
-                      </div>
-                      <div style={{ textAlign: "right" }}>
-                        <div style={{ fontSize: 11, color: "#94a3b8" }}>{pos?.title}</div>
-                        <div style={{ fontSize: 10, color: "#475569" }}>{emp?.name ?? "Vacant"}</div>
-                      </div>
-                      <button
-                        onClick={() => resolveAction(sig.id)}
-                        style={{
-                          fontSize: 10, color: "#818cf8", background: "rgba(99,102,241,0.1)",
-                          border: "1px solid rgba(99,102,241,0.3)", borderRadius: 4,
-                          padding: "4px 10px", cursor: "pointer", fontWeight: 600,
+                  <div
+                    style={{
+                      display: "flex",
+                      justifyContent: "flex-start",
+                      alignItems: "flex-start",
+                      minHeight: 560,
+                      maxHeight: "70vh",
+                      overflow: "auto",
+                      padding: "8px 4px",
+                    }}
+                  >
+                    {rootPositions.length === 0 ? (
+                      <EmptyOrgGuide
+                        disabled={isLocalDemoMode || busy}
+                        onCreatePosition={() => {
+                          const titleEl = document.querySelector<HTMLInputElement>('input[placeholder="Position title"]');
+                          if (titleEl) titleEl.focus();
                         }}
-                      >
-                        Resolve
-                      </button>
-                    </div>
-                  );
-                })}
-                {uiState.signals.length === 0 && (
-                  <div style={{ color: "#22c55e", fontSize: 14, padding: "40px 0", textAlign: "center" }}>
-                    ✓ All signals resolved — organization is healthy
-                  </div>
-                )}
-              </div>
-            )}
-            {activeNav === "actions" && (
-              <div>
-                <div style={{ marginBottom: 16, fontSize: 13, color: "#94a3b8" }}>
-                  {uiState.actions.length} pending actions
-                </div>
-                {uiState.actions.map((act) => {
-                  const pos = SEED.positions.find((p) => p.id === act.positionId);
-                  return (
-                    <div key={act.id} style={{
-                      padding: "14px 16px", borderRadius: 10, marginBottom: 10,
-                      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                      display: "flex", alignItems: "center", gap: 14,
-                    }}>
-                      <div style={{
-                        width: 36, height: 36, borderRadius: 8,
-                        background: "rgba(99,102,241,0.15)", display: "flex",
-                        alignItems: "center", justifyContent: "center", fontSize: 16, color: "#818cf8",
-                      }}>⚡</div>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: "#e2e8f0", marginBottom: 2 }}>{act.label}</div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>{pos?.title} · {pos?.department}</div>
-                      </div>
-                      <span style={{ fontSize: 11, color: "#94a3b8" }}>{act.dueIn}</span>
-                      <button
-                        onClick={() => resolveAction(act.id)}
-                        style={{
-                          fontSize: 10, color: "#22c55e", background: "rgba(34,197,94,0.1)",
-                          border: "1px solid rgba(34,197,94,0.3)", borderRadius: 4,
-                          padding: "4px 10px", cursor: "pointer", fontWeight: 600,
-                        }}
-                      >
-                        Complete
-                      </button>
-                    </div>
-                  );
-                })}
-                {uiState.actions.length === 0 && (
-                  <div style={{ color: "#22c55e", fontSize: 14, padding: "40px 0", textAlign: "center" }}>
-                    ✓ All actions completed
-                  </div>
-                )}
-              </div>
-            )}
-            {activeNav === "compliance" && (
-              <div>
-                <div style={{ marginBottom: 16, fontSize: 13, color: "#94a3b8" }}>
-                  Compliance status across all positions
-                </div>
-                {SEED.compliance.map((item) => {
-                  const pos = SEED.positions.find((p) => p.id === item.positionId);
-                  const statusCfg = item.status === "complete"
-                    ? { color: "#22c55e", bg: "rgba(34,197,94,0.1)", label: "Complete" }
-                    : item.status === "expired"
-                    ? { color: "#f59e0b", bg: "rgba(245,158,11,0.1)", label: "Expired" }
-                    : { color: "#ef4444", bg: "rgba(239,68,68,0.1)", label: "Missing" };
-                  return (
-                    <div key={item.id} style={{
-                      padding: "12px 16px", borderRadius: 10, marginBottom: 8,
-                      background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                      display: "flex", alignItems: "center", gap: 14,
-                    }}>
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontWeight: 600, fontSize: 13, color: "#e2e8f0", marginBottom: 2 }}>{item.type}</div>
-                        <div style={{ fontSize: 11, color: "#64748b" }}>{item.description} · {pos?.title}</div>
-                      </div>
-                      <span style={{
-                        padding: "3px 10px", borderRadius: 12,
-                        background: statusCfg.bg, color: statusCfg.color,
-                        fontSize: 11, fontWeight: 600,
-                      }}>
-                        {statusCfg.label}
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-            {activeNav === "reports" && (
-              <div>
-                <div style={{ marginBottom: 16, fontSize: 13, color: "#94a3b8" }}>
-                  Reports &mdash; Finance Report (read-only)
-                </div>
-                <div style={{
-                  padding: "16px 20px", borderRadius: 10, marginBottom: 10,
-                  background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                }}>
-                  <div style={{ fontSize: 11, fontWeight: 600, color: "#64748b", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: 12 }}>
-                    Employee Finance Details
-                  </div>
-                  <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                    {SEED.employees.map((emp) => {
-                      const pos = SEED.positions.find((p) => p.id === emp.positionId);
-                      return (
-                        <div key={emp.id} style={{
-                          display: "flex", alignItems: "center", gap: 12,
-                          padding: "10px 12px", borderRadius: 8,
-                          background: "rgba(255,255,255,0.02)",
-                        }}>
-                          <Avatar initials={emp.avatarInitials} color={emp.avatarColor} size={32} />
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: "#e2e8f0" }}>{emp.name}</div>
-                            <div style={{ fontSize: 10, color: "#64748b" }}>{pos?.title} &middot; {pos?.department}</div>
-                          </div>
-                          <div style={{ textAlign: "right", minWidth: 100 }}>
-                            <div style={{ fontSize: 12, fontWeight: 600, color: "#22c55e" }}>${emp.salary.toLocaleString()}</div>
-                            <div style={{ fontSize: 9, color: "#64748b" }}>{emp.bankName} &middot; ****{emp.bankAccount.slice(-4)}</div>
-                          </div>
-                          <div style={{
-                            padding: "2px 8px", borderRadius: 12, fontSize: 10, fontWeight: 600,
-                            background: emp.status === "active" ? "rgba(34,197,94,0.1)" : emp.status === "on_leave" ? "rgba(245,158,11,0.1)" : "rgba(239,68,68,0.1)",
-                            color: emp.status === "active" ? "#22c55e" : emp.status === "on_leave" ? "#f59e0b" : "#ef4444",
-                          }}>
-                            {emp.status === "active" ? "Active" : emp.status === "on_leave" ? "Leave" : "Offboarding"}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-            )}
-            {activeNav === "employees" && (
-              <div>
-                <div style={{ marginBottom: 16 }}>
-                  <div style={{ fontSize: 13, color: "#94a3b8", marginBottom: 8 }}>
-                    {SEED.employees.length} employees
-                  </div>
-                  <div style={{
-                    display: "flex", alignItems: "center", gap: 8,
-                    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.08)",
-                    borderRadius: 8, padding: "6px 12px", width: 300,
-                  }}>
-                    <span style={{ color: "#64748b", fontSize: 12 }}>⌕</span>
-                    <input
-                      type="text"
-                      value={employeeSearch}
-                      onChange={(e) => setEmployeeSearch(e.target.value)}
-                      placeholder="Search by name, position, department..."
-                      style={{
-                        background: "none", border: "none", color: "#e2e8f0",
-                        fontSize: 11, outline: "none", width: "100%",
-                      }}
-                    />
-                  </div>
-                </div>
-                {SEED.employees
-                  .filter((emp) => {
-                    const pos = SEED.positions.find((p) => p.id === emp.positionId);
-                    const q = employeeSearch.toLowerCase();
-                    return !q || emp.name.toLowerCase().includes(q) || (pos?.title.toLowerCase().includes(q) ?? false) || (pos?.department.toLowerCase().includes(q) ?? false);
-                  })
-                  .map((emp) => {
-                    const pos = SEED.positions.find((p) => p.id === emp.positionId);
-                    return (
+                      />
+                    ) : (
                       <div
-                        key={emp.id}
-                        onClick={() => {
-                          setSelectedPositionId(emp.positionId);
-                          setActiveNav("org");
-                        }}
                         style={{
-                          padding: "12px 16px", borderRadius: 10, marginBottom: 8,
-                          background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.07)",
-                          display: "flex", alignItems: "center", gap: 14,
-                          cursor: "pointer",
+                          display: "flex",
+                          flexDirection: "column",
+                          gap: 30,
+                          alignItems: "center",
+                          minWidth: "max-content",
+                          margin: "0 auto",
                         }}
                       >
-                        <Avatar initials={emp.avatarInitials} color={emp.avatarColor} size={36} />
-                        <div style={{ flex: 1 }}>
-                          <div style={{ fontWeight: 600, fontSize: 13, color: "#e2e8f0", marginBottom: 2 }}>{emp.name}</div>
-                          <div style={{ fontSize: 11, color: "#64748b" }}>{pos?.title} · {pos?.department}</div>
-                        </div>
-                        <div style={{ textAlign: "right" }}>
-                          <div style={{ fontSize: 10, color: "#475569", marginBottom: 3 }}>{emp.location}</div>
-                          <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
-                            <StatusDot status={emp.status} />
-                            <span style={{ fontSize: 9, color: "#64748b" }}>
-                              {emp.status === "active" ? "Active" : emp.status === "on_leave" ? "Leave" : "Offboarding"}
-                            </span>
-                          </div>
+                        {rootPositions.map((position) => renderPositionNode(position.id))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                <div style={{ ...STYLE.panel, border: "1px solid #D8E0EC", position: "sticky", top: 12 }}>
+                  <div style={{ ...STYLE.subTitle, marginBottom: 8 }}>{UI_TERMS.panel.positionPanel}</div>
+                  {!selectedPosition ? (
+                    <div
+                      style={{
+                        padding: "24px 16px",
+                        textAlign: "center",
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "center",
+                        gap: 8,
+                      }}
+                    >
+                      <div
+                        style={{
+                          width: 36,
+                          height: 36,
+                          borderRadius: 10,
+                          background: "#F1F5F9",
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginBottom: 4,
+                        }}
+                      >
+                        <svg width="18" height="18" viewBox="0 0 18 18" fill="none">
+                          <rect x="7" y="2" width="4" height="4" rx="1.5" fill="#94A3B8" />
+                          <rect x="2" y="12" width="4" height="4" rx="1.5" fill="#CBD5E1" />
+                          <rect x="7" y="12" width="4" height="4" rx="1.5" fill="#CBD5E1" />
+                          <rect x="12" y="12" width="4" height="4" rx="1.5" fill="#CBD5E1" />
+                          <line x1="9" y1="6" x2="9" y2="12" stroke="#E2E8F0" strokeWidth="1.5" />
+                          <line x1="4" y1="9" x2="14" y2="9" stroke="#E2E8F0" strokeWidth="1.5" />
+                          <line x1="4" y1="9" x2="4" y2="12" stroke="#E2E8F0" strokeWidth="1.5" />
+                          <line x1="14" y1="9" x2="14" y2="12" stroke="#E2E8F0" strokeWidth="1.5" />
+                        </svg>
+                      </div>
+                      <div style={{ fontSize: 12, fontWeight: 600, color: "#475569" }}>
+                        {positions.length === 0 ? "No positions yet" : "No position selected"}
+                      </div>
+                      <div style={{ fontSize: 11, color: "#94A3B8", lineHeight: 1.5 }}>
+                        {positions.length === 0
+                          ? "Create your first position to get started."
+                          : "Click any node in the chart to manage it."}
+                      </div>
+                    </div>
+                  ) : (
+                    <>
+                      <div style={{ marginBottom: 10 }}>
+                        <div style={{ fontSize: 15, fontWeight: 800, color: "#0F172A" }}>{selectedPosition.title}</div>
+                        <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                          Department: {selectedPosition.teamId ? teamMap.get(selectedPosition.teamId)?.name ?? "Not set" : "Not set"}
                         </div>
                       </div>
+
+                      {/* Numbered workflow tabs — communicate intended sequence */}
+                      <div
+                        style={{
+                          display: "grid",
+                          gridTemplateColumns: "repeat(3, minmax(0,1fr))",
+                          gap: 4,
+                          marginBottom: 14,
+                          padding: 3,
+                          background: "#F1F5F9",
+                          borderRadius: 10,
+                        }}
+                      >
+                        {(
+                          [
+                            { id: "position" as PositionPanelTab, step: "1", label: "Structure", Icon: LayoutGrid },
+                            { id: "assignment" as PositionPanelTab, step: "2", label: "Assign", Icon: UserCheck },
+                            { id: "documents" as PositionPanelTab, step: "3", label: "Evidence", Icon: FileText },
+                          ] as const
+                        ).map(({ id, step, label, Icon }) => {
+                          const isActive = positionPanelTab === id;
+                          return (
+                            <button
+                              key={id}
+                              type="button"
+                              onClick={() => setPositionPanelTab(id)}
+                              style={{
+                                display: "flex",
+                                flexDirection: "column",
+                                alignItems: "center",
+                                gap: 3,
+                                padding: "7px 4px",
+                                border: "none",
+                                borderRadius: 8,
+                                background: isActive ? "#FFFFFF" : "transparent",
+                                boxShadow: isActive ? "0 1px 4px rgba(15,23,42,0.08)" : "none",
+                                cursor: "pointer",
+                                transition: "background 0.12s",
+                              }}
+                            >
+                              <div
+                                style={{
+                                  display: "flex",
+                                  alignItems: "center",
+                                  gap: 4,
+                                }}
+                              >
+                                <span
+                                  style={{
+                                    fontSize: 10,
+                                    fontWeight: 800,
+                                    color: isActive ? "#2563EB" : "#94A3B8",
+                                    letterSpacing: "0.04em",
+                                  }}
+                                >
+                                  {step}
+                                </span>
+                                <Icon
+                                  size={13}
+                                  color={isActive ? "#2563EB" : "#94A3B8"}
+                                  strokeWidth={isActive ? 2.5 : 2}
+                                />
+                              </div>
+                              <span
+                                style={{
+                                  fontSize: 10,
+                                  fontWeight: isActive ? 700 : 500,
+                                  color: isActive ? "#0F172A" : "#64748B",
+                                  letterSpacing: "0.02em",
+                                }}
+                              >
+                                {label}
+                              </span>
+                            </button>
+                          );
+                        })}
+                      </div>
+
+                      {positionPanelTab === "position" ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            <strong>{UI_TERMS.panel.fields.position}</strong>: {selectedPosition.title}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            <strong>{UI_TERMS.panel.fields.reportsTo}</strong>: {selectedPosition.reportsToPositionId
+                              ? positionMap.get(selectedPosition.reportsToPositionId)?.title ?? selectedPosition.reportsToPositionId
+                              : "Not set"}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            <strong>{UI_TERMS.panel.fields.department}</strong>: {selectedPosition.teamId
+                              ? teamMap.get(selectedPosition.teamId)?.name ?? selectedPosition.teamId
+                              : "Not set"}
+                          </div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            <strong>{UI_TERMS.panel.fields.status}</strong>: {statePresentation(resolvePositionNodeState(selectedPosition.id)).label}
+                          </div>
+                          {selectedHasNoReportingLine ? (
+                            <div style={{ fontSize: 11, color: "#92400E" }}>
+                              {UI_TERMS.warnings.noReportingLine}
+                            </div>
+                          ) : null}
+                          {selectedHasStructuralIssue ? (
+                            <div style={{ fontSize: 11, color: "#92400E" }}>
+                              {UI_TERMS.warnings.structureUpdated}
+                            </div>
+                          ) : null}
+                          {!selectedAssignment ? (
+                            <div style={{ fontSize: 11, color: "#64748B" }}>
+                              {UI_TERMS.warnings.currentlyUnassigned}
+                            </div>
+                          ) : null}
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>{UI_TERMS.panel.fields.notes}</label>
+                          <textarea placeholder="Add context" rows={2} style={{ width: "100%", resize: "vertical" }} />
+
+                          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                            <button onClick={() => { setEditingReportingLine(false); setQuickInsert({ mode: "above", title: "" }); }}>
+                              Add above
+                            </button>
+                            <button onClick={() => { setEditingReportingLine(false); setQuickInsert({ mode: "below", title: "" }); }}>
+                              Add below
+                            </button>
+                            <button onClick={() => { setEditingReportingLine(false); setQuickInsert({ mode: "parallel", title: "" }); }}>
+                              Add parallel
+                            </button>
+                            <button
+                              onClick={() => {
+                                setQuickInsert(null);
+                                setReportingLineDraftId(selectedPosition.reportsToPositionId ?? "");
+                                setEditingReportingLine(true);
+                              }}
+                            >
+                              Update reporting line
+                            </button>
+                            <button
+                              onClick={() => void handleVacateSelectedPosition()}
+                              disabled={isLocalDemoMode || !selectedAssignment}
+                            >
+                              Vacate position
+                            </button>
+                          </div>
+
+                          {quickInsert ? (
+                            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+                              <input
+                                autoFocus
+                                value={quickInsert.title}
+                                onChange={(event) =>
+                                  setQuickInsert({ mode: quickInsert.mode, title: event.target.value })
+                                }
+                                onKeyDown={(event) => {
+                                  if (event.key === "Enter" && quickInsert.title.trim()) {
+                                    void handleQuickInsertPosition(quickInsert.mode, selectedPosition.id, quickInsert.title);
+                                  }
+                                  if (event.key === "Escape") setQuickInsert(null);
+                                }}
+                                placeholder={`New position title (add ${quickInsert.mode})`}
+                                style={{ flex: 1 }}
+                              />
+                              <button
+                                onClick={() => void handleQuickInsertPosition(quickInsert.mode, selectedPosition.id, quickInsert.title)}
+                                disabled={!quickInsert.title.trim() || isLocalDemoMode}
+                              >
+                                Create
+                              </button>
+                              <button onClick={() => setQuickInsert(null)}>Cancel</button>
+                            </div>
+                          ) : null}
+
+                          {editingReportingLine ? (
+                            <div style={{ display: "flex", gap: 6, alignItems: "center", marginTop: 4 }}>
+                              <select
+                                value={reportingLineDraftId}
+                                onChange={(event) => setReportingLineDraftId(event.target.value)}
+                                style={{ flex: 1 }}
+                              >
+                                <option value="">No manager (root position)</option>
+                                {positions
+                                  .filter((candidate) => candidate.id !== selectedPosition.id)
+                                  .map((candidate) => (
+                                    <option key={candidate.id} value={candidate.id}>
+                                      {candidate.title}
+                                    </option>
+                                  ))}
+                              </select>
+                              <button
+                                onClick={() => void handleUpdateReportingLine(selectedPosition.id, reportingLineDraftId || null)}
+                                disabled={isLocalDemoMode}
+                              >
+                                Save
+                              </button>
+                              <button onClick={() => setEditingReportingLine(false)}>Cancel</button>
+                            </div>
+                          ) : null}
+                        </div>
+                      ) : null}
+
+                      {positionPanelTab === "assignment" ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                          {/* Current occupant summary */}
+                          {selectedAssignment ? (
+                            <div
+                              style={{
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 8,
+                                padding: "8px 10px",
+                                background: "#F0FDF4",
+                                border: "1px solid #BBF7D0",
+                                borderRadius: 8,
+                              }}
+                            >
+                              <div
+                                style={{
+                                  width: 28,
+                                  height: 28,
+                                  borderRadius: "50%",
+                                  background: "#D1FAE5",
+                                  display: "flex",
+                                  alignItems: "center",
+                                  justifyContent: "center",
+                                  fontSize: 11,
+                                  fontWeight: 800,
+                                  color: "#059669",
+                                  flexShrink: 0,
+                                }}
+                              >
+                                {selectedAssignment.person.fullName
+                                  ? selectedAssignment.person.fullName.split(" ").map((p) => p[0]).join("").slice(0, 2).toUpperCase()
+                                  : "?"}
+                              </div>
+                              <div style={{ minWidth: 0 }}>
+                                <div style={{ fontSize: 12, fontWeight: 700, color: "#065F46" }}>
+                                  {selectedAssignment.person.fullName ?? "Unknown"}
+                                </div>
+                                <div style={{ fontSize: 10, color: "#6EE7B7" }}>Active assignment</div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div
+                              style={{
+                                padding: "8px 10px",
+                                background: "#FFFBEB",
+                                border: "1px solid #FDE68A",
+                                borderRadius: 8,
+                                fontSize: 11,
+                                color: "#92400E",
+                              }}
+                            >
+                              This position is vacant. Assign a person below.
+                            </div>
+                          )}
+
+                          {/* Person selector */}
+                          <div>
+                            <label
+                              htmlFor="assign-person-select"
+                              style={{ fontSize: 11, color: "#334155", fontWeight: 600, display: "block", marginBottom: 4 }}
+                            >
+                              {selectedAssignment ? "Reassign to" : "Assign person"}
+                            </label>
+                            <select
+                              id="assign-person-select"
+                              ref={assignPersonSelectRef}
+                              value={assignmentDraftEmployeeId}
+                              onChange={(event) => setAssignmentDraftEmployeeId(event.target.value)}
+                              style={{ width: "100%" }}
+                            >
+                              <option value="">Select person</option>
+                              {people.map((person) => (
+                                <option key={person.id} value={person.id}>
+                                  {person.fullName}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+
+                          {/* Start date (persisted as assignment startedAt) */}
+                          {!selectedAssignment ? (
+                            <div>
+                              <label
+                                htmlFor="assign-start-date"
+                                style={{ fontSize: 11, color: "#334155", fontWeight: 600, display: "block", marginBottom: 4 }}
+                              >
+                                Start date
+                              </label>
+                              <input
+                                id="assign-start-date"
+                                type="date"
+                                value={assignmentDraftStartDate}
+                                onChange={(event) => setAssignmentDraftStartDate(event.target.value)}
+                                style={{ width: "100%" }}
+                              />
+                            </div>
+                          ) : null}
+
+                          {/* Primary action */}
+                          <button
+                            type="button"
+                            onClick={() => void handleSaveAssignment()}
+                            disabled={isLocalDemoMode || !assignmentDraftEmployeeId}
+                            style={{
+                              background: !isLocalDemoMode && assignmentDraftEmployeeId
+                                ? "linear-gradient(135deg, #2563EB 0%, #1D4ED8 100%)"
+                                : "#E2E8F0",
+                              color: !isLocalDemoMode && assignmentDraftEmployeeId ? "#FFFFFF" : "#94A3B8",
+                              border: "none",
+                              borderRadius: 8,
+                              padding: "9px 14px",
+                              fontSize: 13,
+                              fontWeight: 700,
+                              cursor: !isLocalDemoMode && assignmentDraftEmployeeId ? "pointer" : "not-allowed",
+                              boxShadow: !isLocalDemoMode && assignmentDraftEmployeeId
+                                ? "0 2px 8px rgba(37,99,235,0.25)"
+                                : "none",
+                            }}
+                          >
+                            {selectedAssignment ? "Reassign person" : "Assign person"}
+                          </button>
+
+                          {/* Termination — single action, clear microcopy */}
+                          {selectedAssignment && (
+                            <div>
+                              <label
+                                htmlFor="vacate-last-working-day"
+                                style={{ fontSize: 11, color: "#334155", fontWeight: 600, display: "block", marginBottom: 4 }}
+                              >
+                                Last working day
+                              </label>
+                              <input
+                                id="vacate-last-working-day"
+                                type="date"
+                                value={vacateLastWorkingDay}
+                                onChange={(event) => setVacateLastWorkingDay(event.target.value)}
+                                disabled={isLocalDemoMode}
+                                style={{ width: "100%" }}
+                              />
+                            </div>
+                          )}
+                          {selectedAssignment && (
+                            <button
+                              type="button"
+                              onClick={() => void handleVacateSelectedPosition()}
+                              disabled={isLocalDemoMode}
+                              style={{
+                                background: "none",
+                                border: "1px solid #E2E8F0",
+                                borderRadius: 8,
+                                padding: "8px 14px",
+                                fontSize: 12,
+                                fontWeight: 600,
+                                color: "#475569",
+                                cursor: isLocalDemoMode ? "not-allowed" : "pointer",
+                                textAlign: "left",
+                              }}
+                            >
+                              <div style={{ fontWeight: 700, color: "#334155", marginBottom: 2 }}>
+                                Vacate position
+                              </div>
+                              <div style={{ fontSize: 11, color: "#94A3B8", fontWeight: 400 }}>
+                                End the current assignment and make this position vacant.
+                              </div>
+                            </button>
+                          )}
+                        </div>
+                      ) : null}
+
+                      {positionPanelTab === "documents" ? (
+                        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                          <div style={{ fontSize: 11, color: "#334155" }}><strong>{UI_TERMS.panel.fields.roleDescription}</strong></div>
+                          <div style={{ fontSize: 11, color: "#334155" }}><strong>{UI_TERMS.panel.fields.keyResponsibilities}</strong></div>
+                          <div style={{ fontSize: 11, color: "#334155" }}><strong>{UI_TERMS.panel.fields.kpis}</strong></div>
+                          <div style={{ fontSize: 11, color: "#334155" }}>
+                            <strong>{UI_TERMS.panel.fields.signatureStatus}</strong>: {selectedPositionDocument ? documentStateLabel(selectedPositionDocument.state) : UI_TERMS.documents.states.draft}
+                          </div>
+
+                          {selectedPositionDocument ? (
+                            <div style={{ border: "1px solid #CBD5E1", borderRadius: 8, background: "#F8FAFC", padding: "8px 10px" }}>
+                              <div style={{ fontSize: 12, fontWeight: 700, color: "#0F172A" }}>{selectedPositionDocument.fileName}</div>
+                              <div style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                                Uploaded {formatDateLabel(selectedPositionDocument.uploadedAt)} · {selectedPositionDocument.sizeLabel}
+                              </div>
+                              <select
+                                style={{ marginTop: 8, width: "100%" }}
+                                value={selectedPositionDocument.state}
+                                onChange={(event) =>
+                                  updatePositionDocumentState(
+                                    selectedPosition.id,
+                                    event.target.value as UploadedPositionDocument["state"],
+                                  )
+                                }
+                              >
+                                <option value="draft">{UI_TERMS.documents.states.draft}</option>
+                                <option value="in_review">{UI_TERMS.documents.states.inReview}</option>
+                                <option value="signed">{UI_TERMS.documents.states.signed}</option>
+                                <option value="outdated">{UI_TERMS.documents.states.outdated}</option>
+                              </select>
+                              <button
+                                style={{ marginTop: 8 }}
+                                onClick={() => window.open(selectedPositionDocument.objectUrl, "_blank", "noopener,noreferrer")}
+                              >
+                                Open document
+                              </button>
+                            </div>
+                          ) : (
+                            <div style={{ fontSize: 11, color: "#64748B" }}>
+                              {UI_TERMS.documents.empty}
+                            </div>
+                          )}
+
+                          <label style={{ fontSize: 11, color: "#334155", fontWeight: 600 }}>
+                            {UI_TERMS.documents.upload}
+                          </label>
+                          <input
+                            type="file"
+                            accept=".pdf,.doc,.docx,.txt,.md,.html"
+                            onChange={(event) =>
+                              handleUploadPositionDocument(
+                                selectedPosition.id,
+                                event.target.files?.[0] ?? null,
+                              )
+                            }
+                          />
+                          <button
+                            onClick={() => {
+                              const reportingLine = selectedPosition.reportsToPositionId
+                                ? positionMap.get(selectedPosition.reportsToPositionId)?.title ?? selectedPosition.reportsToPositionId
+                                : "N/A";
+                              downloadJobDescriptionTemplate({
+                                positionName: selectedPosition.title,
+                                departmentName: selectedPosition.teamId
+                                  ? teamMap.get(selectedPosition.teamId)?.name ?? "Not set"
+                                  : "Not set",
+                                reportingLine,
+                              });
+                            }}
+                          >
+                            {UI_TERMS.documents.downloadTemplate}
+                          </button>
+                        </div>
+                      ) : null}
+
+                    </>
+                  )}
+                </div>
+              </div>
+
+              <div style={{ marginTop: 12 }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    fontWeight: 700,
+                    color: "#334155",
+                    marginBottom: 10,
+                  }}
+                >
+                  Add Positions & People
+                </div>
+
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12, marginTop: 10 }}>
+                  <div style={STYLE.panel}>
+                    <div style={STYLE.subTitle}>Department + Position Setup</div>
+                    <div
+                      style={{
+                        fontSize: 11,
+                        color: isLocalDemoMode ? "#92400E" : "#64748B",
+                        marginBottom: 8,
+                      }}
+                    >
+                      {isLocalDemoMode
+                        ? "Local demo mode is read-only. Connect API mode to persist changes."
+                        : "Use this to build department hierarchy and reporting lines."}
+                    </div>
+
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                        Create Department
+                      </div>
+                      <input
+                        value={newTeamName}
+                        onChange={(event) => setNewTeamName(event.target.value)}
+                        placeholder="Department name"
+                        style={{ width: "100%", marginBottom: 6 }}
+                      />
+                      <select
+                        value={newTeamParentId}
+                        onChange={(event) => setNewTeamParentId(event.target.value)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="">No parent department</option>
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </select>
+                      <button onClick={() => void handleCreateTeam()} disabled={isLocalDemoMode}>
+                        Add Department
+                      </button>
+                    </div>
+
+                    <div>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                        Create Position
+                      </div>
+                      <input
+                        value={newPositionTitle}
+                        onChange={(event) => setNewPositionTitle(event.target.value)}
+                        placeholder="Position title"
+                        style={{ width: "100%", marginBottom: 6 }}
+                      />
+                      <select
+                        value={newPositionTeamId}
+                        onChange={(event) => setNewPositionTeamId(event.target.value)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="">No department</option>
+                        {teams.map((team) => (
+                          <option key={team.id} value={team.id}>
+                            {team.name}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={newPositionReportsToId}
+                        onChange={(event) => setNewPositionReportsToId(event.target.value)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="">No manager (root position)</option>
+                        {positions.map((position) => (
+                          <option key={position.id} value={position.id}>
+                            {position.title}
+                          </option>
+                        ))}
+                      </select>
+                      <button onClick={() => void handleCreatePosition()} disabled={isLocalDemoMode}>
+                        Add Position
+                      </button>
+                    </div>
+                  </div>
+
+                  <div style={STYLE.panel}>
+                    <div style={STYLE.subTitle}>Person Setup</div>
+                    <div style={{ marginBottom: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 700, color: "#334155", marginBottom: 6 }}>
+                        Create Person
+                      </div>
+                      <input
+                        value={newPersonName}
+                        onChange={(event) => setNewPersonName(event.target.value)}
+                        placeholder="Full name"
+                        style={{ width: "100%", marginBottom: 6 }}
+                      />
+                      <input
+                        value={newPersonEmail}
+                        onChange={(event) => setNewPersonEmail(event.target.value)}
+                        placeholder="Email"
+                        style={{ width: "100%", marginBottom: 6 }}
+                      />
+                      <input
+                        value={newPersonPhone}
+                        onChange={(event) => setNewPersonPhone(event.target.value)}
+                        placeholder="Phone"
+                        style={{ width: "100%", marginBottom: 6 }}
+                      />
+                      <select
+                        value={newPersonPositionId}
+                        onChange={(event) => setNewPersonPositionId(event.target.value)}
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value="">No initial position</option>
+                        {positions.map((position) => (
+                          <option key={position.id} value={position.id}>
+                            {position.title}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={newPersonStatus}
+                        onChange={(event) =>
+                          setNewPersonStatus(event.target.value as typeof newPersonStatus)
+                        }
+                        style={{ width: "100%", marginBottom: 6 }}
+                      >
+                        <option value={EmploymentStatus.active}>Active</option>
+                        <option value={EmploymentStatus.on_leave}>On leave</option>
+                        <option value={EmploymentStatus.offboarding}>Offboarding</option>
+                      </select>
+                      <button onClick={() => void handleCreatePerson()} disabled={isLocalDemoMode}>
+                        Add Person
+                      </button>
+                    </div>
+
+                    <div style={{ fontSize: 11, color: "#64748B" }}>
+                      Use the Assignment tab to reassign people between positions.
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </section>
+            </>
+          )}
+
+          {activeNav === "actions" && (
+            <section style={STYLE.panel}>
+              <div style={{ ...STYLE.title, fontSize: 17 }}>Actions</div>
+
+              <div style={{ ...STYLE.panel, marginBottom: 12 }}>
+                <div style={STYLE.subTitle}>Create Action</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 8 }}>
+                  <input value={newActionTitle} onChange={(e) => setNewActionTitle(e.target.value)} placeholder={UI_TERMS.actions.prompts.whatNeedsToBeDone} />
+                  <input type="date" value={newActionDueDate} onChange={(e) => setNewActionDueDate(e.target.value)} />
+                  <select value={newActionOwnerId} onChange={(e) => setNewActionOwnerId(e.target.value)}>
+                    <option value="">{UI_TERMS.actions.prompts.whoIsResponsible}</option>
+                    {decisionMakerPositions.map((position) => (
+                      <option key={position.id} value={position.id}>{position.title}</option>
+                    ))}
+                  </select>
+                  <select value={newActionLinkId} onChange={(e) => setNewActionLinkId(e.target.value)}>
+                    <option value="">{UI_TERMS.actions.prompts.whereDoesThisBelong}</option>
+                    {decisionMakerPositions.map((position) => (
+                      <option key={position.id} value={position.id}>{position.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <button style={{ marginTop: 8 }} onClick={() => void handleCreateAction()}>Create Action</button>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {actions.map((item) => (
+                  <div key={item.id} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: 10, background: "#F8FAFC" }}>
+                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                      <div>
+                        <div style={{ fontWeight: 700 }}>{item.title}</div>
+                        <div style={{ fontSize: 12, color: "#475569" }}>{linkLabel(item)}</div>
+                        <div style={{ fontSize: 12, color: "#475569" }}>
+                          Owner: {ownerLabel(item.ownerPersonId, item.ownerPositionId)} · Due: {formatDateLabel(item.dueDate)}
+                        </div>
+                        {import.meta.env.DEV ? (
+                          <div style={{ fontSize: 11, color: "#1D4ED8", marginTop: 2 }}>
+                            Path: {item.assignmentId ? "assignment > person > position" : item.ownerPersonId ? "person > position fallback" : "position structural"}
+                            {item.assignmentId ? ` · Assignment ${item.assignmentId.slice(0, 8)}` : ""}
+                          </div>
+                        ) : null}
+                      </div>
+                      <div style={{ display: "flex", gap: 6 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: "#334155", border: "1px solid #CBD5E1", borderRadius: 999, padding: "3px 8px" }}>
+                          {actionStatusLabel(item.status)}
+                        </span>
+                        {item.status !== ActionStatus.done ? (
+                          <button onClick={() => void handleTransitionAction(item)}>
+                            {item.status === ActionStatus.open ? "Start" : "Mark Done"}
+                          </button>
+                        ) : null}
+                        <button onClick={() => void handleDeleteEntity("action", item.id)}>Delete</button>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+                {actions.length === 0 ? <div style={{ fontSize: 12, color: "#64748B" }}>{UI_TERMS.actions.empty}</div> : null}
+              </div>
+            </section>
+          )}
+
+          {activeNav === "team" && (
+            <section style={STYLE.panel}>
+              <div style={{ ...STYLE.title, fontSize: 17 }}>Team Directory</div>
+              <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                <thead>
+                  <tr style={{ textAlign: "left", borderBottom: "1px solid #E5E7EB" }}>
+                    <th style={{ padding: 6 }}>Name</th>
+                    <th style={{ padding: 6 }}>Position</th>
+                    <th style={{ padding: 6 }}>Team</th>
+                    <th style={{ padding: 6 }}>Email</th>
+                    <th style={{ padding: 6 }}>Phone</th>
+                    <th style={{ padding: 6 }}>Status</th>
+                    <th style={{ padding: 6 }}></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {people.map((person) => {
+                    const assignment = activeAssignmentByPersonId.get(person.id);
+                    const position = assignment ? positionMap.get(assignment.positionId) : null;
+                    const team = position?.teamId ? teamMap.get(position.teamId) : null;
+                    return (
+                      <tr key={person.id} style={{ borderBottom: "1px solid #F1F5F9" }}>
+                        <td style={{ padding: 6 }}>{person.fullName}</td>
+                        <td style={{ padding: 6 }}>{position?.title ?? "-"}</td>
+                        <td style={{ padding: 6 }}>{team?.name ?? "-"}</td>
+                        <td style={{ padding: 6 }}>{person.email ?? "-"}</td>
+                        <td style={{ padding: 6 }}>{person.phone ?? "-"}</td>
+                        <td style={{ padding: 6 }}>{person.employmentStatus}</td>
+                        <td style={{ padding: 6 }}>
+                          <button onClick={() => void handleDeleteEntity("person", person.id)}>Delete</button>
+                        </td>
+                      </tr>
                     );
                   })}
-              </div>
-            )}
-            {!["org", "risk", "signals", "actions", "compliance", "employees", "reports"].includes(activeNav) && (
-              <div style={{ color: "#475569", padding: "60px 0", textAlign: "center", fontSize: 13 }}>
-                {activeNav.charAt(0).toUpperCase() + activeNav.slice(1)} view — select a section from the sidebar
-              </div>
-            )}
+                </tbody>
+              </table>
+            </section>
+          )}
 
-            {showJson && (
-              <div style={{ marginTop: 24 }}>
-                <JsonInspectorPanel seed={SEED} controlState={controlState} uiState={uiState} />
-              </div>
-            )}
-          </div>
+          {activeNav === "policies" && (
+            <section style={STYLE.panel}>
+              <div style={{ ...STYLE.title, fontSize: 17 }}>Policies</div>
 
-          {/* Right Detail Panel */}
-          <div style={{
-            width: 320, flexShrink: 0,
-            background: "#13161f", borderLeft: "1px solid rgba(255,255,255,0.06)",
-            display: "flex", flexDirection: "column", overflow: "hidden",
-          }}>
-            <RightPanel
-              uiState={uiState}
-              onResolveAction={resolveAction}
-              onCompleteOnboarding={completeOnboarding}
-              onClose={() => setControlState((prev) => ({ ...prev, selectedPositionId: "1-001" }))}
-              onEditPosition={() => setEditingPosition(uiState.selectedPosition?.id ?? null)}
-              isEditing={editingPosition === uiState.selectedPosition?.id}
-              onSaveEdit={updatePosition}
-              onCancelEdit={() => setEditingPosition(null)}
-              expandedAction={expandedAction}
-              onToggleAction={setExpandedAction}
-            />
-          </div>
+              <div style={{ ...STYLE.panel, marginBottom: 12 }}>
+                <div style={STYLE.subTitle}>Create Policy</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(6, minmax(0,1fr))", gap: 8 }}>
+                  <input value={newPolicyTitle} onChange={(e) => setNewPolicyTitle(e.target.value)} placeholder="Policy title" />
+                  <input value={newPolicyBody} onChange={(e) => setNewPolicyBody(e.target.value)} placeholder="Policy text" />
+                  <select value={newPolicyScope} onChange={(e) => setNewPolicyScope(e.target.value as typeof newPolicyScope)}>
+                    <option value={PolicyScope.organization}>Organization</option>
+                    <option value={PolicyScope.team}>Team</option>
+                    <option value={PolicyScope.position}>Position</option>
+                  </select>
+                  <select value={newPolicyTeamId} onChange={(e) => setNewPolicyTeamId(e.target.value)}>
+                    <option value="">Team target</option>
+                    {teams.map((team) => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                  </select>
+                  <select value={newPolicyPositionId} onChange={(e) => setNewPolicyPositionId(e.target.value)}>
+                    <option value="">Position target</option>
+                    {positions.map((position) => (
+                      <option key={position.id} value={position.id}>{position.title}</option>
+                    ))}
+                  </select>
+                  <div style={{ display: "flex", gap: 6 }}>
+                    <select value={newPolicyOwnerType} onChange={(e) => setNewPolicyOwnerType(e.target.value as OwnerType)}>
+                      <option value="person">Owner person</option>
+                      <option value="position">Owner position</option>
+                    </select>
+                    <select value={newPolicyOwnerId} onChange={(e) => setNewPolicyOwnerId(e.target.value)}>
+                      <option value="">Owner</option>
+                      {(newPolicyOwnerType === "person" ? people : positions).map((item) => (
+                        <option key={item.id} value={item.id}>{"fullName" in item ? item.fullName : item.title}</option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                <button style={{ marginTop: 8 }} onClick={() => void handleCreatePolicy()}>Create Policy</button>
+              </div>
+
+              <div style={{ ...STYLE.panel, marginBottom: 12 }}>
+                <div style={STYLE.subTitle}>Retarget Policy Scope</div>
+                <div style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0,1fr))", gap: 8 }}>
+                  <select value={policyRetargetPolicyId} onChange={(e) => setPolicyRetargetPolicyId(e.target.value)}>
+                    <option value="">Policy</option>
+                    {policies.map((policy) => (
+                      <option key={policy.id} value={policy.id}>{policy.title}</option>
+                    ))}
+                  </select>
+                  <select value={policyRetargetScope} onChange={(e) => setPolicyRetargetScope(e.target.value as typeof policyRetargetScope)}>
+                    <option value={PolicyScope.organization}>Organization</option>
+                    <option value={PolicyScope.team}>Team</option>
+                    <option value={PolicyScope.position}>Position</option>
+                  </select>
+                  <select value={policyRetargetTeamId} onChange={(e) => setPolicyRetargetTeamId(e.target.value)}>
+                    <option value="">Team target</option>
+                    {teams.map((team) => (
+                      <option key={team.id} value={team.id}>{team.name}</option>
+                    ))}
+                  </select>
+                  <select value={policyRetargetPositionId} onChange={(e) => setPolicyRetargetPositionId(e.target.value)}>
+                    <option value="">Position target</option>
+                    {positions.map((position) => (
+                      <option key={position.id} value={position.id}>{position.title}</option>
+                    ))}
+                  </select>
+                </div>
+                <button style={{ marginTop: 8 }} onClick={() => void handleAttachPolicyScope()}>Update Scope</button>
+              </div>
+
+              <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                {policies.map((policy) => (
+                  <div key={policy.id} style={{ border: "1px solid #E5E7EB", borderRadius: 8, padding: 10 }}>
+                    <div style={{ fontWeight: 700 }}>{policy.title}</div>
+                    <div style={{ fontSize: 12, color: "#475569" }}>{policy.body}</div>
+                    <div style={{ fontSize: 12, color: "#475569" }}>
+                      Scope: {policy.scope}
+                      {policy.teamId ? ` (${teamMap.get(policy.teamId)?.name ?? policy.teamId})` : ""}
+                      {policy.positionId ? ` (${positionMap.get(policy.positionId)?.title ?? policy.positionId})` : ""}
+                    </div>
+                    <div style={{ fontSize: 12, color: "#475569" }}>
+                      Owner: {ownerLabel(policy.ownerPersonId, policy.ownerPositionId)}
+                    </div>
+                    <button style={{ marginTop: 6 }} onClick={() => void handleDeleteEntity("policy", policy.id)}>Delete</button>
+                  </div>
+                ))}
+                {policies.length === 0 ? <div style={{ fontSize: 12, color: "#64748B" }}>No policies yet.</div> : null}
+              </div>
+            </section>
+          )}
+
+          {activeNav === "administration" && (
+            <section style={STYLE.panel}>
+              <div style={{ ...STYLE.title, fontSize: 17 }}>Administration</div>
+              <div style={{ fontSize: 12, color: "#475569", marginBottom: 10 }}>
+                Organization ID: {organizationId ?? "-"}
+              </div>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 8, marginBottom: 8 }}>
+                <button onClick={downloadOrgSummaryHtml}>Download Founder Dependency Report</button>
+                {import.meta.env.DEV ? (
+                  <>
+                    <button onClick={() => void handleResetDemoState()} disabled={busy}>
+                      Reset Deterministic Demo
+                    </button>
+                    <button onClick={() => void handleInvalidOrgRecoveryCheck()} disabled={busy}>
+                      Run Invalid-Org Recovery Check
+                    </button>
+                  </>
+                ) : null}
+              </div>
+              {import.meta.env.DEV && demoResetSummary ? (
+                <div style={{ fontSize: 12, color: "#0F172A", marginBottom: 6 }}>{demoResetSummary}</div>
+              ) : null}
+            </section>
+          )}
+      {feedbackToast ? (
+        <div
+          style={{
+            position: "fixed",
+            right: 20,
+            bottom: 20,
+            background: feedbackToast.tone === "error" ? "#7F1D1D" : "#0F172A",
+            color: "#F8FAFC",
+            borderRadius: 10,
+            padding: "10px 12px",
+            fontSize: 12,
+            boxShadow: "0 14px 28px rgba(2, 6, 23, 0.25)",
+            zIndex: 40,
+          }}
+        >
+          {feedbackToast.message}
         </div>
-      </div>
+      ) : null}
     </div>
+    </AppShell>
   );
 }
+
+export default TeamFrame;
