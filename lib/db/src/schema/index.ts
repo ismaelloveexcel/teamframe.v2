@@ -346,6 +346,21 @@ export const hrOffboardingTable = pgTable("hr_offboarding", {
   updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
 });
 
+// 6. Report (Prompt 7) — FROZEN report output. content jsonb captured at
+//    generation time; editing source records afterwards does NOT change it.
+export const hrReportKindEnum = pgEnum("hr_report_kind", ["finance", "exit"]);
+
+export const hrReportTable = pgTable("hr_report", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  kind: hrReportKindEnum("kind").notNull(), // finance | exit
+  subjectId: uuid("subject_id").references(() => hrEmployeesTable.id, { onDelete: "set null" }), // employeeId for exit, null for finance
+  periodCutoff: date("period_cutoff"), // finance period cutoff, null for exit
+  content: jsonb("content").$type<Record<string, unknown>>().notNull(), // FROZEN serialized output
+  generatedBy: uuid("generated_by").references(() => usersTable.id, { onDelete: "set null" }),
+  generatedAt: timestamp("generated_at", { withTimezone: true }).defaultNow().notNull(),
+});
+
 export type HrCompensation = typeof hrCompensationTable.$inferSelect;
 export type HrLeave = typeof hrLeaveTable.$inferSelect;
 export type HrLeaveBalance = typeof hrLeaveBalanceTable.$inferSelect;
@@ -354,6 +369,7 @@ export type HrPolicyAcknowledgement = typeof hrPolicyAcknowledgementTable.$infer
 export type HrTemplate = typeof hrTemplateTable.$inferSelect;
 export type HrDocument = typeof hrDocumentTable.$inferSelect;
 export type HrOffboarding = typeof hrOffboardingTable.$inferSelect;
+export type HrReport = typeof hrReportTable.$inferSelect;
 
 export const organizationMembershipsTable = pgTable(
   "organization_memberships",

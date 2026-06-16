@@ -19,7 +19,8 @@
     "leave-gate": "tsx src/__rls_check__/leave-gate.ts",
     "policy-gate": "tsx src/__rls_check__/policy-gate.ts",
     "document-gate": "tsx src/__rls_check__/document-gate.ts",
-    "offboarding-gate": "tsx src/__rls_check__/offboarding-gate.ts"
+    "offboarding-gate": "tsx src/__rls_check__/offboarding-gate.ts",
+    "report-gate": "tsx src/__rls_check__/report-gate.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",
