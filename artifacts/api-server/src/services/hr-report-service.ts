@@ -73,7 +73,7 @@ export async function generateFinanceReport(
     .where(
       and(
         eq(hrLeaveTable.companyId, companyId),
-        eq(hrLeaveTable.type, "unpaid"),
+        eq(hrLeaveTable.leaveTypeCode, "unpaid"),
         lte(hrLeaveTable.startDate, periodCutoff),
       ),
     );

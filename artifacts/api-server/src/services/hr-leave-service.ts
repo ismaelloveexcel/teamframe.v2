@@ -7,22 +7,14 @@ import {
   type HrLeaveBalance,
 } from "@workspace/db";
 import { mutateWithAudit } from "./hr-audit.js";
+import { resolveProviderForCompany, type LeaveType } from "../compliance/index.js";
+import { badRequest } from "../lib/http-error.js";
 
-// UAE statutory leave types + unpaid (matches hr_leave_type pgEnum).
-export const LEAVE_TYPES = [
-  "annual",
-  "sick",
-  "maternity",
-  "paternity",
-  "hajj",
-  "bereavement",
-  "unpaid",
-] as const;
-export type LeaveType = (typeof LEAVE_TYPES)[number];
+export type { LeaveType };
 
 export type CreateLeaveInput = {
   employeeId: string;
-  type: LeaveType;
+  type: string; // leave_type_code; validated against the company's allowed set
   startDate: string;
   endDate: string;
   days: number;
@@ -32,18 +24,46 @@ export type CreateLeaveInput = {
 const rec = (v: unknown) => v as unknown as Record<string, unknown>;
 
 /**
+ * The set of leave types a company may use = its jurisdiction provider's leave
+ * types (global defaults) UNION any company-specific overrides (active).
+ * getLeaveTypes already performs that union.
+ */
+export async function allowedLeaveTypes(companyId: string): Promise<LeaveType[]> {
+  const provider = await resolveProviderForCompany(companyId);
+  return provider.getLeaveTypes(companyId);
+}
+
+async function assertAllowedCode(companyId: string, code: string): Promise<void> {
+  const allowed = await allowedLeaveTypes(companyId);
+  if (!allowed.some((t) => t.code === code)) {
+    badRequest(`Unknown leave type "${code}" for this company`);
+  }
+}
+
+/**
  * Create a leave record. If the leave is approved and a balance row exists for
- * the (employee, type), decrement balanceDays in the SAME transaction.
+ * the (employee, code), decrement balanceDays in the SAME transaction.
  */
 export async function createLeave(
   companyId: string,
   actorId: string,
   input: CreateLeaveInput,
 ): Promise<HrLeave> {
+  await assertAllowedCode(companyId, input.type);
   return mutateWithAudit(async (tx) => {
     const [row] = await tx
       .insert(hrLeaveTable)
-      .values({ ...input, status: input.status ?? "approved", companyId, createdBy: actorId, updatedBy: actorId })
+      .values({
+        companyId,
+        employeeId: input.employeeId,
+        leaveTypeCode: input.type,
+        startDate: input.startDate,
+        endDate: input.endDate,
+        days: input.days,
+        status: input.status ?? "approved",
+        createdBy: actorId,
+        updatedBy: actorId,
+      })
       .returning();
     if (row.status === "approved") {
       const [bal] = await tx
@@ -53,7 +73,7 @@ export async function createLeave(
           and(
             eq(hrLeaveBalanceTable.companyId, companyId),
             eq(hrLeaveBalanceTable.employeeId, input.employeeId),
-            eq(hrLeaveBalanceTable.type, input.type),
+            eq(hrLeaveBalanceTable.leaveTypeCode, input.type),
           ),
         );
       if (bal) {
@@ -83,6 +103,7 @@ export async function updateLeave(
   id: string,
   patch: Partial<CreateLeaveInput>,
 ): Promise<HrLeave | null> {
+  if (patch.type != null) await assertAllowedCode(companyId, patch.type);
   return mutateWithAudit(async (tx) => {
     const [before] = await tx
       .select()
@@ -94,9 +115,15 @@ export async function updateLeave(
         audit: { companyId, entityType: "leave", entityId: id, action: "update" as const, actorId: null },
       };
     }
+    const { type, ...restPatch } = patch;
     const [row] = await tx
       .update(hrLeaveTable)
-      .set({ ...patch, updatedBy: actorId, updatedAt: new Date() })
+      .set({
+        ...restPatch,
+        ...(type != null ? { leaveTypeCode: type } : {}),
+        updatedBy: actorId,
+        updatedAt: new Date(),
+      })
       .where(and(eq(hrLeaveTable.id, id), eq(hrLeaveTable.companyId, companyId)))
       .returning();
     return {
@@ -134,14 +161,15 @@ export async function getLeave(companyId: string, id: string): Promise<HrLeave |
 
 // ── Leave balance ─────────────────────────────────────────────────────────
 
-export type SetBalanceInput = { employeeId: string; type: LeaveType; balanceDays: number };
+export type SetBalanceInput = { employeeId: string; type: string; balanceDays: number };
 
-/** Create or set a leave-balance row for (employee, type). */
+/** Create or set a leave-balance row for (employee, code). */
 export async function setLeaveBalance(
   companyId: string,
   actorId: string,
   input: SetBalanceInput,
 ): Promise<HrLeaveBalance> {
+  await assertAllowedCode(companyId, input.type);
   return mutateWithAudit(async (tx) => {
     const [existing] = await tx
       .select()
@@ -150,7 +178,7 @@ export async function setLeaveBalance(
         and(
           eq(hrLeaveBalanceTable.companyId, companyId),
           eq(hrLeaveBalanceTable.employeeId, input.employeeId),
-          eq(hrLeaveBalanceTable.type, input.type),
+          eq(hrLeaveBalanceTable.leaveTypeCode, input.type),
         ),
       );
     if (existing) {
@@ -174,7 +202,14 @@ export async function setLeaveBalance(
     }
     const [row] = await tx
       .insert(hrLeaveBalanceTable)
-      .values({ ...input, companyId, createdBy: actorId, updatedBy: actorId })
+      .values({
+        companyId,
+        employeeId: input.employeeId,
+        leaveTypeCode: input.type,
+        balanceDays: input.balanceDays,
+        createdBy: actorId,
+        updatedBy: actorId,
+      })
       .returning();
     return {
       result: row,
