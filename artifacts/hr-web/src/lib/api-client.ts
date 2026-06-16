@@ -125,6 +125,15 @@ export async function patchValidated<T>(
   return parse(schema, res.data, url);
 }
 
+export async function putValidated<T>(
+  url: string,
+  body: unknown,
+  schema: ZodType<T>,
+): Promise<T> {
+  const res = await http.put(url, body);
+  return parse(schema, res.data, url);
+}
+
 export async function del(url: string): Promise<void> {
   await http.delete(url);
 }
