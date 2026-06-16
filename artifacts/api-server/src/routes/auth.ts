@@ -1,5 +1,5 @@
 import { Router, type IRouter } from "express";
-import { randomBytes, randomUUID } from "crypto";
+import { randomBytes, randomUUID, createHash } from "crypto";
 import bcrypt from "bcrypt";
 import {
   db,
@@ -9,10 +9,11 @@ import {
   sessionsTable,
   membershipsTable,
   companiesTable,
+  accountActivationTokensTable,
 } from "@workspace/db";
-import { eq } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { asyncHandler } from "../lib/async-handler.js";
-import { badRequest, unauthorized } from "../lib/http-error.js";
+import { badRequest, unauthorized, HttpError } from "../lib/http-error.js";
 import { requireSessionAuth } from "../middlewares/session-auth.js";
 
 const router: IRouter = Router();
@@ -188,6 +189,106 @@ router.post(
     res.json({
       token: session.token,
       userId: session.userId,
+      companyId: session.companyId,
+      expiresAt: session.expiresAt,
+    });
+  }),
+);
+
+/**
+ * POST /api/auth/activate
+ * Body: { token, password }
+ *
+ * Employee credential activation. Runs BEFORE any tenant context exists (like
+ * login): the token is resolved via the SECURITY DEFINER lookup so RLS on the
+ * global tables is bypassed in a controlled, explicit way. The token is
+ * single-use — once consumed it can never activate again.
+ *
+ * Errors:
+ *  - 400: missing fields / unknown token (invalid)
+ *  - 410: token already consumed or expired (gone)
+ */
+router.post(
+  "/auth/activate",
+  asyncHandler(async (req, res) => {
+    const { token, password } = req.body as { token?: string; password?: string };
+    if (!token || !password) {
+      badRequest("token and password are required");
+    }
+
+    const tokenHash = createHash("sha256").update(token).digest("hex");
+
+    // SECURITY DEFINER bypasses RLS on the global identity tables (no tenant
+    // context yet), symmetric with login's get_user_by_email.
+    const lookup = await pool.query<{
+      token_id: string;
+      user_id: string;
+      expires_at: string;
+      consumed_at: string | null;
+      user_status: string;
+    }>("SELECT * FROM get_activation_by_token_hash($1)", [tokenHash]);
+
+    if (lookup.rows.length === 0) {
+      throw new HttpError(400, "Invalid activation token");
+    }
+
+    const row = lookup.rows[0];
+    if (row.consumed_at !== null) {
+      throw new HttpError(410, "Activation token has already been used");
+    }
+    if (new Date(row.expires_at).getTime() <= Date.now()) {
+      throw new HttpError(410, "Activation token has expired");
+    }
+
+    const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
+
+    // Single transaction: set credentials + activate user + consume token.
+    // Consume with a guard on consumed_at IS NULL so concurrent activations
+    // can't both win (single-use enforced at the DB level).
+    await db.transaction(async (tx) => {
+      const consumed = await tx
+        .update(accountActivationTokensTable)
+        .set({ consumedAt: new Date() })
+        .where(
+          and(
+            eq(accountActivationTokensTable.id, row.token_id),
+            isNull(accountActivationTokensTable.consumedAt),
+          ),
+        )
+        .returning();
+      // If no row came back, another request consumed it first — single-use.
+      if (consumed.length === 0) {
+        throw new HttpError(410, "Activation token has already been used");
+      }
+
+      await tx
+        .update(usersTable)
+        .set({ passwordHash, status: "active", updatedAt: new Date() })
+        .where(eq(usersTable.id, row.user_id));
+    });
+
+    // Issue a session token like login (default company membership if any).
+    const membershipResult = await pool.query<{ company_id: string }>(
+      "SELECT company_id FROM get_user_default_company($1)",
+      [row.user_id],
+    );
+
+    const sessionToken = generateToken();
+    const expiresAt = new Date(Date.now() + SESSION_TTL_HOURS * 60 * 60 * 1000);
+    const [session] = await db
+      .insert(sessionsTable)
+      .values({
+        userId: row.user_id,
+        token: sessionToken,
+        companyId: membershipResult.rows[0]?.company_id ?? null,
+        expiresAt,
+      })
+      .returning();
+
+    res.json({
+      activated: true,
+      userId: session.userId,
+      token: session.token,
       companyId: session.companyId,
       expiresAt: session.expiresAt,
     });

@@ -1,5 +1,7 @@
+import { randomBytes, createHash } from "node:crypto";
 import { and, eq, isNull } from "drizzle-orm";
 import {
+  accountActivationTokensTable,
   db,
   hrEmployeesTable,
   hrPositionAssignmentsTable,
@@ -9,6 +11,31 @@ import {
   type HrPositionAssignment,
 } from "@workspace/db";
 import { mutateWithAudit } from "./hr-audit.js";
+
+/** Activation tokens live 7 days from issue. */
+const ACTIVATION_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Thrown when invite() targets an email that already has a user account.
+ * The route maps this to a clean 409 Conflict (not a 500 from the unique
+ * constraint).
+ */
+export class EmailConflictError extends Error {
+  readonly email: string;
+  constructor(email: string) {
+    super(`A user with email "${email}" already exists`);
+    this.name = "EmailConflictError";
+    this.email = email;
+  }
+}
+
+function generatePlaintextToken(): string {
+  return randomBytes(32).toString("hex");
+}
+
+function hashToken(plaintext: string): string {
+  return createHash("sha256").update(plaintext).digest("hex");
+}
 
 export type CreateEmployeeInput = {
   employeeNo: string;
@@ -183,7 +210,7 @@ export async function invite(
   companyId: string,
   actorId: string,
   employeeId: string,
-): Promise<{ userId: string } | null> {
+): Promise<{ userId: string; activationToken: string; expiresAt: Date } | null> {
   return mutateWithAudit(async (tx) => {
     const [emp] = await tx
       .select()
@@ -195,7 +222,15 @@ export async function invite(
         audit: { companyId, entityType: "employee", entityId: employeeId, action: "update" as const, actorId: null },
       };
     }
-    const email = emp.companyEmail ?? emp.personalEmail ?? `${emp.employeeNo}@invite.local`;
+    const email = (emp.companyEmail ?? emp.personalEmail ?? `${emp.employeeNo}@invite.local`).toLowerCase();
+
+    // Surface a typed 409 instead of letting the users.email unique constraint
+    // throw an opaque 500 from inside the transaction.
+    const [existing] = await tx.select().from(usersTable).where(eq(usersTable.email, email));
+    if (existing) {
+      throw new EmailConflictError(email);
+    }
+
     const [user] = await tx.insert(usersTable).values({ email, status: "invited" }).returning();
     await tx.insert(membershipsTable).values({ userId: user.id, companyId, role: "employee" });
     const [updated] = await tx
@@ -203,8 +238,19 @@ export async function invite(
       .set({ userId: user.id, updatedBy: actorId, updatedAt: new Date() })
       .where(eq(hrEmployeesTable.id, employeeId))
       .returning();
+
+    // Single-use activation token: store ONLY the sha256 hash; the plaintext is
+    // returned once here and never persisted (no email infra in scope).
+    const plaintext = generatePlaintextToken();
+    const expiresAt = new Date(Date.now() + ACTIVATION_TTL_MS);
+    await tx.insert(accountActivationTokensTable).values({
+      userId: user.id,
+      tokenHash: hashToken(plaintext),
+      expiresAt,
+    });
+
     return {
-      result: { userId: user.id },
+      result: { userId: user.id, activationToken: plaintext, expiresAt },
       audit: {
         companyId,
         entityType: "employee",
@@ -216,4 +262,34 @@ export async function invite(
       },
     };
   });
+}
+
+/**
+ * (Re)issue a fresh activation token for an already-invited employee's user.
+ * Returns null if the employee doesn't exist or has no linked user yet.
+ * Stores only the sha256 hash; returns the plaintext once.
+ */
+export async function issueActivationToken(
+  companyId: string,
+  employeeId: string,
+): Promise<{ userId: string; activationToken: string; expiresAt: Date } | null> {
+  const [emp] = await db
+    .select()
+    .from(hrEmployeesTable)
+    .where(and(eq(hrEmployeesTable.id, employeeId), eq(hrEmployeesTable.companyId, companyId)));
+  if (!emp || !emp.userId) return null;
+
+  const plaintext = generatePlaintextToken();
+  const expiresAt = new Date(Date.now() + ACTIVATION_TTL_MS);
+  await db.insert(accountActivationTokensTable).values({
+    userId: emp.userId,
+    tokenHash: hashToken(plaintext),
+    expiresAt,
+  });
+  return { userId: emp.userId, activationToken: plaintext, expiresAt };
+}
+
+/** Exported for routes/gates that hash a plaintext token for lookup. */
+export function hashActivationToken(plaintext: string): string {
+  return hashToken(plaintext);
 }
