@@ -69,8 +69,8 @@ async function main() {
 
   const cutoff = "2024-03-31";
   await db.insert(hrLeaveTable).values([
-    { companyId, employeeId: emp.id, type: "unpaid", startDate: "2024-01-10", endDate: "2024-01-12", days: 3, status: "approved", createdBy: actorId, updatedBy: actorId },
-    { companyId, employeeId: emp.id, type: "unpaid", startDate: "2024-03-01", endDate: "2024-03-02", days: 2, status: "approved", createdBy: actorId, updatedBy: actorId },
+    { companyId, employeeId: emp.id, leaveTypeCode: "unpaid", startDate: "2024-01-10", endDate: "2024-01-12", days: 3, status: "approved", createdBy: actorId, updatedBy: actorId },
+    { companyId, employeeId: emp.id, leaveTypeCode: "unpaid", startDate: "2024-03-01", endDate: "2024-03-02", days: 2, status: "approved", createdBy: actorId, updatedBy: actorId },
   ]);
 
   // Frozen offboarding exit record (source for the exit report). EOSG computed
@@ -81,7 +81,7 @@ async function main() {
     reason: "resignation",
     eosg: { basicMonthlyPay: 800_000, joinDate: "2021-01-01", exitDate: "2024-06-30" },
   });
-  const expectedGratuity = off.eosg.gratuityAmount; // minor units
+  const expectedGratuity = off.eosg!.gratuityAmount; // minor units (UAE company)
 
   // ── Generate FROZEN reports ────────────────────────────────────────────────
   const finance = await generateFinanceReport(companyId, actorId, cutoff);

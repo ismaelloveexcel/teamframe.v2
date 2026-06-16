@@ -68,16 +68,16 @@ async function main() {
   const cutoff = "2024-03-31";
   // Unpaid leave IN period (start_date <= cutoff): 3 + 2 = 5 days.
   await db.insert(hrLeaveTable).values([
-    { companyId, employeeId: emp.id, type: "unpaid", startDate: "2024-01-10", endDate: "2024-01-12", days: 3, status: "approved", createdBy: actorId, updatedBy: actorId },
-    { companyId, employeeId: emp.id, type: "unpaid", startDate: "2024-03-01", endDate: "2024-03-02", days: 2, status: "approved", createdBy: actorId, updatedBy: actorId },
+    { companyId, employeeId: emp.id, leaveTypeCode: "unpaid", startDate: "2024-01-10", endDate: "2024-01-12", days: 3, status: "approved", createdBy: actorId, updatedBy: actorId },
+    { companyId, employeeId: emp.id, leaveTypeCode: "unpaid", startDate: "2024-03-01", endDate: "2024-03-02", days: 2, status: "approved", createdBy: actorId, updatedBy: actorId },
   ]);
   // Unpaid leave OUTSIDE period (start_date > cutoff): 4 days — must NOT count.
   await db.insert(hrLeaveTable).values([
-    { companyId, employeeId: emp.id, type: "unpaid", startDate: "2024-05-01", endDate: "2024-05-04", days: 4, status: "approved", createdBy: actorId, updatedBy: actorId },
+    { companyId, employeeId: emp.id, leaveTypeCode: "unpaid", startDate: "2024-05-01", endDate: "2024-05-04", days: 4, status: "approved", createdBy: actorId, updatedBy: actorId },
   ]);
   // A NON-unpaid (annual) leave in period — must NOT count either.
   await db.insert(hrLeaveTable).values([
-    { companyId, employeeId: emp.id, type: "annual", startDate: "2024-02-01", endDate: "2024-02-05", days: 5, status: "approved", createdBy: actorId, updatedBy: actorId },
+    { companyId, employeeId: emp.id, leaveTypeCode: "annual", startDate: "2024-02-01", endDate: "2024-02-05", days: 5, status: "approved", createdBy: actorId, updatedBy: actorId },
   ]);
 
   const EXPECTED_UNPAID_IN_PERIOD = 5;
