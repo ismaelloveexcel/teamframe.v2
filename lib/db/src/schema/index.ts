@@ -152,6 +152,69 @@ export const hrAuditLogTable = pgTable("hr_audit_log", {
   timestamp: timestamp("timestamp", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// ── HR domain (company-scoped, ACTIVE). Separate from the dormant org-scoped
+//    shells. Fields grounded in docs/hr/DATA_DICTIONARY.md. ────────────────────
+export const hrPositionsTable = pgTable("hr_positions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  title: text("title").notNull(),
+  department: text("department"),
+  function: text("function"),
+  lineManagerId: uuid("line_manager_id").references((): AnyPgColumn => hrPositionsTable.id, { onDelete: "set null" }),
+  grade: text("grade"),
+  location: text("location"),
+  employmentType: text("employment_type"),
+  workSchedule: text("work_schedule"),
+  budgeted: boolean("budgeted").default(true).notNull(),
+  jobDescription: text("job_description"),
+  status: text("status").default("active").notNull(), // active | retired
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
+  updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
+});
+
+export const hrEmployeesTable = pgTable("hr_employees", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  employeeNo: text("employee_no").notNull(),
+  firstName: text("first_name").notNull(),
+  lastName: text("last_name").notNull(),
+  dateOfBirth: date("date_of_birth"),
+  gender: text("gender"),
+  nationality: text("nationality"),
+  personalEmail: text("personal_email"),
+  companyEmail: text("company_email"),
+  mobileNumber: text("mobile_number"),
+  address: text("address"),
+  emergencyContacts: jsonb("emergency_contacts").$type<Record<string, unknown>[]>(),
+  joinDate: date("join_date"),
+  dateOfExit: date("date_of_exit"),
+  status: text("status").default("Draft").notNull(), // Draft|Pending|Active|Notice|Exited
+  userId: uuid("user_id").references(() => usersTable.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
+  updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
+});
+
+export const hrPositionAssignmentsTable = pgTable("hr_position_assignments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
+  employeeId: uuid("employee_id").notNull().references(() => hrEmployeesTable.id, { onDelete: "cascade" }),
+  positionId: uuid("position_id").notNull().references(() => hrPositionsTable.id, { onDelete: "cascade" }),
+  startDate: date("start_date").notNull(),
+  endDate: date("end_date"), // null = active
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+  createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
+  updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
+});
+
+export type HrPosition = typeof hrPositionsTable.$inferSelect;
+export type HrEmployee = typeof hrEmployeesTable.$inferSelect;
+export type HrPositionAssignment = typeof hrPositionAssignmentsTable.$inferSelect;
+
 export const organizationMembershipsTable = pgTable(
   "organization_memberships",
   {
