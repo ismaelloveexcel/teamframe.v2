@@ -9,13 +9,14 @@ but RLS only actually constrains the database when the runtime connects as a
 
 Two roles are created by `lib/db/migrations/0001_rls_setup.sql`:
 
-| Role             | Attributes                  | Use                                              |
-| ---------------- | --------------------------- | ------------------------------------------------ |
-| `app_user`       | LOGIN, **NOBYPASSRLS**      | The application runtime. RLS applies to it.      |
-| `app_privileged` | LOGIN, **BYPASSRLS**        | Migrations / break-glass identity ops only.      |
+| Role             | Attributes (as created)       | Use                                              |
+| ---------------- | ----------------------------- | ------------------------------------------------ |
+| `app_user`       | **NOLOGIN**, **NOBYPASSRLS**  | The application runtime. RLS applies to it.      |
+| `app_privileged` | **NOLOGIN**, **BYPASSRLS**    | Migrations / break-glass identity ops only.      |
 
-Set passwords for these roles in your environment (the dev defaults are
-`app_user_pw` / `app_privileged_pw` — **change them in production**).
+The migration creates both roles as `NOLOGIN` with no password. Before use you
+must enable login and set a password with `ALTER ROLE ... LOGIN PASSWORD ...`
+(see §4a). Use strong, secrets-managed passwords in production.
 
 ## 2. Runtime connection — MUST be `app_user`
 
@@ -46,19 +47,46 @@ superuser / `app_privileged`.
 
 ## 4. Migrations
 
-Apply raw SQL migrations in order with a privileged connection:
+Apply raw SQL migrations **in order, starting at `0000`**, with a privileged
+connection. `0000_hr_tables.sql` creates the base tables that every later
+migration (including `0001`'s GRANTs and RLS policies) depends on, so it must
+run first — do not skip it:
 
 ```bash
-for f in lib/db/migrations/0001_*.sql \
+for f in lib/db/migrations/0000_*.sql \
+         lib/db/migrations/0001_*.sql \
          lib/db/migrations/0002_*.sql \
          lib/db/migrations/0003_*.sql \
          lib/db/migrations/0004_*.sql \
          lib/db/migrations/0005_*.sql \
          lib/db/migrations/0006_*.sql \
-         lib/db/migrations/0007_*.sql; do
+         lib/db/migrations/0007_*.sql \
+         lib/db/migrations/0008_*.sql; do
   psql "$ADMIN_DATABASE_URL" -f "$f"
 done
 ```
+
+`0008_account_activation.sql` adds the global `account_activation_tokens`
+identity table (no RLS) plus the `get_activation_by_token_hash` SECURITY
+DEFINER lookup used by `POST /auth/activate`.
+
+### 4a. Enable login for the app roles (one-time, before runtime use)
+
+`0001_rls_setup.sql` creates `app_user` and `app_privileged` as **`NOLOGIN`**
+roles with **no password**. Before the application (or the `appuser-prod-gate`)
+can connect as `app_user`, you must grant them login and a password — the
+migrations deliberately do **not** bake credentials in:
+
+```bash
+psql "$ADMIN_DATABASE_URL" -c "ALTER ROLE app_user      LOGIN PASSWORD '<app_user_pw>';"
+psql "$ADMIN_DATABASE_URL" -c "ALTER ROLE app_privileged LOGIN PASSWORD '<app_privileged_pw>';"
+```
+
+Note also that `0001` hardcodes `GRANT CONNECT ON DATABASE teamframe` — i.e. it
+assumes the target database is named **`teamframe`**. If you deploy under a
+different database name, edit that `GRANT CONNECT ON DATABASE teamframe ...`
+line in `0001_rls_setup.sql` (and re-grant CONNECT on your actual database)
+before applying it, or the roles will be unable to connect.
 
 ## 5. Tenant onboarding (bootstrap)
 

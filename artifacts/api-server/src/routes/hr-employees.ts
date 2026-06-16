@@ -1,14 +1,16 @@
 import { Router, type IRouter } from "express";
 import { asyncHandler } from "../lib/async-handler.js";
-import { badRequest, notFound } from "../lib/http-error.js";
+import { badRequest, conflict, notFound } from "../lib/http-error.js";
 import { requireSessionAuth } from "../middlewares/session-auth.js";
 import { requireRole } from "../middlewares/rbac.js";
 import {
   assign,
   assignmentHistory,
   createEmployee,
+  EmailConflictError,
   getEmployee,
   invite,
+  issueActivationToken,
   listEmployees,
   updateEmployee,
 } from "../services/hr-employee-service.js";
@@ -84,8 +86,24 @@ router.post(
   "/employees/:id/invite",
   asyncHandler(async (req, res) => {
     const actor = req.sessionActor!;
-    const result = await invite(companyOf(req), actor.userId, String(req.params.id));
+    let result;
+    try {
+      result = await invite(companyOf(req), actor.userId, String(req.params.id));
+    } catch (err) {
+      if (err instanceof EmailConflictError) conflict(err.message);
+      throw err;
+    }
     if (!result) notFound("Employee not found");
+    res.status(201).json(result);
+  }),
+);
+
+// Admin (re)issue of an activation token for an already-invited employee.
+router.post(
+  "/employees/:id/activation-token",
+  asyncHandler(async (req, res) => {
+    const result = await issueActivationToken(companyOf(req), String(req.params.id));
+    if (!result) notFound("Employee not found or not yet invited");
     res.status(201).json(result);
   }),
 );

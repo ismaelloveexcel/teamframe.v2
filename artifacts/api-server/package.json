@@ -21,7 +21,8 @@
     "policy-gate": "tsx src/__rls_check__/policy-gate.ts",
     "document-gate": "tsx src/__rls_check__/document-gate.ts",
     "offboarding-gate": "tsx src/__rls_check__/offboarding-gate.ts",
-    "report-gate": "tsx src/__rls_check__/report-gate.ts"
+    "report-gate": "tsx src/__rls_check__/report-gate.ts",
+    "activation-gate": "tsx src/__rls_check__/activation-gate.ts"
   },
   "dependencies": {
     "@workspace/api-zod": "workspace:*",

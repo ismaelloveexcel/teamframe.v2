@@ -136,6 +136,23 @@ export const sessionsTable = pgTable("sessions", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 });
 
+// HR v2: account activation tokens (single-use, hashed). GLOBAL identity layer
+// alongside users/sessions — NO RLS. Plaintext token is returned once at
+// invite/issue time; only its sha256 hash is stored.
+export const accountActivationTokensTable = pgTable("account_activation_tokens", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id")
+    .notNull()
+    .references(() => usersTable.id, { onDelete: "cascade" }),
+  tokenHash: text("token_hash").notNull(),
+  expiresAt: timestamp("expires_at", { withTimezone: true }).notNull(),
+  consumedAt: timestamp("consumed_at", { withTimezone: true }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, (table) => [
+  index("account_activation_tokens_token_hash_idx").on(table.tokenHash),
+  index("account_activation_tokens_user_id_idx").on(table.userId),
+]);
+
 // HR audit log — one append-only row per mutation, written in the SAME
 // transaction as the mutation (build-spec §4). before/after capture the change.
 export const hrAuditLogTable = pgTable("hr_audit_log", {
@@ -1253,6 +1270,7 @@ export const createIdempotencyRecordSchema = createInsertSchema(idempotencyRecor
 export type Company = typeof companiesTable.$inferSelect;
 export type Membership = typeof membershipsTable.$inferSelect;
 export type Session = typeof sessionsTable.$inferSelect;
+export type AccountActivationToken = typeof accountActivationTokensTable.$inferSelect;
 export type HrAuditLog = typeof hrAuditLogTable.$inferSelect;
 
 export type OrgEvent = typeof orgEventsTable.$inferSelect;
