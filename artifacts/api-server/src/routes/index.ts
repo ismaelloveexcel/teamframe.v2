@@ -6,6 +6,11 @@ import authRouter from "./auth";
 import hrPositionsRouter from "./hr-positions";
 import hrEmployeesRouter from "./hr-employees";
 import hrOrgchartRouter from "./hr-orgchart";
+import hrCompensationRouter from "./hr-compensation";
+import hrLeaveRouter from "./hr-leave";
+import hrPolicyRouter from "./hr-policy";
+import hrDocumentRouter from "./hr-document";
+import hrOffboardingRouter from "./hr-offboarding";
 import { requireActorContext } from "../middlewares/actor-context";
 
 const router: IRouter = Router();
@@ -18,6 +23,11 @@ router.use(authRouter);
 router.use(hrPositionsRouter);
 router.use(hrEmployeesRouter);
 router.use(hrOrgchartRouter);
+router.use(hrCompensationRouter);
+router.use(hrLeaveRouter);
+router.use(hrPolicyRouter);
+router.use(hrDocumentRouter);
+router.use(hrOffboardingRouter);
 
 // Legacy routes (header-trusted actor context for backward compat)
 router.use(requireActorContext);
