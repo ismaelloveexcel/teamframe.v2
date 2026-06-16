@@ -13,6 +13,11 @@ if (!process.env.DATABASE_URL) {
 
 export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
 
+/** Create an independent connection pool (e.g. to connect as a different role). */
+export function createPool(connectionString: string): pg.Pool {
+  return new Pool({ connectionString });
+}
+
 type DB = NodePgDatabase<typeof schema>;
 
 const defaultDb: DB = drizzle(pool, { schema });
