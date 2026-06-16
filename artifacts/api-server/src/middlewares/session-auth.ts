@@ -1,5 +1,5 @@
 import type { NextFunction, Request, Response } from "express";
-import { pool } from "@workspace/db";
+import { pool, runWithTenant } from "@workspace/db";
 import { unauthorized } from "../lib/http-error.js";
 
 /**
@@ -15,7 +15,7 @@ import { unauthorized } from "../lib/http-error.js";
  */
 export function requireSessionAuth(
   req: Request,
-  _res: Response,
+  res: Response,
   next: NextFunction,
 ): void {
   const authHeader = req.headers["authorization"];
@@ -48,14 +48,33 @@ export function requireSessionAuth(
         unauthorized("Invalid or expired session token");
       }
       const row = result.rows[0];
+      const companyId = row.company_id ?? null;
       req.sessionActor = {
         userId: row.user_id,
         email: row.user_email,
         status: row.user_status as "invited" | "active" | "inactive",
-        companyId: row.company_id ?? null,
+        companyId,
         role: (row.role ?? null) as "admin" | "employee" | "super_admin" | null,
       };
-      next();
+
+      // Scope all `db` access for the rest of this request to the tenant, so
+      // Postgres RLS (app.company_id) constrains every query. The scoped
+      // connection is held until the response settles.
+      if (companyId) {
+        runWithTenant(
+          companyId,
+          () =>
+            new Promise<void>((resolve) => {
+              res.once("finish", resolve);
+              res.once("close", resolve);
+              next();
+            }),
+        ).catch((err: unknown) => {
+          next(err);
+        });
+      } else {
+        next();
+      }
     })
     .catch((err: unknown) => {
       next(err);
