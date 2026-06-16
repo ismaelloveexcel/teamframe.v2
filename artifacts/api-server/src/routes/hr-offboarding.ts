@@ -4,10 +4,10 @@ import { badRequest, notFound } from "../lib/http-error.js";
 import { requireSessionAuth } from "../middlewares/session-auth.js";
 import { requireRole } from "../middlewares/rbac.js";
 import {
-  computeEosg,
   createOffboarding,
   getOffboarding,
   listOffboarding,
+  previewOffboarding,
 } from "../services/hr-offboarding-service.js";
 
 const router: IRouter = Router();
@@ -20,7 +20,9 @@ function companyOf(req: { sessionActor?: { companyId: string | null } }): string
   return companyId as string;
 }
 
-// Preview EOSG without persisting.
+// Preview gratuity without persisting — routed through the company's
+// compliance provider (UAE -> EOSG numbers identical to before; generic ->
+// { gratuityAmount: null, calculationMethod: "manual" }).
 router.post(
   "/offboarding/preview",
   asyncHandler(async (req, res) => {
@@ -28,7 +30,7 @@ router.post(
     if (basicMonthlyPay == null || !joinDate || !exitDate) {
       badRequest("basicMonthlyPay, joinDate and exitDate are required");
     }
-    res.json(computeEosg({ basicMonthlyPay, joinDate, exitDate }));
+    res.json(await previewOffboarding(companyOf(req), { basicMonthlyPay, joinDate, exitDate }));
   }),
 );
 

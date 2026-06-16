@@ -160,15 +160,9 @@ export const compensationSchema = z.object({
 export type Compensation = z.infer<typeof compensationSchema>;
 
 // ── Leave ───────────────────────────────────────────────────────────────────
-export const leaveTypeSchema = z.enum([
-  "annual",
-  "sick",
-  "maternity",
-  "paternity",
-  "hajj",
-  "bereavement",
-  "unpaid",
-]);
+// Leave types are jurisdiction-defined (see backend compliance providers), so the
+// client must accept any code the server returns — not a hardcoded UAE set.
+export const leaveTypeSchema = z.string();
 export type LeaveType = z.infer<typeof leaveTypeSchema>;
 
 export const leaveSchema = z.object({

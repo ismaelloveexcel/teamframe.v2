@@ -10,7 +10,7 @@ import {
   usersTable,
 } from "@workspace/db";
 import {
-  LEAVE_TYPES,
+  allowedLeaveTypes,
   createLeave,
   listLeave,
   listLeaveBalances,
@@ -37,15 +37,19 @@ async function main() {
     .values({ companyId, employeeNo: "E001", firstName: "Leave", lastName: "Test", createdBy: actorId, updatedBy: actorId })
     .returning();
 
+  // Resolve the company's allowed leave types via the compliance provider.
+  // jurisdiction=UAE -> the full UAE statutory set (same as before Phase 1).
+  const providerTypes = (await allowedLeaveTypes(companyId)).map((t) => t.code);
+
   // Pre-load statutory balances for all types.
-  for (const type of LEAVE_TYPES) {
+  for (const type of providerTypes) {
     await setLeaveBalance(companyId, actorId, { employeeId: emp.id, type, balanceDays: type === "annual" ? 30 : 10 });
   }
   const balances = await listLeaveBalances(companyId, emp.id);
   const passTypes =
-    LEAVE_TYPES.every((t) => balances.some((b) => b.type === t)) &&
+    providerTypes.every((t) => balances.some((b) => b.leaveTypeCode === t)) &&
     ["annual", "sick", "maternity", "paternity", "hajj", "bereavement", "unpaid"].every((t) =>
-      (LEAVE_TYPES as readonly string[]).includes(t),
+      providerTypes.includes(t),
     );
 
   // Create an approved 5-day annual leave -> balance should decrement 30 -> 25.
@@ -57,10 +61,10 @@ async function main() {
     days: 5,
     status: "approved",
   });
-  const passCreate = !!leave && leave.days === 5 && leave.type === "annual";
+  const passCreate = !!leave && leave.days === 5 && leave.leaveTypeCode === "annual";
 
   const afterBalances = await listLeaveBalances(companyId, emp.id);
-  const annual = afterBalances.find((b) => b.type === "annual");
+  const annual = afterBalances.find((b) => b.leaveTypeCode === "annual");
   const passDecrement = annual?.balanceDays === 25;
 
   // Read back leave records.

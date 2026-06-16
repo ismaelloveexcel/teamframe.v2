@@ -4,7 +4,7 @@ import { badRequest, notFound } from "../lib/http-error.js";
 import { requireSessionAuth } from "../middlewares/session-auth.js";
 import { requireRole } from "../middlewares/rbac.js";
 import {
-  LEAVE_TYPES,
+  allowedLeaveTypes,
   createLeave,
   getLeave,
   listLeave,
@@ -24,10 +24,15 @@ function companyOf(req: { sessionActor?: { companyId: string | null } }): string
   return companyId as string;
 }
 
-// Expose the statutory leave-type set.
-router.get("/leave/types", (_req, res) => {
-  res.json(LEAVE_TYPES);
-});
+// Expose the leave-type set for the caller's company jurisdiction. Response is
+// a string array of codes (unchanged shape consumed by hr-web).
+router.get(
+  "/leave/types",
+  asyncHandler(async (req, res) => {
+    const types = await allowedLeaveTypes(companyOf(req));
+    res.json(types.map((t) => t.code));
+  }),
+);
 
 router.post(
   "/leave",

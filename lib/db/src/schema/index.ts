@@ -255,22 +255,29 @@ export const hrCompensationTable = pgTable("hr_compensation", {
   updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
 });
 
-// 2. Leave — UAE statutory leave types + unpaid.
-export const hrLeaveTypeEnum = pgEnum("hr_leave_type", [
-  "annual",
-  "sick",
-  "maternity",
-  "paternity",
-  "hajj",
-  "bereavement",
-  "unpaid",
-]);
+// 2. Leave — type is a free-text jurisdiction code (`leave_type_code`). Allowed
+//    values are enforced at the app layer against the jurisdiction's leave_types
+//    catalogue (compliance provider + company overrides), not by a DB enum.
+
+// Jurisdiction-driven leave-type catalogue. company_id NULL rows are global
+// jurisdiction defaults (readable by every tenant); company_id set rows are
+// tenant-specific overrides (RLS-scoped).
+export const leaveTypesTable = pgTable("leave_types", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  companyId: uuid("company_id").references(() => companiesTable.id, { onDelete: "cascade" }),
+  jurisdiction: text("jurisdiction"),
+  code: text("code").notNull(),
+  name: text("name").notNull(),
+  active: boolean("active").notNull().default(true),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+  updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
+});
 
 export const hrLeaveTable = pgTable("hr_leave", {
   id: uuid("id").defaultRandom().primaryKey(),
   companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
   employeeId: uuid("employee_id").notNull().references(() => hrEmployeesTable.id, { onDelete: "cascade" }),
-  type: hrLeaveTypeEnum("type").notNull(),
+  leaveTypeCode: text("leave_type_code").notNull(),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
   days: integer("days").notNull(),
@@ -285,14 +292,14 @@ export const hrLeaveBalanceTable = pgTable("hr_leave_balance", {
   id: uuid("id").defaultRandom().primaryKey(),
   companyId: uuid("company_id").notNull().references(() => companiesTable.id, { onDelete: "cascade" }),
   employeeId: uuid("employee_id").notNull().references(() => hrEmployeesTable.id, { onDelete: "cascade" }),
-  type: hrLeaveTypeEnum("type").notNull(),
+  leaveTypeCode: text("leave_type_code").notNull(),
   balanceDays: integer("balance_days").notNull().default(0),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
   updatedBy: uuid("updated_by").references(() => usersTable.id, { onDelete: "set null" }),
 }, (table) => [
-  unique("hr_leave_balance_employee_type_unique").on(table.employeeId, table.type),
+  unique("hr_leave_balance_employee_type_unique").on(table.employeeId, table.leaveTypeCode),
 ]);
 
 // 3. Policy + acknowledgement (versioned, per-employee ack).
@@ -356,7 +363,8 @@ export const hrOffboardingTable = pgTable("hr_offboarding", {
   reason: text("reason"),
   // EOSG inputs (frozen) + computed value
   eosgInputs: jsonb("eosg_inputs").$type<Record<string, unknown>>(), // { basicMonthlyPay, joinDate, exitDate, yearsOfService }
-  gratuityAmount: integer("gratuity_amount"), // computed EOSG, minor units
+  gratuityAmount: integer("gratuity_amount"), // computed gratuity, minor units (NULL = no statutory calc)
+  calculationMethod: text("calculation_method"), // which provider produced it: 'uae_eosg' | 'manual'
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
   createdBy: uuid("created_by").references(() => usersTable.id, { onDelete: "set null" }),
@@ -379,6 +387,7 @@ export const hrReportTable = pgTable("hr_report", {
 });
 
 export type HrCompensation = typeof hrCompensationTable.$inferSelect;
+export type LeaveTypeRow = typeof leaveTypesTable.$inferSelect;
 export type HrLeave = typeof hrLeaveTable.$inferSelect;
 export type HrLeaveBalance = typeof hrLeaveBalanceTable.$inferSelect;
 export type HrPolicy = typeof hrPolicyTable.$inferSelect;
