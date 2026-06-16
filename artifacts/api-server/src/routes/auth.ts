@@ -31,11 +31,9 @@ function generateToken(): string {
 router.post(
   "/auth/register",
   asyncHandler(async (req, res) => {
-    const { email, password, companyId, role } = req.body as {
+    const { email, password } = req.body as {
       email?: string;
       password?: string;
-      companyId?: string;
-      role?: string;
     };
 
     if (!email || !password) {
@@ -44,6 +42,10 @@ router.post(
 
     const passwordHash = await bcrypt.hash(password, SALT_ROUNDS);
 
+    // Register only creates a bare user account. Tenant membership is NEVER
+    // assigned from the request body — that would let anyone who learns a
+    // company UUID self-grant an admin role. Company membership is established
+    // only via an admin's invite() flow or POST /auth/bootstrap.
     const [user] = await db
       .insert(usersTable)
       .values({
@@ -53,19 +55,6 @@ router.post(
         updatedAt: new Date(),
       })
       .returning();
-
-    if (companyId) {
-      const memberRole = (role ?? "employee") as "admin" | "employee" | "super_admin";
-      // memberships has FORCED RLS (company_id = app.company_id). Scope the
-      // insert to the target company so the WITH CHECK passes under app_user.
-      await runWithTenant(companyId, async () => {
-        await db.insert(membershipsTable).values({
-          userId: user.id,
-          companyId,
-          role: memberRole,
-        });
-      });
-    }
 
     res.status(201).json({ id: user.id, email: user.email, status: user.status });
   }),
