@@ -1,0 +1,115 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+# Verification-only (no deploy). Codifies the documented provisioning procedure
+# (drizzle push -> migrations 0000..latest -> app-role login) so the deploy story
+# in docs/hr/DEPLOYMENT.md stays a tested regression guard, and runs typecheck,
+# frontend build, and the full gate suite against a real Postgres.
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: postgres
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    env:
+      # Superuser connection used by most gates and by drizzle push / migrations.
+      DATABASE_URL: postgresql://postgres:postgres@localhost:5432/teamframe
+      ADMIN_DATABASE_URL: postgresql://postgres:postgres@localhost:5432/teamframe
+      # NOBYPASSRLS app_user connection for the production-path RLS gate (TCP, no socket).
+      APP_USER_DATABASE_URL: postgresql://app_user:app_user_pw@localhost:5432/teamframe
+      PGHOST: localhost
+      PGPORT: "5432"
+      PGUSER: postgres
+      PGPASSWORD: postgres
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install psql client
+        run: sudo apt-get update && sudo apt-get install -y postgresql-client
+
+      - name: Create database
+        run: psql "postgresql://postgres:postgres@localhost:5432/postgres" -c "CREATE DATABASE teamframe;"
+
+      - name: Provision schema (drizzle push) + RLS/role/function migrations
+        run: |
+          # Base schema (incl. the global `users` table) from the Drizzle models,
+          # then the raw SQL migrations add RLS, roles, SECURITY DEFINER functions,
+          # grants and seed data. Table create/alter statements that push already
+          # satisfied error harmlessly under ON_ERROR_STOP=0; the gates are the
+          # real check that RLS/functions/seeds landed.
+          pnpm --filter @workspace/db run push-force
+          for f in lib/db/migrations/0000_*.sql \
+                   lib/db/migrations/0001_*.sql \
+                   lib/db/migrations/0002_*.sql \
+                   lib/db/migrations/0003_*.sql \
+                   lib/db/migrations/0004_*.sql \
+                   lib/db/migrations/0005_*.sql \
+                   lib/db/migrations/0006_*.sql \
+                   lib/db/migrations/0007_*.sql \
+                   lib/db/migrations/0008_*.sql \
+                   lib/db/migrations/0009_*.sql \
+                   lib/db/migrations/0010_*.sql \
+                   lib/db/migrations/0011_*.sql; do
+            echo "applying $f"
+            psql "$DATABASE_URL" -v ON_ERROR_STOP=0 -f "$f"
+          done
+
+      - name: Enable login for app roles (per DEPLOYMENT.md §4a)
+        run: |
+          psql "$DATABASE_URL" -c "ALTER ROLE app_user      LOGIN PASSWORD 'app_user_pw';"
+          psql "$DATABASE_URL" -c "ALTER ROLE app_privileged LOGIN PASSWORD 'app_privileged_pw';"
+
+      - name: Build lib declarations (db + api-zod + api-client-react)
+        run: pnpm exec tsc --build tsconfig.json
+
+      - name: Typecheck (api-server)
+        run: pnpm --filter @workspace/api-server typecheck
+
+      - name: Typecheck (hr-web)
+        run: pnpm --filter @workspace/hr-web typecheck
+
+      - name: Build (hr-web)
+        run: pnpm --filter @workspace/hr-web build
+
+      - name: Gate suite
+        working-directory: artifacts/api-server
+        run: |
+          set -e
+          for g in rls runtime-rls appuser-prod audit position employee orgchart \
+                   compensation leave policy document offboarding report activation \
+                   report-render provider historical-integrity migration; do
+            echo "::group::gate $g"
+            ./node_modules/.bin/tsx "src/__rls_check__/${g}-gate.ts"
+            echo "::endgroup::"
+          done
