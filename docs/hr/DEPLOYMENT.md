@@ -61,7 +61,10 @@ for f in lib/db/migrations/0000_*.sql \
          lib/db/migrations/0005_*.sql \
          lib/db/migrations/0006_*.sql \
          lib/db/migrations/0007_*.sql \
-         lib/db/migrations/0008_*.sql; do
+         lib/db/migrations/0008_*.sql \
+         lib/db/migrations/0009_*.sql \
+         lib/db/migrations/0010_*.sql \
+         lib/db/migrations/0011_*.sql; do
   psql "$ADMIN_DATABASE_URL" -f "$f"
 done
 ```
