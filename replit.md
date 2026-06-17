@@ -1,45 +1,52 @@
-# [Project name]
+# TeamFrame v2
 
-_Replace the heading above with the project's name, and this line with one sentence describing what this app does for users._
+Multi-tenant HR SaaS: positions, employees, compensation, leave, policies, documents, offboarding, and reports — backed by Postgres RLS for tenant isolation.
 
 ## Run & Operate
 
 - `pnpm --filter @workspace/api-server run dev` — run the API server (port 5000)
+- `pnpm --filter @workspace/hr-web run dev` — run the HR frontend (Vite dev server)
 - `pnpm run typecheck` — full typecheck across all packages
 - `pnpm run build` — typecheck + build all packages
-- `pnpm --filter @workspace/api-spec run codegen` — regenerate API hooks and Zod schemas from the OpenAPI spec
-- `pnpm --filter @workspace/db run push` — push DB schema changes (dev only)
-- Required env: `DATABASE_URL` — Postgres connection string
+- `pnpm --filter @workspace/db run push-force` — push DB schema changes (dev only)
+- Required env: `DATABASE_URL` — Postgres connection string (must point at `app_user` in production)
 
 ## Stack
 
-- pnpm workspaces, Node.js 24, TypeScript 5.9
-- API: Express 5
-- DB: PostgreSQL + Drizzle ORM
-- Validation: Zod (`zod/v4`), `drizzle-zod`
-- API codegen: Orval (from OpenAPI spec)
-- Build: esbuild (CJS bundle)
+- pnpm workspaces, Node.js 22+, TypeScript 5.9
+- API: Express 5 (`artifacts/api-server`)
+- Frontend: React 19 + Vite + Tailwind + TanStack Query (`artifacts/hr-web`)
+- DB: PostgreSQL 16 + Drizzle ORM (`lib/db`)
+- Validation: Zod v3 (`^3.25`), `drizzle-zod`
+- Build: esbuild (API server ESM bundle)
 
 ## Where things live
 
-_Populate as you build — short repo map plus pointers to the source-of-truth file for DB schema, API contracts, theme files, etc._
+- `lib/db/` — Drizzle schema + migrations (source of truth for DB shape)
+- `lib/db/migrations/` — Raw SQL migrations `0000`–`0011` (apply in order)
+- `artifacts/api-server/src/routes/` — All API route handlers
+- `artifacts/api-server/src/__rls_check__/` — 18-gate CI test suite
+- `artifacts/api-server/src/compliance/` — Jurisdiction provider layer (UAE + Generic)
+- `artifacts/hr-web/src/` — React HR frontend pages and API client
+- `docs/hr/DEPLOYMENT.md` — Fresh-clone provisioning procedure
+- `.github/workflows/ci.yml` — CI pipeline definition
 
 ## Architecture decisions
 
-_Populate as you build — non-obvious choices a reader couldn't infer from the code (3-5 bullets)._
+- **RLS as defence-in-depth**: All tenant tables have `FORCE ROW LEVEL SECURITY`. The runtime connects as `app_user` (NOBYPASSRLS). `runWithTenant()` sets `app.company_id` on a pooled connection for the request duration and resets it on release — a missing/reset context fails closed (0 rows).
+- **SECURITY DEFINER functions** for identity resolution before tenant context exists (`get_user_by_email`, `get_user_default_company`, `get_activation_by_token_hash`, `get_session_with_membership`).
+- **Compliance providers** abstract jurisdiction-specific rules. UAE gratuity (EOSG) and leave types live in `providers/uae.ts`; new jurisdictions add a provider without touching core HR logic.
+- **Frozen reports**: `hr_report` stores the full JSON payload at generation time. Historical reports are immutable regardless of schema or provider changes.
+- **Single-use activation tokens**: Invite flow generates a SHA-256-hashed token stored in `account_activation_tokens`. `POST /auth/activate` consumes it in a single transaction (guarded by `consumedAt IS NULL`).
 
 ## Product
 
-_Describe the high-level user-facing capabilities of this app once they exist._
-
-## User preferences
-
-_Populate as you build — explicit user instructions worth remembering across sessions._
+Nine HR modules wired end-to-end: **Positions** (org structure), **Employees** (profiles + assignments), **Compensation** (salary + bank), **Leave** (requests + balances), **Policies** (versioned + acknowledged), **Documents** (templates + generated), **Offboarding** (EOSG/gratuity), **Reports** (finance + exit, frozen snapshots), and **Org Chart** (visual hierarchy).
 
 ## Gotchas
 
-_Populate as you build — sharp edges, "always run X before Y" rules._
-
-## Pointers
-
-- See the `pnpm-workspace` skill for workspace structure, TypeScript setup, and package details
+- `app_user` is created as `NOLOGIN` by migration `0001`. Run `ALTER ROLE app_user LOGIN PASSWORD '...'` before connecting as it (see `DEPLOYMENT.md §4a`).
+- Migration `0001` hardcodes `GRANT CONNECT ON DATABASE teamframe` — the DB must be named `teamframe` or that line needs editing.
+- `DATABASE_URL` in production must point at `app_user`, not a superuser — a superuser bypasses RLS silently.
+- Apply migrations in order (`0000` → `0011`) using a privileged connection; `drizzle push` only handles the base schema.
+- CI uses `pnpm v10` — lockfile was generated with v10 overrides; do not downgrade.
