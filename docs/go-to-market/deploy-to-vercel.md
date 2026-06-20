@@ -1,8 +1,8 @@
 # Deploying TeamFrame to Vercel
 
 You need two deployments:
-1. **Frontend** — the TeamFrame UI you interact with (mockup-sandbox)
-2. **Backend** — the API server that stores your data (api-server)
+1. **Frontend** — the TeamFrame HR web app (`hr-web`)
+2. **Backend** — the API server that stores your data (`api-server`)
 
 Plus one database: **Neon** (free PostgreSQL, works directly with Vercel).
 
@@ -14,24 +14,38 @@ Plus one database: **Neon** (free PostgreSQL, works directly with Vercel).
 2. Create a new project — name it `teamframe`
 3. Copy the connection string. It looks like:
    ```
-   postgresql://user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
+   postgresql://app_user:password@ep-xxx.us-east-2.aws.neon.tech/neondb?sslmode=require
    ```
-4. Keep this — you will need it in both deployments
+4. Keep this — you will need it when deploying the backend
+
+> **Security note**: The connection string must use the `app_user` role (NOBYPASSRLS), not a superuser. TeamFrame's Row-Level Security policies depend on this.
 
 ---
 
 ## Step 2 — Apply the database schema
 
-Before deploying, apply the schema to your Neon database.
+Apply the migrations to your Neon database in order. Each file in `lib/db/migrations/` must be run once, in sequence.
 
-On your local machine (requires Node.js):
+Using `psql` with your Neon connection string:
 
 ```bash
-cd /workspace
-DATABASE_URL="your-neon-connection-string" pnpm --filter @workspace/db push
+for f in lib/db/migrations/0000_hr_tables.sql \
+          lib/db/migrations/0001_rls_setup.sql \
+          lib/db/migrations/0002_hr_audit_rls.sql \
+          lib/db/migrations/0003_hr_domain_core.sql \
+          lib/db/migrations/0004_hr_modules.sql \
+          lib/db/migrations/0005_hr_reports.sql \
+          lib/db/migrations/0006_auth_default_company.sql \
+          lib/db/migrations/0007_harden_rls_nullif.sql \
+          lib/db/migrations/0008_account_activation.sql \
+          lib/db/migrations/0009_leave_types.sql \
+          lib/db/migrations/0010_leave_type_code.sql \
+          lib/db/migrations/0011_offboarding_calculation_method.sql; do
+  psql "$DATABASE_URL" -f "$f"
+done
 ```
 
-This creates all the tables TeamFrame needs. Run it once.
+Run each migration exactly once. Re-running migrations is not safe.
 
 ---
 
@@ -43,18 +57,19 @@ This creates all the tables TeamFrame needs. Run it once.
 4. **IMPORTANT — Configure these settings:**
    - Root Directory: `artifacts/api-server`
    - Framework Preset: Other
-   - Build Command: `node ./build.mjs`
-   - Output Directory: `dist`
+   - Build Command: (leave blank — `vercel.json` in `artifacts/api-server` handles routing)
    - Install Command: `cd ../.. && pnpm install --frozen-lockfile`
 
 5. Add these environment variables:
-   | Variable | Value |
-   |---|---|
-   | `DATABASE_URL` | Your Neon connection string from Step 1 |
-   | `NODE_ENV` | `production` |
+   | Variable | Required | Description |
+   |---|---|---|
+   | `DATABASE_URL` | Yes | Your Neon connection string (must use `app_user` role) |
+   | `NODE_ENV` | Yes | Set to `production` |
+   | `LOG_LEVEL` | No | Set to `info` (default) |
 
 6. Click **Deploy**
 7. Once deployed, copy the URL — it will look like `https://teamframe-api-xxx.vercel.app`
+8. Verify the API is running: open `https://teamframe-api-xxx.vercel.app/api/healthz` — it should return `{"status":"ok"}`
 
 ---
 
@@ -65,14 +80,13 @@ This creates all the tables TeamFrame needs. Run it once.
 3. **IMPORTANT — Configure these settings:**
    - Root Directory: ` ` (leave blank — use repository root)
    - Framework Preset: Other
-   - Build Command: (leave blank — uses `vercel.json` at root)
-   - Output Directory: `artifacts/mockup-sandbox/dist`
+   - Build Command: (leave blank — uses `vercel.json` at repository root)
+   - Output Directory: `artifacts/hr-web/dist`
 
 4. Add these environment variables:
-   | Variable | Value |
-   |---|---|
-   | `VITE_API_BASE_URL` | Your API URL from Step 3 (e.g. `https://teamframe-api-xxx.vercel.app`) |
-   | `BASE_PATH` | `/` |
+   | Variable | Required | Description |
+   |---|---|---|
+   | `VITE_API_BASE_URL` | Yes | Full URL of your deployed API server from Step 3 (e.g. `https://teamframe-api-xxx.vercel.app`) |
 
 5. Click **Deploy**
 6. Once deployed, you will have a URL like `https://teamframe-xxx.vercel.app`
@@ -81,60 +95,52 @@ This creates all the tables TeamFrame needs. Run it once.
 
 ## Step 5 — Access TeamFrame
 
-Open your browser and go to:
+Open your browser and go to your frontend deployment URL:
 
 ```
-https://teamframe-xxx.vercel.app/preview/teamframe/TeamFrame
+https://teamframe-xxx.vercel.app
 ```
 
-This is the TeamFrame application. If the API URL is configured correctly, you will see the live system connected to your Neon database.
+On first load you will be prompted to sign in. Use the bootstrap endpoint to create your first admin account before inviting team members:
 
-If the API is not reachable, TeamFrame falls back to **demo mode** — a read-only local simulation. You will see a yellow "Demo mode" badge in the sidebar.
+```
+POST https://teamframe-api-xxx.vercel.app/api/auth/bootstrap
+```
 
----
-
-## Running the Simulation
-
-Once deployed and connected:
-
-1. Open TeamFrame at `/preview/teamframe/TeamFrame`
-2. The org chart will be empty on first load
-3. Expand "Structure controls" to create your first position
-4. Follow the production readiness checklist in `docs/go-to-market/production-readiness-checklist.md`
-
-All changes made through the UI will be stored in your Neon database and will persist across sessions.
+Then sign in through the app and complete setup from there.
 
 ---
 
 ## Troubleshooting
 
-**"Demo mode" badge appears (amber, in sidebar)**
-The frontend cannot reach the API. Check:
-- `VITE_API_BASE_URL` is set correctly in the frontend Vercel project
-- The API deployment succeeded (visit the API URL + `/api/healthz` — should return `{"status":"ok"}`)
+**API returns 500 or connection errors**
+- Verify `DATABASE_URL` is set in the backend Vercel project and uses the `app_user` role
+- Confirm all 12 migrations (0000–0011) were applied in order
+- Check the Vercel function logs for the specific error
 
-**API deployment fails**
-- Check that `DATABASE_URL` is set in the backend Vercel project
+**API deployment fails at build**
+- Check that Root Directory is set to `artifacts/api-server` in the Vercel project settings
 - Check the Vercel build logs for the specific error
 
-**Changes don't save**
-TeamFrame is in demo mode. See "Demo mode badge appears" above.
+**Frontend shows blank page or network errors**
+- Verify `VITE_API_BASE_URL` is set in the frontend Vercel project (no trailing slash)
+- Confirm the API deployment succeeded (visit the API URL + `/api/healthz`)
 
 **Schema error / table not found**
-Run Step 2 (schema push) again against your Neon database.
+- A migration may have been skipped. Check which tables exist in Neon and re-run any missing migrations.
 
 ---
 
 ## Environment Variables Reference
 
-### Backend (api-server)
+### Backend (`artifacts/api-server`)
 | Variable | Required | Description |
 |---|---|---|
-| `DATABASE_URL` | Yes | Neon PostgreSQL connection string |
+| `DATABASE_URL` | Yes | Neon PostgreSQL connection string — must use `app_user` role (NOBYPASSRLS) |
 | `NODE_ENV` | Yes | Set to `production` |
+| `LOG_LEVEL` | No | Logging verbosity — `info`, `debug`, `warn`, or `error` |
 
-### Frontend (mockup-sandbox)
+### Frontend (`artifacts/hr-web`)
 | Variable | Required | Description |
 |---|---|---|
-| `VITE_API_BASE_URL` | Yes | Full URL of your deployed API server |
-| `BASE_PATH` | Yes | Set to `/` |
+| `VITE_API_BASE_URL` | Yes | Full URL of deployed API server (no trailing slash) |
