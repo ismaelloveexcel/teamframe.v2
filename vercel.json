@@ -1,0 +1,7 @@
+{
+  "version": 2,
+  "buildCommand": "pnpm install --frozen-lockfile && pnpm --filter @workspace/hr-web run build",
+  "outputDirectory": "artifacts/hr-web/dist",
+  "framework": null,
+  "rewrites": [{ "source": "/(.*)", "destination": "/index.html" }]
+}
