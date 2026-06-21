@@ -39,12 +39,15 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
 
       # ── Step 1: Verify connection ──────────────────────────────────────────
+      # Connect to neondb (always exists) to verify credentials before
+      # the teamframe database is created.
       - name: Verify Neon connection
         env:
           NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
         run: |
           echo "Connecting to Neon..."
-          psql "$NEON_ADMIN_URL" -c "SELECT version();"
+          BOOTSTRAP="${NEON_ADMIN_URL/\/teamframe?/\/neondb?}"
+          psql "$BOOTSTRAP" -c "SELECT version();"
 
       # ── Step 2: Ensure teamframe database exists ───────────────────────────
       # NEON_ADMIN_URL must end in /teamframe?sslmode=require
@@ -60,7 +63,15 @@ jobs:
             && echo "Created database teamframe." \
             || echo "Database teamframe already exists — skipping."
 
-      # ── Step 3: Apply migrations 0000–0011 ────────────────────────────────
+      # ── Step 3: Bootstrap base schema (drizzle push) ─────────────────────
+      # 0000_hr_tables.sql does ALTER TABLE users which requires users to exist.
+      # CI runs drizzle push-force first; we do the same here against the Neon DB.
+      - name: Bootstrap base schema (drizzle push)
+        env:
+          DATABASE_URL: ${{ secrets.NEON_ADMIN_URL }}
+        run: pnpm --filter @workspace/db run push-force
+
+      # ── Step 4: Apply migrations 0000–0011 ────────────────────────────────
       - name: Apply migrations 0000–0011
         env:
           NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
@@ -85,7 +96,7 @@ jobs:
           done
           echo "All migrations applied."
 
-      # ── Step 4: Enable app_user login ─────────────────────────────────────
+      # ── Step 5: Enable app_user login ─────────────────────────────────────
       # migration 0001 creates app_user as NOLOGIN; we enable it here using the
       # password from the repo secret (never echoed to logs).
       - name: Enable app_user login
@@ -96,7 +107,7 @@ jobs:
           psql "$NEON_ADMIN_URL" -c "ALTER ROLE app_user LOGIN PASSWORD '$APP_USER_PW';"
           echo "app_user login enabled."
 
-      # ── Step 5: Verify role attributes ────────────────────────────────────
+      # ── Step 6: Verify role attributes ────────────────────────────────────
       - name: Verify role attributes
         env:
           NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
@@ -121,7 +132,7 @@ jobs:
           fi
           echo "app_user verified: LOGIN=true, superuser=false, bypassrls=false ✓"
 
-      # ── Step 6: Build APP_USER_DATABASE_URL (masked) ──────────────────────
+      # ── Step 7: Build APP_USER_DATABASE_URL (masked) ──────────────────────
       - name: Construct and mask APP_USER_DATABASE_URL
         env:
           NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
@@ -133,11 +144,11 @@ jobs:
           echo "::add-mask::$APP_USER_URL"
           echo "APP_USER_DATABASE_URL=$APP_USER_URL" >> "$GITHUB_ENV"
 
-      # ── Step 7: Build lib declarations ────────────────────────────────────
+      # ── Step 8: Build lib declarations ────────────────────────────────────
       - name: Build lib declarations
         run: pnpm exec tsc --build tsconfig.json
 
-      # ── Step 8: Run all 18 gates ──────────────────────────────────────────
+      # ── Step 9: Run all 18 gates ──────────────────────────────────────────
       # Gates run in the same order as ci.yml.
       # DATABASE_URL = admin URL  (owner role — used by all gates except appuser-prod)
       # APP_USER_DATABASE_URL     (app_user role — used by appuser-prod-gate only)
@@ -192,7 +203,7 @@ jobs:
           echo "GATE_VERDICT=PASS" >> "$GITHUB_ENV"
           echo "FAILED_GATE=" >> "$GITHUB_ENV"
 
-      # ── Step 9: Write results doc ──────────────────────────────────────────
+      # ── Step 10: Write results doc ─────────────────────────────────────────
       # Runs even on gate failure so we always get a doc.
       - name: Write Gate 2B results doc
         if: always()
@@ -271,7 +282,7 @@ jobs:
 
           echo "Results doc written to docs/hr/GATE_2B_NEON_RLS_RESULTS.md"
 
-      # ── Step 10: Commit and push results doc ──────────────────────────────
+      # ── Step 11: Commit and push results doc ──────────────────────────────
       - name: Commit and push results doc
         if: always()
         run: |
