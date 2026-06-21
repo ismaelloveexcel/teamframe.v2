@@ -39,12 +39,14 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
 
       # ── Step 1: Verify connection ──────────────────────────────────────────
+      # Connect to neondb (always exists) — teamframe DB is created in Step 2.
       - name: Verify Neon connection
         env:
           NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
         run: |
           echo "Connecting to Neon..."
-          psql "$NEON_ADMIN_URL" -c "SELECT version();"
+          BOOTSTRAP="${NEON_ADMIN_URL/\/teamframe?/\/neondb?}"
+          psql "$BOOTSTRAP" -c "SELECT version();"
 
       # ── Step 2: Ensure teamframe database exists ───────────────────────────
       # NEON_ADMIN_URL must end in /teamframe?sslmode=require
@@ -60,7 +62,15 @@ jobs:
             && echo "Created database teamframe." \
             || echo "Database teamframe already exists — skipping."
 
-      # ── Step 3: Apply migrations 0000–0011 ────────────────────────────────
+      # ── Step 3: Bootstrap base schema (drizzle push) ─────────────────────
+      # 0000_hr_tables.sql does ALTER TABLE users — requires users/organizations
+      # tables to exist first. CI runs push-force before migrations; same here.
+      - name: Bootstrap base schema (drizzle push)
+        env:
+          DATABASE_URL: ${{ secrets.NEON_ADMIN_URL }}
+        run: pnpm --filter @workspace/db run push-force
+
+      # ── Step 4: Apply migrations 0000–0011 ────────────────────────────────
       - name: Apply migrations 0000–0011
         env:
           NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
