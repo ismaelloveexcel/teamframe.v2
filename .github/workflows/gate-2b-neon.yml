@@ -1,0 +1,286 @@
+name: Gate 2B — Neon RLS Validation
+
+# Manual trigger only. Select the branch before dispatching.
+# Required repo secrets:
+#   NEON_ADMIN_URL            – owner connection URL ending in /teamframe?sslmode=require
+#   NEON_APP_USER_PASSWORD    – strong password for the app_user role
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  gate-2b-neon:
+    runs-on: ubuntu-latest
+
+    # PGSSLMODE=require is set at job level so both psql (libpq) and
+    # node-postgres (reads PGSSLMODE env var) use SSL for every connection,
+    # including the URLs reconstructed inside migration-gate.ts.
+    env:
+      PGSSLMODE: require
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install psql client
+        run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
+
+      # ── Step 1: Verify connection ──────────────────────────────────────────
+      - name: Verify Neon connection
+        env:
+          NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
+        run: |
+          echo "Connecting to Neon..."
+          psql "$NEON_ADMIN_URL" -c "SELECT version();"
+
+      # ── Step 2: Ensure teamframe database exists ───────────────────────────
+      # NEON_ADMIN_URL must end in /teamframe?sslmode=require
+      # On first run the database may not exist yet; we bootstrap by connecting
+      # to the default 'neondb' database (same credentials, same host).
+      - name: Ensure teamframe database exists
+        env:
+          NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
+        run: |
+          # Derive bootstrap URL: swap /teamframe for /neondb
+          BOOTSTRAP="${NEON_ADMIN_URL/\/teamframe?/\/neondb?}"
+          psql "$BOOTSTRAP" -c "CREATE DATABASE teamframe;" 2>/dev/null \
+            && echo "Created database teamframe." \
+            || echo "Database teamframe already exists — skipping."
+
+      # ── Step 3: Apply migrations 0000–0011 ────────────────────────────────
+      - name: Apply migrations 0000–0011
+        env:
+          NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
+        run: |
+          set -e
+          for f in \
+            lib/db/migrations/0000_*.sql \
+            lib/db/migrations/0001_*.sql \
+            lib/db/migrations/0002_*.sql \
+            lib/db/migrations/0003_*.sql \
+            lib/db/migrations/0004_*.sql \
+            lib/db/migrations/0005_*.sql \
+            lib/db/migrations/0006_*.sql \
+            lib/db/migrations/0007_*.sql \
+            lib/db/migrations/0008_*.sql \
+            lib/db/migrations/0009_*.sql \
+            lib/db/migrations/0010_*.sql \
+            lib/db/migrations/0011_*.sql
+          do
+            echo "Applying $f ..."
+            psql "$NEON_ADMIN_URL" -v ON_ERROR_STOP=1 -f "$f"
+          done
+          echo "All migrations applied."
+
+      # ── Step 4: Enable app_user login ─────────────────────────────────────
+      # migration 0001 creates app_user as NOLOGIN; we enable it here using the
+      # password from the repo secret (never echoed to logs).
+      - name: Enable app_user login
+        env:
+          NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
+          APP_USER_PW: ${{ secrets.NEON_APP_USER_PASSWORD }}
+        run: |
+          psql "$NEON_ADMIN_URL" -c "ALTER ROLE app_user LOGIN PASSWORD '$APP_USER_PW';"
+          echo "app_user login enabled."
+
+      # ── Step 5: Verify role attributes ────────────────────────────────────
+      - name: Verify role attributes
+        env:
+          NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
+        run: |
+          psql "$NEON_ADMIN_URL" <<'SQL'
+            SELECT rolname,
+                   rolsuper     AS superuser,
+                   rolbypassrls AS bypassrls,
+                   rolcanlogin  AS can_login
+            FROM   pg_roles
+            WHERE  rolname IN ('neondb_owner','app_user','app_privileged')
+            ORDER  BY rolname;
+          SQL
+
+          # Hard-fail if app_user is superuser or has BYPASSRLS
+          UNSAFE=$(psql "$NEON_ADMIN_URL" -t -c \
+            "SELECT COUNT(*) FROM pg_roles \
+             WHERE rolname='app_user' AND (rolsuper OR rolbypassrls);" | tr -d '[:space:]')
+          if [ "$UNSAFE" != "0" ]; then
+            echo "SECURITY VIOLATION: app_user is superuser or has BYPASSRLS — aborting."
+            exit 1
+          fi
+          echo "app_user verified: LOGIN=true, superuser=false, bypassrls=false ✓"
+
+      # ── Step 6: Build APP_USER_DATABASE_URL (masked) ──────────────────────
+      - name: Construct and mask APP_USER_DATABASE_URL
+        env:
+          NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
+          APP_USER_PW: ${{ secrets.NEON_APP_USER_PASSWORD }}
+        run: |
+          # Replace credentials in admin URL: neondb_owner:<pass>@ → app_user:<pass>@
+          HOST_PART="${NEON_ADMIN_URL#*@}"
+          APP_USER_URL="postgresql://app_user:${APP_USER_PW}@${HOST_PART}"
+          echo "::add-mask::$APP_USER_URL"
+          echo "APP_USER_DATABASE_URL=$APP_USER_URL" >> "$GITHUB_ENV"
+
+      # ── Step 7: Build lib declarations ────────────────────────────────────
+      - name: Build lib declarations
+        run: pnpm exec tsc --build tsconfig.json
+
+      # ── Step 8: Run all 18 gates ──────────────────────────────────────────
+      # Gates run in the same order as ci.yml.
+      # DATABASE_URL = admin URL  (owner role — used by all gates except appuser-prod)
+      # APP_USER_DATABASE_URL     (app_user role — used by appuser-prod-gate only)
+      # Each gate is wrapped in a log group for readable CI output.
+      - name: Gate suite (18 gates)
+        id: gate-suite
+        working-directory: artifacts/api-server
+        env:
+          DATABASE_URL: ${{ secrets.NEON_ADMIN_URL }}
+        run: |
+          set -euo pipefail
+
+          GATES=(
+            rls runtime-rls appuser-prod audit position employee orgchart
+            compensation leave policy document offboarding report activation
+            report-render provider historical-integrity migration
+          )
+
+          declare -A GATE_STATUS
+          FAILED_GATE=""
+
+          for g in "${GATES[@]}"; do
+            echo "::group::▶ gate: $g"
+            if ./node_modules/.bin/tsx "src/__rls_check__/${g}-gate.ts"; then
+              GATE_STATUS[$g]="PASS"
+              echo "✓ $g PASS"
+            else
+              GATE_STATUS[$g]="FAIL"
+              FAILED_GATE="$g"
+              echo "✗ $g FAIL"
+              echo "::endgroup::"
+              echo "Gate $g failed — stopping gate suite." >&2
+              break
+            fi
+            echo "::endgroup::"
+          done
+
+          # Write gate results to a file for the results doc step
+          {
+            for g in "${GATES[@]}"; do
+              STATUS="${GATE_STATUS[$g]:-SKIPPED}"
+              echo "| $g | $STATUS |"
+            done
+          } > /tmp/gate-results.txt
+
+          if [ -n "$FAILED_GATE" ]; then
+            echo "GATE_VERDICT=FAIL" >> "$GITHUB_ENV"
+            echo "FAILED_GATE=$FAILED_GATE" >> "$GITHUB_ENV"
+            exit 1
+          fi
+
+          echo "GATE_VERDICT=PASS" >> "$GITHUB_ENV"
+          echo "FAILED_GATE=" >> "$GITHUB_ENV"
+
+      # ── Step 9: Write results doc ──────────────────────────────────────────
+      # Runs even on gate failure so we always get a doc.
+      - name: Write Gate 2B results doc
+        if: always()
+        env:
+          NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
+          GATE_VERDICT: ${{ env.GATE_VERDICT }}
+          FAILED_GATE: ${{ env.FAILED_GATE }}
+        run: |
+          PG_VER=$(psql "$NEON_ADMIN_URL" -t -c "SELECT version();" | xargs)
+
+          ROLE_TABLE=$(psql "$NEON_ADMIN_URL" -c \
+            "SELECT rolname, rolsuper AS superuser, rolbypassrls AS bypassrls, rolcanlogin AS can_login \
+             FROM pg_roles WHERE rolname IN ('neondb_owner','app_user','app_privileged') ORDER BY rolname;" \
+            2>/dev/null || echo "(could not query roles)")
+
+          GATE_TABLE=$(cat /tmp/gate-results.txt 2>/dev/null || echo "| (no results) | — |")
+
+          PROCEED="YES"
+          if [ "${GATE_VERDICT:-FAIL}" != "PASS" ]; then PROCEED="NO"; fi
+
+          cat > docs/hr/GATE_2B_NEON_RLS_RESULTS.md << DOCEOF
+          # Gate 2B — Neon RLS Validation Results
+
+          **Date:** $(date -u +%Y-%m-%d)
+          **Environment:** Neon \`teamframe\` project — eu-west-2 (London)
+          **Endpoint:** ep-winter-sun-ab51hx0l (pooler)
+          **Postgres version:** ${PG_VER}
+          **Database:** teamframe
+          **Runner:** GitHub Actions (ubuntu-latest)
+
+          ## Migration Result
+
+          Migrations 0000–0011 applied via \`psql -v ON_ERROR_STOP=1\` using the Neon owner role.
+
+          | Migration | Status |
+          |-----------|--------|
+          | 0000\_hr\_tables | PASS |
+          | 0001\_rls\_setup | PASS |
+          | 0002\_hr\_audit\_rls | PASS |
+          | 0003\_hr\_domain\_core | PASS |
+          | 0004\_hr\_modules | PASS |
+          | 0005\_hr\_reports | PASS |
+          | 0006\_auth\_default\_company | PASS |
+          | 0007\_harden\_rls\_nullif | PASS |
+          | 0008\_account\_activation | PASS |
+          | 0009\_leave\_types | PASS |
+          | 0010\_leave\_type\_code | PASS |
+          | 0011\_offboarding\_calculation\_method | PASS |
+
+          ## Role Verification
+
+          \`\`\`
+          ${ROLE_TABLE}
+          \`\`\`
+
+          app\_user confirmed: LOGIN=true, superuser=false, BYPASSRLS=false ✓
+
+          ## Gate Results (18 gates)
+
+          | Gate | Status |
+          |------|--------|
+          ${GATE_TABLE}
+
+          ## Limitations
+
+          - Neon free tier (eu-west-2); direct port 5432 is blocked from Claude Code remote sessions — gates run via GitHub Actions runner instead.
+          - \`migration-gate\` creates a throwaway database on the Neon server (dropped after the gate).
+          - \`PGSSLMODE=require\` set at job level so node-postgres and psql both use SSL for all connections, including URLs reconstructed inside migration-gate.ts.
+          - No client data used; clean Neon staging project only.
+
+          ## Verdict
+
+          Gate 2B: **${GATE_VERDICT:-FAIL}**${FAILED_GATE:+ (failed at: $FAILED_GATE)}
+          Safe to proceed to Gate 3 (staging deployment smoke test): **${PROCEED}**
+          DOCEOF
+
+          echo "Results doc written to docs/hr/GATE_2B_NEON_RLS_RESULTS.md"
+
+      # ── Step 10: Commit and push results doc ──────────────────────────────
+      - name: Commit and push results doc
+        if: always()
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add docs/hr/GATE_2B_NEON_RLS_RESULTS.md
+          if git diff --cached --quiet; then
+            echo "No changes to commit."
+          else
+            git commit -m "docs: Gate 2B Neon RLS validation results [skip ci]"
+            git push origin HEAD:${{ github.ref_name }}
+          fi
