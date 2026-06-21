@@ -3,7 +3,7 @@
 **Date:** 2026-06-21
 **Environment:** Neon `teamframe` project — eu-west-2 (London)
 **Endpoint:** ep-winter-sun-ab51hx0l (pooler)
-**Postgres version:** 
+**Postgres version:** PostgreSQL 18.4 (48c2093) on aarch64-unknown-linux-gnu, compiled by gcc (Ubuntu 13.3.0-6ubuntu2~24.04.1) 13.3.0, 64-bit
 **Database:** teamframe
 **Runner:** GitHub Actions (ubuntu-latest)
 
@@ -29,7 +29,12 @@ Migrations 0000–0011 applied via `psql -v ON_ERROR_STOP=1` using the Neon owne
 ## Role Verification
 
 ```
-(could not query roles)
+    rolname     | superuser | bypassrls | can_login 
+----------------+-----------+-----------+-----------
+ app_privileged | f         | t         | f
+ app_user       | f         | f         | t
+ neondb_owner   | f         | t         | t
+(3 rows)
 ```
 
 app\_user confirmed: LOGIN=true, superuser=false, BYPASSRLS=false ✓
@@ -38,7 +43,24 @@ app\_user confirmed: LOGIN=true, superuser=false, BYPASSRLS=false ✓
 
 | Gate | Status |
 |------|--------|
-| (no results) | — |
+| rls | PASS |
+| runtime-rls | PASS |
+| appuser-prod | PASS |
+| audit | PASS |
+| position | PASS |
+| employee | PASS |
+| orgchart | PASS |
+| compensation | PASS |
+| leave | PASS |
+| policy | PASS |
+| document | PASS |
+| offboarding | PASS |
+| report | PASS |
+| activation | PASS |
+| report-render | PASS |
+| provider | PASS |
+| historical-integrity | PASS |
+| migration | PASS |
 
 ## Limitations
 
@@ -49,5 +71,5 @@ app\_user confirmed: LOGIN=true, superuser=false, BYPASSRLS=false ✓
 
 ## Verdict
 
-Gate 2B: **FAIL**
-Safe to proceed to Gate 3 (staging deployment smoke test): **NO**
+Gate 2B: **PASS**
+Safe to proceed to Gate 3 (staging deployment smoke test): **YES**
