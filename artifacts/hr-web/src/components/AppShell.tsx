@@ -44,7 +44,7 @@ function TfLogo() {
   return (
     <div className="flex items-center gap-2.5">
       <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-accent">
-        <span className="text-xs font-bold text-white tracking-tight">TF</span>
+        <span className="text-xs font-bold text-slate-900 tracking-tight">TF</span>
       </div>
       <span className="font-semibold text-tf-text tracking-tight">TeamFrame</span>
     </div>
@@ -94,14 +94,14 @@ export function AppShell() {
               cn(
                 "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
                 isActive
-                  ? "bg-accent-soft text-accent"
+                  ? "bg-accent-soft text-tf-text"
                   : "text-tf-muted hover:bg-tf-panel hover:text-tf-text",
               )
             }
           >
             {({ isActive }) => (
               <>
-                <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-accent" : "")} />
+                <Icon className={cn("h-4 w-4 shrink-0", isActive ? "text-accent-dark" : "")} />
                 {label}
               </>
             )}

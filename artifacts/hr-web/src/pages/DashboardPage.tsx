@@ -39,7 +39,7 @@ function StatCard({
         <div
           className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
             accent
-              ? "bg-accent text-white shadow-sm shadow-accent/30"
+              ? "bg-accent text-slate-900 shadow-sm shadow-black/10"
               : "bg-tf-panel text-tf-muted"
           }`}
         >
@@ -81,7 +81,7 @@ function QuickLink({
         <p className="font-medium text-tf-text">{label}</p>
         <p className="text-xs text-tf-muted">{description}</p>
       </div>
-      <ArrowRight className="h-4 w-4 shrink-0 text-tf-subtle transition-colors group-hover:text-accent" />
+      <ArrowRight className="h-4 w-4 shrink-0 text-tf-subtle transition-colors group-hover:text-accent-strong" />
     </Link>
   );
 }
@@ -211,7 +211,7 @@ export function DashboardPage() {
             </div>
             <div className="flex items-center gap-3 rounded-xl border border-tf-border bg-white px-4 py-3">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-soft">
-                <TrendingUp className="h-4 w-4 text-accent" />
+                <TrendingUp className="h-4 w-4 text-accent-strong" />
               </div>
               <div>
                 <p className="text-sm font-medium text-tf-text">Workspace ready</p>

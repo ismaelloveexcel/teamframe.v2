@@ -58,7 +58,7 @@ export function DocumentsPage() {
             key={t}
             onClick={() => setTab(t)}
             className={`border-b-2 px-4 py-2.5 text-sm font-medium capitalize transition-colors ${
-              tab === t ? "border-accent text-accent" : "border-transparent text-tf-muted hover:text-tf-text"
+              tab === t ? "border-accent text-accent-strong" : "border-transparent text-tf-muted hover:text-tf-text"
             }`}
           >
             {t}

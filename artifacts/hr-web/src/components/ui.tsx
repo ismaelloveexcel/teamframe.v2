@@ -19,7 +19,7 @@ export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className, variant = "primary", size = "md", ...props }, ref) => {
     const variants: Record<string, string> = {
       primary:
-        "bg-accent text-white hover:bg-accent-dark focus-visible:ring-accent disabled:bg-slate-300 disabled:text-slate-500",
+        "bg-accent text-slate-900 hover:bg-accent-dark focus-visible:ring-accent disabled:bg-slate-200 disabled:text-slate-400",
       secondary:
         "bg-white text-tf-text border border-tf-border hover:bg-tf-panel disabled:opacity-50",
       danger: "bg-tf-danger text-white hover:bg-red-700 disabled:opacity-50",
@@ -146,7 +146,7 @@ export function Badge({
     amber:   "bg-tf-warning-soft text-tf-warning",
     red:     "bg-tf-danger-soft text-tf-danger",
     blue:    "bg-blue-50 text-blue-600",
-    accent:  "bg-accent-soft text-accent",
+    accent:  "bg-accent-soft text-accent-strong",
   };
   return (
     <span

@@ -1,14 +1,16 @@
 @import "tailwindcss";
 
 /* ── TeamFrame Design Tokens ─────────────────────────────────────────────────
-   Signature accent: indigo (#6366f1) — premium, calm, replaceable per client.
-   Use accent only for: active nav, CTAs, scores, risk markers, progress.
+   Signature accent: fluo-lime (#b6ff3b) — restrained, replaceable per client.
+   Use ONLY for: active states, CTA details, risk/score markers, small highlights,
+   progress indicators. Never as large backgrounds. Always dark text on lime.
    ─────────────────────────────────────────────────────────────────────────── */
 @theme {
-  /* Accent — indigo signature */
-  --color-accent:      #6366f1;
-  --color-accent-dark: #4f46e5;
-  --color-accent-soft: #eef2ff;
+  /* Accent — fluo-lime signature */
+  --color-accent:        #b6ff3b;
+  --color-accent-dark:   #8ee600;   /* hover / pressed */
+  --color-accent-strong: #5a9000;   /* text on white — AAA contrast */
+  --color-accent-soft:   color-mix(in srgb, #b6ff3b 14%, transparent); /* subtle wash */
 
   /* Semantic surfaces */
   --color-tf-bg:     #f8fafc;   /* page background */
@@ -54,9 +56,9 @@ body {
   -moz-osx-font-smoothing: grayscale;
 }
 
-/* Smooth focus rings via accent */
+/* Focus rings via accent — lime on dark surfaces is highly visible */
 *:focus-visible {
-  outline: 2px solid #6366f1;
+  outline: 2px solid #b6ff3b;
   outline-offset: 2px;
 }
 

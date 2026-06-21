@@ -80,7 +80,7 @@ export function FinanceReportPage() {
                     <li key={r.id}>
                       <button
                         className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition-colors hover:bg-tf-panel ${
-                          selected?.id === r.id ? "bg-accent-soft/50 font-medium text-accent" : "text-tf-text"
+                          selected?.id === r.id ? "bg-accent-soft/50 font-medium text-accent-strong" : "text-tf-text"
                         }`}
                         onClick={() => open.mutate(r.id)}
                       >

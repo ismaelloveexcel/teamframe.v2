@@ -16,8 +16,8 @@ export function AuthLayout({
       <div className="w-full max-w-sm">
         {/* Logo */}
         <div className="mb-8 flex flex-col items-center gap-3">
-          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent shadow-md shadow-accent/20">
-            <span className="text-sm font-bold text-white tracking-tight">TF</span>
+          <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-accent shadow-md shadow-black/10">
+            <span className="text-sm font-bold text-slate-900 tracking-tight">TF</span>
           </div>
           <div className="text-center">
             <p className="text-sm font-semibold text-tf-text tracking-tight">TeamFrame</p>
