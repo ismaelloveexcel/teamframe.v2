@@ -23,26 +23,26 @@ export function DataTable<T>({
     <div className="overflow-x-auto">
       <table className="w-full text-sm">
         <thead>
-          <tr className="border-b border-slate-200 text-left text-xs uppercase tracking-wide text-slate-500">
+          <tr className="border-b border-tf-border bg-tf-bg text-left text-xs font-medium uppercase tracking-wide text-tf-subtle">
             {columns.map((c) => (
-              <th key={c.key} className={cn("px-4 py-3 font-medium", c.className)}>
+              <th key={c.key} className={cn("px-4 py-3", c.className)}>
                 {c.header}
               </th>
             ))}
           </tr>
         </thead>
-        <tbody>
+        <tbody className="divide-y divide-tf-border-soft">
           {rows.map((row) => (
             <tr
               key={rowKey(row)}
               onClick={onRowClick ? () => onRowClick(row) : undefined}
               className={cn(
-                "border-b border-slate-100 last:border-0",
-                onRowClick && "cursor-pointer hover:bg-slate-50",
+                "transition-colors",
+                onRowClick && "cursor-pointer hover:bg-accent-soft/40",
               )}
             >
               {columns.map((c) => (
-                <td key={c.key} className={cn("px-4 py-3 text-slate-700", c.className)}>
+                <td key={c.key} className={cn("px-4 py-3 text-tf-text", c.className)}>
                   {c.render(row)}
                 </td>
               ))}
@@ -68,20 +68,20 @@ export function Pagination({
 }) {
   if (pageCount <= 1) return null;
   return (
-    <div className="flex items-center justify-between border-t border-slate-100 px-4 py-3 text-sm text-slate-500">
+    <div className="flex items-center justify-between border-t border-tf-border-soft px-4 py-3 text-sm text-tf-muted">
       <span>
         Page {page} of {pageCount} · {total} total
       </span>
       <div className="flex gap-2">
         <button
-          className="rounded-md border border-slate-300 px-2.5 py-1 disabled:opacity-40"
+          className="rounded-lg border border-tf-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-tf-panel disabled:cursor-not-allowed disabled:opacity-40"
           disabled={page <= 1}
           onClick={() => onPage(page - 1)}
         >
           Previous
         </button>
         <button
-          className="rounded-md border border-slate-300 px-2.5 py-1 disabled:opacity-40"
+          className="rounded-lg border border-tf-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-tf-panel disabled:cursor-not-allowed disabled:opacity-40"
           disabled={page >= pageCount}
           onClick={() => onPage(page + 1)}
         >

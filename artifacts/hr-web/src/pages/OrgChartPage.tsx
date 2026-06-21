@@ -69,8 +69,8 @@ function OrgNode({
   return (
     <div>
       <div
-        className={`flex items-center gap-3 rounded-md border border-slate-200 bg-white px-3 py-2 ${
-          canClick ? "cursor-pointer hover:border-slate-400 hover:bg-slate-50" : ""
+        className={`flex items-center gap-3 rounded-xl border border-tf-border bg-white px-3.5 py-2.5 transition-all ${
+          canClick ? "cursor-pointer hover:border-accent/30 hover:bg-accent-soft/30 hover:shadow-sm" : ""
         }`}
         style={{ marginLeft: depth * 24 }}
         onClick={canClick ? () => onSelect(emp!.id) : undefined}
@@ -86,15 +86,15 @@ function OrgNode({
       >
         {depth > 0 && <ChevronRight className="h-4 w-4 shrink-0 text-slate-300" />}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-medium text-slate-900">
+          <p className="truncate text-sm font-medium text-tf-text">
             {node.position.title}
             {node.position.department && (
-              <span className="ml-2 text-xs font-normal text-slate-400">
+              <span className="ml-2 text-xs font-normal text-tf-subtle">
                 {node.position.department}
               </span>
             )}
           </p>
-          <p className="truncate text-xs text-slate-500">
+          <p className="truncate text-xs text-tf-muted">
             {emp ? `${emp.firstName} ${emp.lastName} · #${emp.employeeNo}` : "Vacant"}
           </p>
         </div>
