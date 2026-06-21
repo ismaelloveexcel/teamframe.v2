@@ -39,12 +39,15 @@ jobs:
         run: sudo apt-get update -qq && sudo apt-get install -y -qq postgresql-client
 
       # ── Step 1: Verify connection ──────────────────────────────────────────
+      # Connect to the always-existing neondb to verify credentials before
+      # the teamframe database is created.
       - name: Verify Neon connection
         env:
           NEON_ADMIN_URL: ${{ secrets.NEON_ADMIN_URL }}
         run: |
           echo "Connecting to Neon..."
-          psql "$NEON_ADMIN_URL" -c "SELECT version();"
+          BOOTSTRAP="${NEON_ADMIN_URL/\/teamframe?/\/neondb?}"
+          psql "$BOOTSTRAP" -c "SELECT version();"
 
       # ── Step 2: Ensure teamframe database exists ───────────────────────────
       # NEON_ADMIN_URL must end in /teamframe?sslmode=require
