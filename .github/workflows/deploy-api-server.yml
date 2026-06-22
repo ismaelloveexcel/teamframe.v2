@@ -31,9 +31,6 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build workspace libs
-        run: pnpm --filter @workspace/db run build
-
       - name: Build api-server
         run: pnpm --filter @workspace/api-server run build
 
