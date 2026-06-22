@@ -38,6 +38,15 @@ jobs:
       - name: Build TypeScript project references
         run: pnpm run typecheck:libs
 
+      - name: Diagnose TypeScript (informational)
+        working-directory: artifacts/api-server
+        continue-on-error: true
+        run: |
+          echo "=== api-server tsconfig ==="
+          pnpm exec tsc --noEmit -p tsconfig.json 2>&1 | head -60 || true
+          echo "=== api/tsconfig.json ==="
+          pnpm exec tsc --noEmit -p api/tsconfig.json 2>&1 | head -60 || true
+
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
 
