@@ -6,6 +6,7 @@ on:
     paths:
       - "artifacts/api-server/**"
       - "lib/db/**"
+      - "lib/api-zod/**"
       - "pnpm-lock.yaml"
   workflow_dispatch:
 
@@ -33,6 +34,9 @@ jobs:
 
       - name: Build api-server
         run: pnpm --filter @workspace/api-server run build
+
+      - name: Build TypeScript project references
+        run: pnpm run typecheck:libs
 
       - name: Install Vercel CLI
         run: npm install -g vercel@latest
