@@ -1,0 +1,37 @@
+name: Bootstrap TeamFrame admin account
+
+on:
+  workflow_dispatch:
+    inputs:
+      companyName:
+        description: "Company name"
+        required: true
+        default: "ARIE Finance"
+      adminEmail:
+        description: "Admin email"
+        required: true
+        default: "ismael@ariefinance.com"
+      adminPassword:
+        description: "Admin password (min 8 chars)"
+        required: true
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Call bootstrap endpoint
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api-server-phi-three.vercel.app/api/auth/bootstrap" \
+            -H "Content-Type: application/json" \
+            -d "{\"companyName\":\"${{ github.event.inputs.companyName }}\",\"adminEmail\":\"${{ github.event.inputs.adminEmail }}\",\"adminPassword\":\"${{ github.event.inputs.adminPassword }}\"}" \
+            --max-time 30)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "HTTP Status: $HTTP_CODE"
+          echo "Response Body: $BODY"
+          if [ "$HTTP_CODE" != "200" ] && [ "$HTTP_CODE" != "201" ]; then
+            echo "::error::Bootstrap failed with status $HTTP_CODE: $BODY"
+            exit 1
+          fi
+          echo "Bootstrap succeeded."

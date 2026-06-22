@@ -1,0 +1,59 @@
+name: Deploy hr-web to Vercel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "artifacts/hr-web/**"
+      - "lib/**"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+
+env:
+  VERCEL_ORG_ID: team_LUgbx4qzGleJbDFrfMKYLjDm
+  VERCEL_PROJECT_ID: prj_B40P8rtMeKokDSvNFWOsnv07Xkmr
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 10
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Set VITE_API_BASE_URL on Vercel project
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
+        run: |
+          echo "https://api-server-phi-three.vercel.app/api" | \
+            vercel env add VITE_API_BASE_URL production --token=$VERCEL_TOKEN --force || true
+          echo "https://api-server-phi-three.vercel.app/api" | \
+            vercel env add VITE_API_BASE_URL preview --token=$VERCEL_TOKEN --force || true
+
+      - name: Build Vercel output (prebuilt)
+        env:
+          VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
+          VITE_API_BASE_URL: https://api-server-phi-three.vercel.app/api
+        run: vercel build --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Deploy to Vercel
+        env:
+          VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
+        run: vercel deploy --prebuilt --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
