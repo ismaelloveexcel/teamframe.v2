@@ -57,3 +57,17 @@ jobs:
           VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
         run: vercel deploy --prebuilt --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+
+      - name: Bootstrap admin account (idempotent — safe to re-run)
+        continue-on-error: true
+        env:
+          NEON_APP_USER_PASSWORD: ${{ secrets.NEON_APP_USER_PASSWORD }}
+        run: |
+          RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api-server-phi-three.vercel.app/api/auth/bootstrap" \
+            -H "Content-Type: application/json" \
+            -d "{\"companyName\":\"ARIE Finance\",\"adminEmail\":\"ismael@ariefinance.com\",\"adminPassword\":\"${NEON_APP_USER_PASSWORD}\"}" \
+            --max-time 30)
+          HTTP_CODE=$(echo "$RESPONSE" | tail -n1)
+          BODY=$(echo "$RESPONSE" | head -n -1)
+          echo "Bootstrap response (${HTTP_CODE}): ${BODY}"

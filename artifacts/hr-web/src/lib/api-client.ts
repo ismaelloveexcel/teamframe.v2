@@ -2,11 +2,11 @@ import axios, { AxiosError, type AxiosInstance } from "axios";
 import { z, type ZodType } from "zod";
 import { clearToken, getToken } from "./token";
 
-// Base URL is configurable. Default points at the local api-server; in dev the
-// Vite proxy forwards /api -> backend, so a relative "/api" also works.
+// Base URL resolves in order: VITE_API_BASE_URL env var → production api-server.
+// For local dev, set VITE_API_BASE_URL=http://localhost:8080/api in .env.local.
 const BASE_URL =
   (import.meta.env.VITE_API_BASE_URL as string | undefined) ??
-  "http://localhost:8080/api";
+  "https://api-server-phi-three.vercel.app/api";
 
 export const apiBaseUrl = BASE_URL;
 
