@@ -91,7 +91,7 @@ function EmployeesTable({
     {
       key: "name",
       header: "Name",
-      render: (e) => <span className="font-medium text-slate-900">{fullName(e)}</span>,
+      render: (e) => <span className="font-medium text-tf-text">{fullName(e)}</span>,
     },
     { key: "no", header: "Employee #", render: (e) => e.employeeNo },
     { key: "email", header: "Email", render: (e) => e.companyEmail ?? e.personalEmail ?? "—" },
@@ -105,9 +105,9 @@ function EmployeesTable({
 
   return (
     <>
-      <div className="border-b border-slate-100 p-3">
+      <div className="border-b border-tf-border-soft p-3">
         <div className="relative max-w-sm">
-          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+          <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-tf-subtle" />
           <Input
             className="pl-9"
             placeholder="Search by name, number or email…"

@@ -21,8 +21,7 @@ function downloadJson(report: Report) {
 
 /**
  * Renders a generated, FROZEN report. Tries the server-rendered HTML
- * (GET /reports/:id/render, on feat/report-ux-polish); if unavailable it falls
- * back to a structured render of the frozen JSON content.
+ * (GET /reports/:id/render); if unavailable falls back to structured JSON render.
  */
 export function ReportViewer({ report }: { report: Report }) {
   const render = useQuery({
@@ -36,8 +35,8 @@ export function ReportViewer({ report }: { report: Report }) {
       <CardHeader
         title={
           <span className="flex items-center gap-2">
-            {report.kind === "finance" ? "Finance report" : "Exit report"}
-            <Badge tone="blue">frozen</Badge>
+            {report.kind === "finance" ? "Finance Report" : "Exit Report"}
+            <Badge tone="accent">frozen</Badge>
           </span>
         }
         description={`Generated ${formatDate(report.generatedAt)}${
@@ -71,33 +70,30 @@ export function ReportViewer({ report }: { report: Report }) {
 
 function JsonReport({ report }: { report: Report }) {
   const content = report.content as Record<string, unknown>;
-  const lines = content.lines as
-    | Array<Record<string, unknown>>
-    | undefined;
+  const lines = content.lines as Array<Record<string, unknown>> | undefined;
   const totals = content.totals as Record<string, unknown> | undefined;
 
   return (
-    <div className="space-y-4">
-      <p className="no-print rounded-md bg-amber-50 px-3 py-2 text-xs text-amber-700">
-        Server-rendered HTML view is unavailable on this backend; showing the
-        frozen report content.
-      </p>
+    <div className="space-y-5">
+      <div className="no-print rounded-xl border border-tf-warning-soft bg-tf-warning-soft px-3.5 py-2.5 text-xs text-tf-warning">
+        Server-rendered HTML view is unavailable — showing the frozen report content.
+      </div>
 
-      {lines && (
-        <div className="overflow-x-auto">
+      {lines && lines.length > 0 && (
+        <div className="overflow-x-auto rounded-xl border border-tf-border">
           <table className="w-full text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-left text-xs uppercase text-slate-500">
+              <tr className="border-b border-tf-border bg-tf-bg text-left text-xs font-medium uppercase tracking-wide text-tf-subtle">
                 {Object.keys(lines[0] ?? {}).map((k) => (
-                  <th key={k} className="px-3 py-2 font-medium">{k}</th>
+                  <th key={k} className="px-4 py-3">{k}</th>
                 ))}
               </tr>
             </thead>
-            <tbody>
+            <tbody className="divide-y divide-tf-border-soft">
               {lines.map((row, i) => (
-                <tr key={i} className="border-b border-slate-100">
+                <tr key={i} className="hover:bg-tf-panel/50 transition-colors">
                   {Object.values(row).map((v, j) => (
-                    <td key={j} className="px-3 py-2 text-slate-700">
+                    <td key={j} className="px-4 py-3 text-tf-text">
                       {typeof v === "object" ? JSON.stringify(v) : String(v ?? "—")}
                     </td>
                   ))}
@@ -109,13 +105,15 @@ function JsonReport({ report }: { report: Report }) {
       )}
 
       {totals && (
-        <div className="rounded-md border border-slate-200 bg-slate-50 p-4 text-sm">
-          <p className="mb-2 font-medium text-slate-700">Totals</p>
-          <dl className="grid grid-cols-2 gap-1 sm:grid-cols-3">
+        <div className="rounded-xl border border-tf-border bg-tf-panel p-5">
+          <p className="mb-3 text-xs font-semibold uppercase tracking-wide text-tf-muted">
+            Totals
+          </p>
+          <dl className="grid grid-cols-2 gap-3 sm:grid-cols-3">
             {Object.entries(totals).map(([k, v]) => (
-              <div key={k}>
-                <dt className="text-slate-500">{k}</dt>
-                <dd className="font-medium text-slate-900">{String(v)}</dd>
+              <div key={k} className="rounded-lg bg-white px-3 py-2.5 shadow-sm ring-1 ring-tf-border">
+                <dt className="text-xs text-tf-muted">{k}</dt>
+                <dd className="mt-0.5 font-semibold text-tf-text">{String(v)}</dd>
               </div>
             ))}
           </dl>
@@ -123,8 +121,10 @@ function JsonReport({ report }: { report: Report }) {
       )}
 
       <details className="text-xs">
-        <summary className="cursor-pointer text-slate-500">Raw content</summary>
-        <pre className="mt-2 overflow-x-auto rounded-md bg-slate-900 p-3 text-slate-100">
+        <summary className="cursor-pointer text-tf-muted hover:text-tf-text transition-colors">
+          Raw content
+        </summary>
+        <pre className="mt-2 overflow-x-auto rounded-xl bg-slate-900 p-4 text-slate-100 text-xs leading-relaxed">
           {JSON.stringify(report.content, null, 2)}
         </pre>
       </details>

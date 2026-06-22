@@ -75,17 +75,17 @@ export function FinanceReportPage() {
               empty={<EmptyState icon={<FileBarChart className="h-8 w-8" />} title="No reports yet" />}
             >
               {(data) => (
-                <ul className="divide-y divide-slate-100">
+                <ul className="divide-y divide-tf-border-soft">
                   {data.data.map((r) => (
                     <li key={r.id}>
                       <button
-                        className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm hover:bg-slate-50 ${
-                          selected?.id === r.id ? "bg-slate-50 font-medium" : ""
+                        className={`flex w-full items-center justify-between px-4 py-3 text-left text-sm transition-colors hover:bg-tf-panel ${
+                          selected?.id === r.id ? "bg-accent-soft/50 font-medium text-accent-strong" : "text-tf-text"
                         }`}
                         onClick={() => open.mutate(r.id)}
                       >
                         <span>Cutoff {formatDate(r.periodCutoff)}</span>
-                        <span className="text-slate-400">{formatDate(r.generatedAt)}</span>
+                        <span className="text-tf-subtle text-xs">{formatDate(r.generatedAt)}</span>
                       </button>
                     </li>
                   ))}

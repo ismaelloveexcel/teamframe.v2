@@ -63,7 +63,7 @@ export function ActivatePage() {
     >
       <form className="space-y-4" onSubmit={onSubmit}>
         {notYetAvailable ? (
-          <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-sm text-amber-800">
+          <div className="rounded-xl border border-tf-warning-soft bg-tf-warning-soft px-3.5 py-3 text-sm text-tf-warning">
             Account activation is not available on this backend yet (the
             <code className="mx-1">/auth/activate</code> endpoint ships with the
             HR backend prerequisites). Please try again once it has been deployed.

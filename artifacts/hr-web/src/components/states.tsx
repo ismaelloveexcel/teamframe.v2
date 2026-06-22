@@ -5,16 +5,21 @@ import { cn } from "../lib/utils";
 import { Button, Card } from "./ui";
 
 export function Skeleton({ className }: { className?: string }) {
-  return <div className={cn("animate-pulse rounded bg-slate-200", className)} />;
+  return (
+    <div className={cn("animate-pulse rounded-lg bg-tf-panel", className)} />
+  );
 }
 
 export function TableSkeleton({ rows = 5, cols = 4 }: { rows?: number; cols?: number }) {
   return (
-    <div className="space-y-2 p-4">
+    <div className="space-y-3 p-5">
       {Array.from({ length: rows }).map((_, r) => (
         <div key={r} className="flex gap-4">
           {Array.from({ length: cols }).map((_, c) => (
-            <Skeleton key={c} className="h-5 flex-1" />
+            <Skeleton
+              key={c}
+              className={cn("h-4 flex-1", c === 0 && "max-w-[120px]")}
+            />
           ))}
         </div>
       ))}
@@ -34,11 +39,15 @@ export function EmptyState({
   icon?: ReactNode;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
-      <div className="text-slate-300">{icon ?? <Inbox className="h-10 w-10" />}</div>
+    <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-tf-panel text-tf-subtle">
+        {icon ?? <Inbox className="h-6 w-6" />}
+      </div>
       <div>
-        <p className="font-medium text-slate-700">{title}</p>
-        {description && <p className="mt-1 text-sm text-slate-500">{description}</p>}
+        <p className="font-medium text-tf-text">{title}</p>
+        {description && (
+          <p className="mt-1.5 max-w-xs text-sm text-tf-muted">{description}</p>
+        )}
       </div>
       {action}
     </div>
@@ -53,11 +62,13 @@ export function ErrorState({
   onRetry?: () => void;
 }) {
   return (
-    <div className="flex flex-col items-center justify-center gap-3 px-6 py-12 text-center">
-      <AlertTriangle className="h-10 w-10 text-red-400" />
+    <div className="flex flex-col items-center justify-center gap-4 px-6 py-16 text-center">
+      <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-tf-danger-soft text-tf-danger">
+        <AlertTriangle className="h-6 w-6" />
+      </div>
       <div>
-        <p className="font-medium text-slate-700">Something went wrong</p>
-        <p className="mt-1 max-w-md text-sm text-slate-500">{errorMessage(error)}</p>
+        <p className="font-medium text-tf-text">Something went wrong</p>
+        <p className="mt-1.5 max-w-md text-sm text-tf-muted">{errorMessage(error)}</p>
       </div>
       {onRetry && (
         <Button variant="secondary" size="sm" onClick={onRetry}>
@@ -72,7 +83,7 @@ export function ErrorState({
 export function ErrorBanner({ error }: { error: unknown }) {
   if (!error) return null;
   return (
-    <div className="flex items-start gap-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+    <div className="flex items-start gap-2.5 rounded-xl border border-tf-danger-soft bg-tf-danger-soft px-3.5 py-3 text-sm text-tf-danger">
       <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
       <span>{errorMessage(error)}</span>
     </div>
