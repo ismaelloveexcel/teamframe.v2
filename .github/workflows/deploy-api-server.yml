@@ -1,0 +1,55 @@
+name: Deploy api-server to Vercel
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "artifacts/api-server/**"
+      - "lib/db/**"
+      - "pnpm-lock.yaml"
+  workflow_dispatch:
+
+env:
+  VERCEL_ORG_ID: team_LUgbx4qzGleJbDFrfMKYLjDm
+  VERCEL_PROJECT_ID: prj_ySXzNBhVDD5qpY5GkCQkNUY9iBsc
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v3
+        with:
+          version: 9
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: "pnpm"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Build workspace libs
+        run: pnpm --filter @workspace/db run build
+
+      - name: Build api-server
+        run: pnpm --filter @workspace/api-server run build
+
+      - name: Install Vercel CLI
+        run: npm install -g vercel@latest
+
+      - name: Build Vercel output (prebuilt)
+        run: vercel build --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: artifacts/api-server
+        env:
+          VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
+
+      - name: Deploy to Vercel
+        run: vercel deploy --prebuilt --prod --yes --token=${{ secrets.VERCEL_TOKEN }}
+        working-directory: artifacts/api-server
+        env:
+          VERCEL_ORG_ID: ${{ env.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ env.VERCEL_PROJECT_ID }}
