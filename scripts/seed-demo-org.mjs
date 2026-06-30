@@ -147,6 +147,20 @@ const ACTIONS = [
   { title: "Recruitment brief — Technology Lead",          owner: "HF",  due: isoDate(7) },
 ];
 
+// Drive a few actions through the lifecycle so the demo shows the full
+// risk -> fix -> proof story across all three lanes (status: open -> in_progress
+// -> done, transitions are strict and walked in order):
+//   - open + overdue  => RED   (urgent risk; left as created)
+//   - in_progress     => YELLOW (a fix is underway / markable item)
+//   - done            => RESOLVED (proof the system closes the loop)
+const ACTION_LIFECYCLE = {
+  "Q3 Client Review — Meridian Portfolio": "done",
+  "Partnership agreement renewal — TechBridge": "done",
+  "Onboard new corporate client — Apex Holdings": "in_progress",
+  "Recruitment brief — Technology Lead": "in_progress",
+};
+const STATUS_ORDER = ["open", "in_progress", "done"];
+
 // ── seed ─────────────────────────────────────────────────────────────────
 async function seed() {
   console.log(`\n=== Seeding "${ORG.name}" via ${API} ===\n`);
@@ -273,6 +287,34 @@ async function seed() {
     log(`created: ${def.title}${def.owner ? "" : "  (unowned)"}`);
   }
 
+  // 8b. Action lifecycle — populate in_progress (yellow) + done (resolved) lanes.
+  // Idempotent & resumable: re-reads current status and only walks forward, so
+  // a re-run after a mid-way failure is safe. Tolerant of an action that was
+  // already advanced past its target.
+  console.log("[7b/8] Action lifecycle (risk -> fix -> proof lanes)");
+  const actionsForLifecycle = (await api("GET", `${base}/actions`)).items ?? [];
+  const actionByTitleObj = new Map(actionsForLifecycle.map((a) => [a.title, a]));
+  for (const [title, target] of Object.entries(ACTION_LIFECYCLE)) {
+    const action = actionByTitleObj.get(title);
+    if (!action) {
+      log(`skip (not found): ${title}`);
+      continue;
+    }
+    let current = action.status ?? "open";
+    const targetIdx = STATUS_ORDER.indexOf(target);
+    if (STATUS_ORDER.indexOf(current) >= targetIdx) {
+      log(`already ${current}: ${title}`);
+      continue;
+    }
+    // Walk one allowed step at a time: open -> in_progress -> done.
+    for (let i = STATUS_ORDER.indexOf(current) + 1; i <= targetIdx; i++) {
+      const next = STATUS_ORDER[i];
+      await api("PATCH", `${base}/actions/${action.id}/status`, { status: next });
+      current = next;
+    }
+    log(`${title} -> ${target}`);
+  }
+
   // 9. Summary
   const positions = (await api("GET", `${base}/positions`)).items ?? [];
   const people = (await api("GET", `${base}/people`)).items ?? [];
@@ -280,6 +322,8 @@ async function seed() {
     (a) => a.status === "active",
   );
   const actions = (await api("GET", `${base}/actions`)).items ?? [];
+  const lanes = { open: 0, in_progress: 0, done: 0 };
+  for (const a of actions) lanes[a.status] = (lanes[a.status] ?? 0) + 1;
 
   console.log(`
 === MERIDIAN ADVISORY GROUP SEEDED ===
@@ -288,6 +332,7 @@ Positions created: ${positions.length}
 People created: ${people.length}
 Assignments created: ${assignments.length}
 Actions created: ${actions.length}
+Action lanes: ${lanes.open} open (red incl. overdue) / ${lanes.in_progress} in_progress (yellow) / ${lanes.done} done (resolved)
 
 Open TeamFrame to generate the Founder Dependency Report:
 https://mockup-sandbox-nine.vercel.app
