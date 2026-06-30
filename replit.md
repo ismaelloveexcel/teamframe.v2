@@ -1,6 +1,62 @@
 # TeamFrame v2
 
-Multi-tenant HR SaaS: positions, employees, compensation, leave, policies, documents, offboarding, and reports — backed by Postgres RLS for tenant isolation.
+TeamFrame is the **check-engine light for people operations** at founder-led
+teams of 6–25. It tracks positions, people, contracts/documents, onboarding and
+offboarding, surfaces people-ops risk, and produces finance and exit reports —
+backed by Postgres RLS for tenant isolation.
+
+It is delivered as a **managed people-ops readiness system**, not self-serve
+software (see "Business model" below). Technically it is a multi-tenant
+application; commercially it is a high-touch service that an operator sets up and
+runs for each client.
+
+## Business model (fixed)
+
+- High-touch **productised service + software** — sold as a managed people-ops
+  readiness system, **not** a self-serve SaaS.
+- Target: **5 clients**, ~1 day/week per client, operator-led.
+- **72-hour done-for-you setup**: the operator provisions the tenant and loads
+  the team and documents; clients do **not** self-serve sign up.
+- Offer: USD 2,500 setup + USD 2,000/month, 3-month minimum (founding pilot:
+  USD 1,000 setup + USD 1,500/month). See `docs/go-to-market/`.
+
+## Build status
+
+Honest snapshot of what is real in the code vs. direction. Do not let marketing
+copy outrun this list.
+
+**Shipped (wired end-to-end, RLS-isolated `hr_*` model):**
+- Positions, Employees, Compensation, Leave, Policies (versioned + acknowledged),
+  Documents (templates + generated/merged), Offboarding (EOSG/gratuity),
+  Reports (finance + exit, frozen snapshots), Org Chart.
+- Tenant isolation via Postgres RLS (`app.company_id` + `app_user` NOBYPASSRLS),
+  session auth, single-use invite/activation, append-only audit log.
+- Operator demo seed (`scripts/seed-demo-org.mjs`).
+
+**In progress / direction:**
+- The consolidated "risk → fix → proof" dashboard (red/yellow/resolved lanes).
+  Compliance/evidence-requirement signals currently live in the **legacy**
+  `organizations/people/actions` surface, not the shipped `hr_*` product.
+
+**Planned (V1.5, scoped):**
+- One admin **weekly risk digest** of open red/yellow signals (see constraint
+  below). Document-**expiry** tracking on `hr_document` (no expiry field today).
+
+**Deliberately NOT building:**
+- Self-serve signup / Stripe checkout / automated tenant provisioning.
+- Payroll, ATS/recruiting, performance reviews, compensation benchmarking, EOR.
+- AI advisor, integrations marketplace, a configurable reminders/notifications
+  engine, multi-channel/Slack notifications, escalation workflows.
+
+## Anti-drift constraints
+
+- TeamFrame stays **operator-led**: no self-serve tenant signup.
+- TeamFrame is **not** a reminders/notifications platform. V1 may include **one**
+  scoped admin digest for open red/yellow signals, but it must not become a
+  configurable reminders engine.
+- It is **not** a full HRIS and gives **no** legal advice.
+- RLS, RBAC, tenant scoping, Zod validation, stale-write guards, and the CI gate
+  suite are load-bearing — do not weaken them.
 
 ## Run & Operate
 

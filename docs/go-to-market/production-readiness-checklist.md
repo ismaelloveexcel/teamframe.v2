@@ -6,6 +6,27 @@ Do not ask "does it feel ready?" Ask each question and record the result.
 
 ---
 
+## Hard gate — multi-tenant production isolation (blocks 2nd paying client)
+
+> **Do not onboard a second paying client until production RLS verification passes.**
+
+This is a blocking gate, not a friction item. A single shared Postgres instance
+with more than one paying tenant is only safe once the database itself enforces
+isolation on the production connection.
+
+| Requirement | Pass / Fail | Notes |
+|---|---|---|
+| `pnpm --filter @workspace/api-server run verify:rls:prod` returns **PASS** against production | | Runbook: `docs/hr/PROD_RLS_VERIFICATION.md` |
+| Production runtime role is `app_user` (NOBYPASSRLS), **not** a superuser | | The #1 footgun — superuser silently bypasses RLS |
+| Non-isolated tenant-keyed tables reviewed (legacy routes not exposed to clients) | | See inventory printed by the verify script |
+| Verification log captured as launch evidence | | Attach `prod-rls-verification-YYYYMMDD.txt` |
+
+Until every row above is **PASS**, the product is *paid-pilot ready pending
+operator verification of production RLS* — a single founding pilot client is
+fine; a second concurrent paying tenant is **not** cleared.
+
+---
+
 ## Checklist
 
 | Requirement | Pass / Fail | Notes |
