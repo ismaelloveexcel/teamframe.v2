@@ -106,7 +106,7 @@ jobs:
         working-directory: artifacts/api-server
         run: |
           set -e
-          for g in rls runtime-rls appuser-prod audit position employee orgchart \
+          for g in rls runtime-rls dashboard-tenant-scope appuser-prod audit position employee orgchart \
                    compensation leave policy document offboarding report activation \
                    report-render provider historical-integrity migration; do
             echo "::group::gate $g"

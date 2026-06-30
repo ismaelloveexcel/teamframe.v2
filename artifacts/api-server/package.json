@@ -11,6 +11,7 @@
     "test:phase-core": "tsx --test \"src/domain/**/__tests__/*.test.ts\"",
     "rls-gate": "tsx src/__rls_check__/rls-gate.ts",
     "runtime-rls-gate": "tsx src/__rls_check__/runtime-rls-gate.ts",
+    "dashboard-tenant-scope-gate": "tsx src/__rls_check__/dashboard-tenant-scope-gate.ts",
     "appuser-prod-gate": "tsx src/__rls_check__/appuser-prod-gate.ts",
     "verify:rls:prod": "tsx src/__rls_check__/prod-rls-verify.ts",
     "audit-gate": "tsx src/__rls_check__/audit-gate.ts",
