@@ -1,8 +1,19 @@
 # Offer Overview
 
+> **Positioning:** TeamFrame is the **check-engine light for people operations**
+> at founder-led teams of 6–25 — it watches contracts, documents, onboarding and
+> offboarding, flags every risk, and is set up and run for you in 72 hours.
+>
+> For the single managed-service offer and pricing, see
+> [`pricing-and-packages.md`](./pricing-and-packages.md). For landing/marketing
+> copy, see [`landing-page-copy.md`](./landing-page-copy.md).
+
 ## The Offer (Plain English)
 
-> "I run your HR function for you using a structured system — so your roles are documented, your org is clear, and nothing falls through the cracks when you hire."
+> "I watch your people operations for you and tell you what's about to break —
+> contracts, documents, onboarding, offboarding — then run the fixes. Your roles
+> stay documented, your risks stay visible, and nothing falls through the cracks
+> when you hire. Set up and run for you in 72 hours."
 
 ---
 
@@ -50,7 +61,7 @@ The client does not interact with TeamFrame directly as a product. They receive 
 
 ## Who This Is For
 
-**Primary target:** Companies with 20–50 employees that are either:
+**Primary target:** Founder-led teams of **6–25** that are either:
 - Actively hiring (adding 1–3 people per month)
 - Structurally unstable (unclear ownership, undocumented roles, founder handling all HR decisions)
 - Post-funding (seed or Series A in the last 12 months)
